@@ -56,3 +56,42 @@ export interface FileEvent {
   type: "create" | "modify" | "delete";
   path: string;
 }
+
+export interface WsMessage {
+  type: "noteChanged" | "noteCreated" | "noteDeleted" | "reindexed";
+  path?: string;
+}
+
+export interface WikiLink {
+  target: string;
+  display?: string;
+}
+
+export interface ParsedTask {
+  text: string;
+  done: boolean;
+  line: number;
+}
+
+export interface PluginManifest {
+  id: string;
+  name: string;
+  version: string;
+  entry: string;
+  hooks?: string[];
+  commands?: { id: string; name: string }[];
+}
+
+export interface SkillDef {
+  name: string;
+  description: string;
+  input: Record<string, string>;
+  output: string;
+  body: string;
+}
+
+export interface CsvSchema {
+  headers: string[];
+  types: string[];
+  rowCount: number;
+}
