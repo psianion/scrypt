@@ -22,8 +22,7 @@ export function initSchema(db: Database): void {
 
   db.run(`
     CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5(
-      title, content, path,
-      content='notes', content_rowid='id'
+      title, content, path
     )
   `);
 
