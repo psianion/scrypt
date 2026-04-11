@@ -1,0 +1,106 @@
+// src/server/index.ts
+import { join } from "node:path";
+import { createDatabase, initSchema } from "./db";
+import { FileManager } from "./file-manager";
+import { Indexer } from "./indexer";
+import { WebSocketManager } from "./websocket";
+import { Router } from "./router";
+import { notesRoutes } from "./api/notes";
+import { searchRoutes } from "./api/search";
+import { journalRoutes } from "./api/journal";
+import { templateRoutes } from "./api/templates";
+import { taskRoutes } from "./api/tasks";
+import { dataRoutes } from "./api/data";
+import { pluginRoutes } from "./api/plugins";
+import { skillRoutes } from "./api/skills";
+import { fileRoutes } from "./api/files";
+
+export interface AppConfig {
+  vaultPath: string;
+  staticDir?: string;
+}
+
+export function createApp(config: AppConfig) {
+  const scryptPath = join(config.vaultPath, ".scrypt");
+  const dbPath = join(scryptPath, "scrypt.db");
+  const staticDir = config.staticDir || join(config.vaultPath, "dist");
+
+  const db = createDatabase(dbPath);
+  initSchema(db);
+
+  const fm = new FileManager(config.vaultPath, scryptPath);
+  const indexer = new Indexer(db, fm);
+  const ws = new WebSocketManager();
+  const router = new Router();
+
+  // Register API routes
+  notesRoutes(router, fm, indexer);
+  searchRoutes(router, indexer);
+  journalRoutes(router, fm, indexer, config.vaultPath);
+  templateRoutes(router, fm, config.vaultPath);
+  taskRoutes(router, indexer, fm, config.vaultPath);
+  dataRoutes(router, config.vaultPath);
+  pluginRoutes(router, config.vaultPath);
+  skillRoutes(router, config.vaultPath);
+  fileRoutes(router, config.vaultPath);
+
+  // File watcher → reindex → WS broadcast
+  fm.watchFiles(async (event) => {
+    if (event.type === "delete") {
+      await indexer.removeNote(event.path);
+    } else {
+      await indexer.reindexNote(event.path);
+    }
+    const wsType =
+      event.type === "create" ? "noteCreated" :
+      event.type === "delete" ? "noteDeleted" : "noteChanged";
+    ws.broadcast({ type: wsType, path: event.path });
+    ws.broadcast({ type: "reindexed" });
+  });
+
+  // Initial full reindex
+  indexer.fullReindex();
+
+  return {
+    fetch(req: Request, server: any): Response | Promise<Response> {
+      // WebSocket upgrade
+      const url = new URL(req.url);
+      if (url.pathname === "/ws") {
+        const upgraded = server.upgrade(req);
+        if (upgraded) return undefined as any;
+        return new Response("WebSocket upgrade failed", { status: 400 });
+      }
+
+      // API routes
+      const apiResponse = router.handle(req);
+      if (apiResponse) return apiResponse;
+
+      // Static files + SPA fallback
+      if (!url.pathname.startsWith("/api/")) {
+        const filePath = join(staticDir, url.pathname);
+        const file = Bun.file(filePath);
+        if (file.size > 0) return new Response(file);
+        const indexFile = Bun.file(join(staticDir, "index.html"));
+        if (indexFile.size > 0) return new Response(indexFile);
+      }
+
+      return Response.json({ error: "Not Found" }, { status: 404 });
+    },
+    websocket: ws.handlers(),
+    indexer,
+    fm,
+    db,
+  };
+}
+
+// CLI entry point
+if (import.meta.main) {
+  const config = { vaultPath: process.cwd() };
+  const app = createApp(config);
+  const server = Bun.serve({
+    port: 3777,
+    fetch: app.fetch,
+    websocket: app.websocket,
+  });
+  console.log(`Scrypt running on http://localhost:${server.port}`);
+}
