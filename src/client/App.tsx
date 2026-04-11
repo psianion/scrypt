@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { BrowserRouter, Routes, Route } from "react-router";
 import { Sidebar } from "./components/Sidebar";
 import { TabBar } from "./components/TabBar";
@@ -14,10 +15,23 @@ import { TagBrowser } from "./views/TagBrowser";
 import { Settings } from "./views/Settings";
 import { useStore } from "./store";
 
-export function App() {
+export function AppContent() {
   const commandPaletteOpen = useStore((s) => s.commandPaletteOpen);
+  const toggleCommandPalette = useStore((s) => s.toggleCommandPalette);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        toggleCommandPalette();
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, []);
+
   return (
-    <BrowserRouter>
+    <>
       <div className="flex h-screen w-screen overflow-hidden">
         <Sidebar />
         <div className="flex flex-col flex-1 min-w-0">
@@ -42,6 +56,14 @@ export function App() {
         </div>
       </div>
       {commandPaletteOpen && <CommandPalette />}
+    </>
+  );
+}
+
+export function App() {
+  return (
+    <BrowserRouter>
+      <AppContent />
     </BrowserRouter>
   );
 }
