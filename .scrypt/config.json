@@ -1,0 +1,14 @@
+{
+  "vault": {
+    "path": ".",
+    "trashRetentionDays": 30
+  },
+  "editor": {
+    "fontSize": 14,
+    "tabSize": 2,
+    "autoSaveDelay": 2000
+  },
+  "server": {
+    "port": 3777
+  }
+}

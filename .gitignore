@@ -1,0 +1,6 @@
+node_modules/
+dist/
+.scrypt/scrypt.db
+.scrypt/trash/
+*.log
+.DS_Store
