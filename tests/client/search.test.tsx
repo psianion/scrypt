@@ -1,0 +1,27 @@
+// tests/client/search.test.tsx
+import { describe, test, expect } from "bun:test";
+import { render, screen, fireEvent } from "@testing-library/react";
+import { BrowserRouter } from "react-router";
+import { SearchView } from "../../src/client/views/SearchView";
+
+globalThis.fetch = (async (url: string) => {
+  if (url.includes("/api/search?q=test")) {
+    return new Response(JSON.stringify([
+      { path: "notes/result.md", title: "Result Note", snippet: "This is a <b>test</b> match." },
+    ]));
+  }
+  return new Response(JSON.stringify([]));
+}) as any;
+
+describe("SearchView", () => {
+  test("shows search input", () => {
+    render(<BrowserRouter><SearchView /></BrowserRouter>);
+    expect(screen.getByPlaceholderText(/search/i)).toBeDefined();
+  });
+
+  test("typing queries /api/search with debounce", async () => {
+    render(<BrowserRouter><SearchView /></BrowserRouter>);
+    fireEvent.change(screen.getByPlaceholderText(/search/i), { target: { value: "test" } });
+    expect(await screen.findByText("Result Note")).toBeDefined();
+  });
+});
