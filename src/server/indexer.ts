@@ -148,10 +148,10 @@ export class Indexer {
     const rows = this.db
       .query(
         `SELECT n.path, n.title, snippet(notes_fts, 1, '<b>', '</b>', '...', 32) as snippet
-         FROM notes_fts fts
-         JOIN notes n ON n.id = fts.rowid
+         FROM notes_fts
+         JOIN notes n ON n.id = notes_fts.rowid
          WHERE notes_fts MATCH ?
-         ORDER BY rank
+         ORDER BY notes_fts.rank
          LIMIT 50`
       )
       .all(query) as { path: string; title: string; snippet: string }[];
