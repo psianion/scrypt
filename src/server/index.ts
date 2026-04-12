@@ -17,6 +17,7 @@ import { fileRoutes } from "./api/files";
 import { ingestRoutes } from "./api/ingest";
 import { threadRoutes } from "./api/threads";
 import { researchRoutes } from "./api/research";
+import { memoryRoutes } from "./api/memories";
 import { IngestRouter } from "./ingest/router";
 import { ActivityLog } from "./activity";
 import { loadConfig, type ScryptConfig } from "./config";
@@ -75,6 +76,7 @@ export function createApp(config: AppConfig) {
   ingestRoutes(router, ingestRouter);
   threadRoutes(router, fm, config.vaultPath, activity);
   researchRoutes(router, db, ingestRouter);
+  memoryRoutes(router, fm);
 
   // File watcher → reindex → WS broadcast
   fm.watchFiles(async (event) => {
