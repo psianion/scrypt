@@ -1,5 +1,5 @@
 // src/server/ingest/router.ts
-import { join, dirname } from "node:path";
+import { join, dirname, basename } from "node:path";
 import { mkdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import type { Database } from "bun:sqlite";
@@ -9,6 +9,11 @@ import { ActivityLog } from "../activity";
 import { isValidKind, destinationFor, KINDS, type Kind } from "./kinds";
 import { slugify } from "../slugger";
 import { stringifyFrontmatter } from "../parsers";
+import {
+  insertResearchRun,
+  appendRunToThread,
+  extractRunSummary,
+} from "../research";
 
 export interface IngestRequest {
   kind: Kind;
@@ -72,6 +77,11 @@ export class IngestRouter {
     }
 
     const slug = slugify(req.title);
+
+    if (req.kind === "research_run") {
+      return this.ingestResearchRun(req, now, slug);
+    }
+
     const relPath = destinationFor(req.kind, slug, now);
     const absPath = join(this.deps.vaultPath, relPath);
 
@@ -122,6 +132,145 @@ export class IngestRouter {
     const end = content.indexOf("\n---\n", 4);
     if (end === -1) return content;
     return content.slice(end + 5);
+  }
+
+  private async ingestResearchRun(
+    req: IngestRequest,
+    now: Date,
+    slug: string,
+  ): Promise<IngestResult> {
+    const userFm = { ...(req.frontmatter ?? {}) };
+    const threadSlug = (userFm as any).thread;
+    if (!threadSlug || typeof threadSlug !== "string") {
+      throw new IngestError(
+        "research_run requires frontmatter.thread",
+        "bad_request",
+        "thread",
+      );
+    }
+
+    const threadRel = `notes/threads/${threadSlug}.md`;
+    const threadAbs = join(this.deps.vaultPath, threadRel);
+    if (!existsSync(threadAbs)) {
+      throw new IngestError(
+        `unknown thread: ${threadSlug}`,
+        "not_found",
+        "thread",
+      );
+    }
+
+    const relPath = destinationFor("research_run", slug, now);
+    const absPath = join(this.deps.vaultPath, relPath);
+
+    const existed = existsSync(absPath);
+    if (existed && !req.replace) {
+      throw new IngestError(
+        `file already exists: ${relPath}`,
+        "conflict",
+      );
+    }
+
+    delete (userFm as any).created;
+    delete (userFm as any).modified;
+    delete (userFm as any).source;
+
+    const startedAt =
+      typeof (userFm as any).started_at === "string"
+        ? (userFm as any).started_at
+        : now.toISOString();
+    const completedAt =
+      typeof (userFm as any).completed_at === "string"
+        ? (userFm as any).completed_at
+        : now.toISOString();
+    const status =
+      typeof (userFm as any).status === "string"
+        ? ((userFm as any).status as "success" | "partial" | "failed")
+        : "success";
+    const durationMs =
+      typeof (userFm as any).duration_ms === "number"
+        ? (userFm as any).duration_ms
+        : undefined;
+    const model =
+      typeof (userFm as any).model === "string"
+        ? (userFm as any).model
+        : undefined;
+    const tokenUsage = (userFm as any).token_usage ?? {};
+    const tokensIn =
+      typeof tokenUsage?.input === "number" ? tokenUsage.input : undefined;
+    const tokensOut =
+      typeof tokenUsage?.output === "number" ? tokenUsage.output : undefined;
+    const errorMsg =
+      typeof (userFm as any).error === "string"
+        ? (userFm as any).error
+        : undefined;
+
+    const fullFm: Record<string, unknown> = {
+      ...userFm,
+      title: req.title,
+      kind: "research_run",
+      thread: threadSlug,
+      created: now.toISOString(),
+      modified: now.toISOString(),
+      source: "claude",
+    };
+
+    const rawBody = this.stripFrontmatterFromBody(req.content);
+    const linkLine = `Links: [[${threadSlug}]]`;
+    const body = rawBody.includes(linkLine)
+      ? rawBody
+      : `${linkLine}\n\n${rawBody}`;
+
+    await mkdir(dirname(absPath), { recursive: true });
+    const markdown = stringifyFrontmatter(fullFm, body);
+    await Bun.write(absPath, markdown);
+
+    const runId = insertResearchRun(this.deps.db, {
+      thread_slug: threadSlug,
+      note_path: relPath,
+      status,
+      started_at: startedAt,
+      completed_at: completedAt,
+      duration_ms: durationMs,
+      model,
+      tokens_in: tokensIn,
+      tokens_out: tokensOut,
+      error: errorMsg,
+    });
+
+    const runNoteFilename = basename(relPath, ".md");
+    const summaryText = extractRunSummary(rawBody);
+    const threadUpdated = await appendRunToThread({
+      vaultPath: this.deps.vaultPath,
+      threadSlug,
+      runNoteFilename,
+      summaryText,
+      completedAt,
+    });
+
+    this.deps.activity.record({
+      action: existed ? "update" : "create",
+      kind: "research_run",
+      path: relPath,
+      actor: "claude",
+      meta: { bytes: markdown.length, thread: threadSlug },
+    });
+    this.deps.activity.record({
+      action: "update",
+      kind: "thread",
+      path: threadUpdated,
+      actor: "claude",
+      meta: { research_run_id: runId },
+    });
+
+    return {
+      path: relPath,
+      kind: "research_run",
+      created: !existed,
+      side_effects: {
+        thread_updated: threadUpdated,
+        research_run_id: runId,
+      },
+    };
   }
 
   private async ingestJournal(content: string, now: Date): Promise<IngestResult> {

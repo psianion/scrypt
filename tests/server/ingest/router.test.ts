@@ -183,3 +183,119 @@ describe("IngestRouter.ingest — journal kind", () => {
     expect(rows.some((r) => r.action === "append")).toBe(true);
   });
 });
+
+describe("IngestRouter.ingest — research_run side effects", () => {
+  async function seedThread(slug: string) {
+    await ingest.ingest({
+      kind: "thread",
+      title: slug,
+      content: "# Thread body",
+      frontmatter: { status: "open", priority: 1, prompt: "initial" },
+    });
+  }
+
+  test("rejects research_run when frontmatter.thread is missing", async () => {
+    await expect(
+      ingest.ingest({
+        kind: "research_run",
+        title: "orphan run",
+        content: "# findings",
+      }),
+    ).rejects.toThrow(/thread/i);
+  });
+
+  test("rejects research_run when thread slug does not exist", async () => {
+    await expect(
+      ingest.ingest({
+        kind: "research_run",
+        title: "bad thread",
+        content: "# findings",
+        frontmatter: { thread: "no-such-thread" },
+      }),
+    ).rejects.toThrow(/unknown thread/i);
+  });
+
+  test("creates a research_run note and inserts research_runs row", async () => {
+    await seedThread("arm-sve2");
+    const res = await ingest.ingest({
+      kind: "research_run",
+      title: "sve2 survey",
+      content: "## Summary\nFound three articles\n\n## Findings\nDetails",
+      frontmatter: {
+        thread: "arm-sve2",
+        status: "success",
+        started_at: "2026-04-12T03:14:00.000Z",
+        completed_at: "2026-04-12T03:14:48.000Z",
+        duration_ms: 48000,
+        model: "claude-opus-4-6",
+        token_usage: { input: 100, output: 50 },
+      },
+    });
+    expect(res.path).toMatch(/^notes\/research\/\d{4}-\d{2}-\d{2}-\d{4}-sve2-survey\.md$/);
+    expect(res.side_effects?.research_run_id).toBeGreaterThan(0);
+    expect(res.side_effects?.thread_updated).toBe("notes/threads/arm-sve2.md");
+
+    const row = db
+      .query("SELECT * FROM research_runs WHERE id = ?")
+      .get(res.side_effects?.research_run_id) as any;
+    expect(row.thread_slug).toBe("arm-sve2");
+    expect(row.note_path).toBe(res.path);
+    expect(row.status).toBe("success");
+    expect(row.tokens_in).toBe(100);
+  });
+
+  test("updates thread frontmatter — last_run, run_count, modified", async () => {
+    await seedThread("arm-sve2");
+    const before = readFileSync(
+      join(vaultPath, "notes/threads/arm-sve2.md"),
+      "utf-8",
+    );
+    const beforeFm = parseFrontmatter(before).frontmatter;
+    expect(beforeFm.run_count).toBeFalsy();
+
+    await ingest.ingest({
+      kind: "research_run",
+      title: "run one",
+      content: "## Summary\nfirst run",
+      frontmatter: {
+        thread: "arm-sve2",
+        status: "success",
+        started_at: new Date().toISOString(),
+        completed_at: new Date().toISOString(),
+      },
+    });
+
+    const after = readFileSync(
+      join(vaultPath, "notes/threads/arm-sve2.md"),
+      "utf-8",
+    );
+    const afterFm = parseFrontmatter(after).frontmatter;
+    expect(afterFm.run_count).toBe(1);
+    expect(typeof afterFm.last_run).toBe("string");
+  });
+
+  test("appends a ## Runs summary block to the thread", async () => {
+    await seedThread("arm-sve2");
+    const res = await ingest.ingest({
+      kind: "research_run",
+      title: "the first run",
+      content:
+        "## Summary\nThis is the short summary of what was found today.\n\n## Findings\nLong body",
+      frontmatter: {
+        thread: "arm-sve2",
+        status: "success",
+        started_at: new Date().toISOString(),
+        completed_at: new Date().toISOString(),
+      },
+    });
+    const threadRaw = readFileSync(
+      join(vaultPath, "notes/threads/arm-sve2.md"),
+      "utf-8",
+    );
+    expect(threadRaw).toContain("## Runs");
+    expect(threadRaw).toContain("[[");
+    expect(threadRaw).toContain(
+      "This is the short summary of what was found today.",
+    );
+  });
+});
