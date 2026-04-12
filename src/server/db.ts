@@ -88,4 +88,37 @@ export function initSchema(db: Database): void {
       value TEXT
     )
   `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS activity_log (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      timestamp  TEXT    NOT NULL,
+      action     TEXT    NOT NULL,
+      kind       TEXT,
+      path       TEXT    NOT NULL,
+      actor      TEXT    NOT NULL,
+      meta       TEXT
+    )
+  `);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_activity_timestamp ON activity_log(timestamp DESC)`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_activity_actor ON activity_log(actor, timestamp DESC)`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_activity_kind ON activity_log(kind, timestamp DESC)`);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS research_runs (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      thread_slug   TEXT    NOT NULL,
+      note_path     TEXT    NOT NULL,
+      status        TEXT    NOT NULL,
+      started_at    TEXT    NOT NULL,
+      completed_at  TEXT,
+      duration_ms   INTEGER,
+      model         TEXT,
+      tokens_in     INTEGER,
+      tokens_out    INTEGER,
+      error         TEXT
+    )
+  `);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_runs_thread ON research_runs(thread_slug, started_at DESC)`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_runs_status ON research_runs(status, started_at DESC)`);
 }

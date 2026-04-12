@@ -72,3 +72,55 @@ describe("initSchema", () => {
     db.close();
   });
 });
+
+describe("initSchema > new research node tables", () => {
+  test("creates activity_log table with correct columns", () => {
+    const db = createDatabase(":memory:");
+    initSchema(db);
+    const cols = db
+      .query("PRAGMA table_info(activity_log)")
+      .all() as { name: string }[];
+    const names = cols.map((c) => c.name).sort();
+    expect(names).toEqual(
+      ["action", "actor", "id", "kind", "meta", "path", "timestamp"].sort(),
+    );
+  });
+
+  test("creates research_runs table with correct columns", () => {
+    const db = createDatabase(":memory:");
+    initSchema(db);
+    const cols = db
+      .query("PRAGMA table_info(research_runs)")
+      .all() as { name: string }[];
+    const names = cols.map((c) => c.name).sort();
+    expect(names).toEqual(
+      [
+        "completed_at",
+        "duration_ms",
+        "error",
+        "id",
+        "model",
+        "note_path",
+        "started_at",
+        "status",
+        "thread_slug",
+        "tokens_in",
+        "tokens_out",
+      ].sort(),
+    );
+  });
+
+  test("creates indexes on activity_log and research_runs", () => {
+    const db = createDatabase(":memory:");
+    initSchema(db);
+    const idx = db
+      .query("SELECT name FROM sqlite_master WHERE type='index' AND name LIKE 'idx_%'")
+      .all() as { name: string }[];
+    const names = idx.map((i) => i.name);
+    expect(names).toContain("idx_activity_timestamp");
+    expect(names).toContain("idx_activity_actor");
+    expect(names).toContain("idx_activity_kind");
+    expect(names).toContain("idx_runs_thread");
+    expect(names).toContain("idx_runs_status");
+  });
+});
