@@ -14,13 +14,28 @@ import { dataRoutes } from "./api/data";
 import { pluginRoutes } from "./api/plugins";
 import { skillRoutes } from "./api/skills";
 import { fileRoutes } from "./api/files";
+import { loadConfig, type ScryptConfig } from "./config";
+import { checkAuth, unauthorizedResponse } from "./auth";
 
 export interface AppConfig {
   vaultPath: string;
   staticDir?: string;
+  authToken?: string;
+  isProduction?: boolean;
 }
 
 export function createApp(config: AppConfig) {
+  const scryptConfig: ScryptConfig = {
+    vaultPath: config.vaultPath,
+    staticDir: config.staticDir,
+    port: 3777,
+    authToken: config.authToken,
+    isProduction: config.isProduction ?? false,
+    gitAutocommit: false,
+    gitAutocommitInterval: 900,
+    trashRetentionDays: 30,
+    logLevel: "info",
+  };
   const scryptPath = join(config.vaultPath, ".scrypt");
   const dbPath = join(scryptPath, "scrypt.db");
   const staticDir = config.staticDir || join(config.vaultPath, "dist");
@@ -74,6 +89,15 @@ export function createApp(config: AppConfig) {
         return new Response("WebSocket upgrade failed", { status: 400 });
       }
 
+      // Auth gate for /api/*
+      const authResult = checkAuth(req, {
+        isProduction: scryptConfig.isProduction,
+        authToken: scryptConfig.authToken,
+      });
+      if (!authResult.ok) {
+        return unauthorizedResponse();
+      }
+
       // API routes
       const apiResponse = router.handle(req);
       if (apiResponse) return apiResponse;
@@ -104,10 +128,15 @@ export function createApp(config: AppConfig) {
 
 // CLI entry point
 if (import.meta.main) {
-  const config = { vaultPath: process.cwd() };
-  const app = createApp(config);
+  const config = loadConfig({ vaultPath: process.cwd() });
+  const app = createApp({
+    vaultPath: config.vaultPath,
+    staticDir: config.staticDir,
+    authToken: config.authToken,
+    isProduction: config.isProduction,
+  });
   const server = Bun.serve({
-    port: 3777,
+    port: config.port,
     fetch: app.fetch,
     websocket: app.websocket,
   });

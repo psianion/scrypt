@@ -43,5 +43,9 @@ export function createTestEnv() {
       app.db.close();
       rmSync(vaultPath, { recursive: true, force: true });
     },
+    authFetch(path: string, init?: RequestInit) {
+      const headers = new Headers(init?.headers);
+      return fetch(`${baseUrl}${path}`, { ...init, headers });
+    },
   };
 }
