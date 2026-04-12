@@ -2,7 +2,7 @@
 import { watch, type FSWatcher } from "node:fs";
 import { mkdir, rename, readdir } from "node:fs/promises";
 import { join, relative, dirname } from "node:path";
-import { parseFrontmatter, stringifyFrontmatter } from "./parsers";
+import { parseFrontmatter, stringifyFrontmatter, mergeServerTimestamps } from "./parsers";
 import type { Note, NoteMeta, FileEvent } from "../shared/types";
 
 export class FileManager {
@@ -48,12 +48,17 @@ export class FileManager {
     const fullPath = join(this.vaultPath, path);
     await mkdir(dirname(fullPath), { recursive: true });
 
-    const now = new Date().toISOString();
-    const fm = {
-      ...frontmatter,
-      modified: now,
-      created: frontmatter?.created || now,
-    };
+    let existingCreated: string | null = null;
+    const priorRaw = await this.readRaw(path);
+    if (priorRaw !== null) {
+      const { frontmatter: priorFm } = parseFrontmatter(priorRaw);
+      const priorCreated = priorFm.created;
+      if (typeof priorCreated === "string" && priorCreated.length > 0) {
+        existingCreated = priorCreated;
+      }
+    }
+
+    const fm = mergeServerTimestamps(frontmatter ?? {}, { existingCreated });
 
     const raw = stringifyFrontmatter(fm, content);
     await Bun.write(fullPath, raw);

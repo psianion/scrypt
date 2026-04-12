@@ -86,6 +86,55 @@ describe("writeNote", () => {
     });
     expect(existsSync(join(vaultPath, "notes/deep/nested/note.md"))).toBe(true);
   });
+
+  test("preserves created across updates", async () => {
+    await fm.writeNote("notes/keep.md", "Body.", { title: "Keep" });
+    const first = await fm.readNote("notes/keep.md");
+    const originalCreated = first!.created;
+    expect(originalCreated).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+
+    await Bun.sleep(5);
+    await fm.writeNote("notes/keep.md", "Body v2.", { title: "Keep" });
+    const second = await fm.readNote("notes/keep.md");
+    expect(second!.created).toBe(originalCreated);
+  });
+
+  test("ignores client-supplied created on new note", async () => {
+    const before = Date.now();
+    await fm.writeNote("notes/new-ignore.md", "Body.", {
+      title: "Ignore",
+      created: "2020-01-01T00:00:00.000Z",
+    });
+    const note = await fm.readNote("notes/new-ignore.md");
+    expect(note!.created).not.toBe("2020-01-01T00:00:00.000Z");
+    const createdMs = new Date(note!.created).getTime();
+    expect(createdMs).toBeGreaterThanOrEqual(before);
+  });
+
+  test("ignores client-supplied modified", async () => {
+    const before = Date.now();
+    await fm.writeNote("notes/mod.md", "Body.", {
+      title: "Mod",
+      modified: "1999-12-31T00:00:00.000Z",
+    });
+    const note = await fm.readNote("notes/mod.md");
+    expect(note!.modified).not.toBe("1999-12-31T00:00:00.000Z");
+    const modifiedMs = new Date(note!.modified).getTime();
+    expect(modifiedMs).toBeGreaterThanOrEqual(before);
+  });
+
+  test("always bumps modified on update", async () => {
+    await fm.writeNote("notes/bump.md", "Body.", { title: "Bump" });
+    const first = await fm.readNote("notes/bump.md");
+    const firstModified = first!.modified;
+
+    await Bun.sleep(5);
+    await fm.writeNote("notes/bump.md", "Body 2.", { title: "Bump" });
+    const second = await fm.readNote("notes/bump.md");
+    expect(new Date(second!.modified).getTime()).toBeGreaterThan(
+      new Date(firstModified).getTime(),
+    );
+  });
 });
 
 describe("deleteNote", () => {
