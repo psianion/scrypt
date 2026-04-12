@@ -81,6 +81,16 @@ export function threadRoutes(
     const url = new URL(req.url);
     const statusParam = url.searchParams.get("status");
     const statuses = statusParam ? statusParam.split(",") : undefined;
+    if (statuses) {
+      for (const s of statuses) {
+        if (!ALLOWED_STATUSES.has(s)) {
+          return Response.json(
+            { error: `invalid status: ${s}`, field: "status" },
+            { status: 400 },
+          );
+        }
+      }
+    }
     const priority = url.searchParams.get("priority");
     const tag = url.searchParams.get("tag") || undefined;
     const limit = url.searchParams.get("limit");

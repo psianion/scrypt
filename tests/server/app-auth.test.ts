@@ -79,3 +79,24 @@ describe("createApp > auth wiring", () => {
     expect(res.status).not.toBe(401);
   });
 });
+
+describe("createApp > auth wiring > Wave 3 routes require auth in production", () => {
+  const routes: Array<[string, string, RequestInit | undefined]> = [
+    ["POST /api/ingest", "http://example.com/api/ingest", { method: "POST" }],
+    ["GET /api/threads", "http://example.com/api/threads", undefined],
+    ["GET /api/threads/:slug", "http://example.com/api/threads/x", undefined],
+    ["POST /api/research_runs", "http://example.com/api/research_runs", { method: "POST" }],
+    ["GET /api/research_runs", "http://example.com/api/research_runs", undefined],
+    ["GET /api/memories", "http://example.com/api/memories", undefined],
+    ["GET /api/daily_context", "http://example.com/api/daily_context", undefined],
+    ["GET /api/activity", "http://example.com/api/activity", undefined],
+  ];
+
+  for (const [label, url, init] of routes) {
+    test(`${label} returns 401 without Authorization`, async () => {
+      makeApp({ isProduction: true, authToken: "secret" });
+      const res = await callFetch(url, init);
+      expect(res.status).toBe(401);
+    });
+  }
+});

@@ -13,7 +13,37 @@ export function activityRoutes(router: Router, activity: ActivityLog): void {
     const action =
       (url.searchParams.get("action") as ActivityAction) || undefined;
     const limitStr = url.searchParams.get("limit");
-    const limit = Math.min(Number(limitStr) || 100, 1000);
+
+    let limit = 100;
+    if (limitStr !== null) {
+      const n = Number(limitStr);
+      if (!Number.isFinite(n) || !Number.isInteger(n) || n <= 0) {
+        return Response.json(
+          { error: `invalid limit: ${limitStr}`, field: "limit" },
+          { status: 400 },
+        );
+      }
+      limit = Math.min(n, 1000);
+    }
+
+    if (since !== undefined && Number.isNaN(Date.parse(since))) {
+      return Response.json(
+        { error: `invalid since: ${since}`, field: "since" },
+        { status: 400 },
+      );
+    }
+    if (until !== undefined && Number.isNaN(Date.parse(until))) {
+      return Response.json(
+        { error: `invalid until: ${until}`, field: "until" },
+        { status: 400 },
+      );
+    }
+    if (since !== undefined && until !== undefined && since > until) {
+      return Response.json(
+        { error: "since must be <= until", field: "since" },
+        { status: 400 },
+      );
+    }
 
     const rows = activity.query({ since, until, actor, kind, action, limit });
     return Response.json(rows);

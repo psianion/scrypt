@@ -26,7 +26,13 @@ export function researchRoutes(
     } catch (err) {
       if (err instanceof IngestError) {
         const status =
-          err.code === "bad_request" ? 400 : err.code === "conflict" ? 409 : 500;
+          err.code === "bad_request"
+            ? 400
+            : err.code === "conflict"
+              ? 409
+              : err.code === "not_found"
+                ? 404
+                : 500;
         return Response.json(
           { error: err.message, field: err.field },
           { status },

@@ -47,3 +47,50 @@ describe("GET /api/activity", () => {
     expect(data.length).toBe(1);
   });
 });
+
+describe("GET /api/activity param validation", () => {
+  test("rejects limit=-1 with 400", async () => {
+    const res = await fetch(`${env.baseUrl}/api/activity?limit=-1`);
+    expect(res.status).toBe(400);
+    expect((await res.json()).field).toBe("limit");
+  });
+
+  test("rejects limit=0 with 400", async () => {
+    const res = await fetch(`${env.baseUrl}/api/activity?limit=0`);
+    expect(res.status).toBe(400);
+    expect((await res.json()).field).toBe("limit");
+  });
+
+  test("rejects limit=abc with 400", async () => {
+    const res = await fetch(`${env.baseUrl}/api/activity?limit=abc`);
+    expect(res.status).toBe(400);
+    expect((await res.json()).field).toBe("limit");
+  });
+
+  test("clamps limit=99999 to 1000", async () => {
+    const res = await fetch(`${env.baseUrl}/api/activity?limit=99999`);
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.length).toBeLessThanOrEqual(1000);
+  });
+
+  test("rejects since=notadate with 400", async () => {
+    const res = await fetch(`${env.baseUrl}/api/activity?since=notadate`);
+    expect(res.status).toBe(400);
+    expect((await res.json()).field).toBe("since");
+  });
+
+  test("rejects until=2026-13-99 with 400", async () => {
+    const res = await fetch(`${env.baseUrl}/api/activity?until=2026-13-99`);
+    expect(res.status).toBe(400);
+    expect((await res.json()).field).toBe("until");
+  });
+
+  test("rejects since > until with 400", async () => {
+    const res = await fetch(
+      `${env.baseUrl}/api/activity?since=2026-04-12T10:00:00Z&until=2026-04-11T00:00:00Z`,
+    );
+    expect(res.status).toBe(400);
+    expect((await res.json()).field).toBe("since");
+  });
+});

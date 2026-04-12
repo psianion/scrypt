@@ -41,10 +41,15 @@ export function dailyContextRoutes(
       if (!raw) continue;
       const { frontmatter, body } = parseFrontmatter(raw);
 
+      // YAML parser returns Date for timestamp values; coerce to ISO string
+      // so lexical comparisons against `cutoff` don't fall through to NaN.
+      const rawModified = frontmatter.modified ?? n.modified ?? null;
       const modified =
-        (frontmatter.modified as string) ||
-        n.modified ||
-        new Date(0).toISOString();
+        rawModified instanceof Date
+          ? rawModified.toISOString()
+          : typeof rawModified === "string" && rawModified
+            ? new Date(rawModified).toISOString()
+            : new Date(0).toISOString();
 
       if (n.path.startsWith("notes/threads/") && frontmatter.kind === "thread") {
         const status = (frontmatter.status as string) ?? "open";
