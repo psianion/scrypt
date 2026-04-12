@@ -80,9 +80,15 @@ export function createApp(config: AppConfig) {
 
       // Static files + SPA fallback
       if (!url.pathname.startsWith("/api/")) {
-        const filePath = join(staticDir, url.pathname);
-        const file = Bun.file(filePath);
-        if (file.size > 0) return new Response(file);
+        // Only try a static file when the path clearly references one —
+        // bare "/" and route paths without an extension go straight to the
+        // SPA shell. Bun.file() on a directory throws on macOS.
+        const hasExt = /\.[a-zA-Z0-9]+$/.test(url.pathname);
+        if (hasExt) {
+          const filePath = join(staticDir, url.pathname);
+          const file = Bun.file(filePath);
+          if (file.size > 0) return new Response(file);
+        }
         const indexFile = Bun.file(join(staticDir, "index.html"));
         if (indexFile.size > 0) return new Response(indexFile);
       }
