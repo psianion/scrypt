@@ -117,6 +117,57 @@ describe("extractTags", () => {
   });
 });
 
+describe("extractTags > regressions", () => {
+  test("does NOT pick up 3-char hex colors", () => {
+    const tags = extractTags("The color is #fff and #333", {});
+    expect(tags).not.toContain("fff");
+    expect(tags).not.toContain("333");
+  });
+
+  test("does NOT pick up 6-char hex colors", () => {
+    const tags = extractTags("Background: #f3f3f3, accent: #333333.", {});
+    expect(tags).not.toContain("f3f3f3");
+    expect(tags).not.toContain("333333");
+  });
+
+  test("does NOT pick up 8-char hex colors (with alpha)", () => {
+    const tags = extractTags("rgba-style: #ff00ff80", {});
+    expect(tags).not.toContain("ff00ff80");
+  });
+
+  test("does NOT pick up numeric-only #1, #2", () => {
+    const tags = extractTags("Step #1 then #2 then #3.", {});
+    expect(tags).not.toContain("1");
+    expect(tags).not.toContain("2");
+  });
+
+  test("still picks up alpha tags like #project and #3d-printing", () => {
+    const tags = extractTags("#project and #3d-printing are real.", {});
+    expect(tags).toContain("project");
+    expect(tags).toContain("3d-printing");
+  });
+
+  test("skips tags inside fenced code blocks", () => {
+    const content = [
+      "Normal #realtag here.",
+      "```",
+      "#fake_inside_fence",
+      "```",
+      "More #another outside.",
+    ].join("\n");
+    const tags = extractTags(content, {});
+    expect(tags).toContain("realtag");
+    expect(tags).toContain("another");
+    expect(tags).not.toContain("fake_inside_fence");
+  });
+
+  test("skips tags inside inline code spans", () => {
+    const tags = extractTags("Use `#inline_fake` but #outline is real.", {});
+    expect(tags).toContain("outline");
+    expect(tags).not.toContain("inline_fake");
+  });
+});
+
 describe("extractTasks", () => {
   test("extracts unchecked tasks", () => {
     const content = "- [ ] Buy groceries\n- [ ] Read book";

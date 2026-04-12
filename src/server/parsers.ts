@@ -44,31 +44,51 @@ export function extractWikiLinks(content: string): WikiLink[] {
   return links;
 }
 
+const HEX_COLOR = /^[0-9a-f]{3}$|^[0-9a-f]{6}$|^[0-9a-f]{8}$/i;
+const HAS_ALPHA = /[A-Za-z]/;
+
+function extractInlineTagsFromLine(line: string): string[] {
+  const stripped = line.replace(/`[^`]*`/g, "");
+  const out: string[] = [];
+  const re = /(^|[^\w&])#([\w/-]+)/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(stripped)) !== null) {
+    const tag = m[2];
+    if (HEX_COLOR.test(tag)) continue;
+    if (!HAS_ALPHA.test(tag)) continue;
+    out.push(tag);
+  }
+  return out;
+}
+
 export function extractTags(
   content: string,
   frontmatter: Record<string, unknown>
 ): string[] {
-  const tags = new Set<string>();
+  const out = new Set<string>();
 
-  // Frontmatter tags
+  const lines = content.split("\n");
+  let inFence = false;
+  for (const line of lines) {
+    const trimmed = line.trimStart();
+    if (trimmed.startsWith("```") || trimmed.startsWith("~~~")) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) continue;
+    for (const tag of extractInlineTagsFromLine(line)) out.add(tag);
+  }
+
   const fmTags = frontmatter.tags;
   if (Array.isArray(fmTags)) {
-    fmTags.forEach((t) => tags.add(String(t)));
-  }
-
-  // Inline tags: match #word but not in headings or code
-  const lines = content.split("\n");
-  for (const line of lines) {
-    if (line.startsWith("#") && line.match(/^#+\s/)) continue; // heading
-    const cleaned = line.replace(/`[^`]*`/g, ""); // strip inline code
-    const regex = /(?:^|\s)#([\w/]+)/g;
-    let match: RegExpExecArray | null;
-    while ((match = regex.exec(cleaned)) !== null) {
-      tags.add(match[1]);
+    for (const t of fmTags) {
+      if (typeof t === "string" && HAS_ALPHA.test(t)) out.add(t);
     }
+  } else if (typeof fmTags === "string" && HAS_ALPHA.test(fmTags)) {
+    out.add(fmTags);
   }
 
-  return Array.from(tags);
+  return Array.from(out);
 }
 
 export function extractTasks(content: string): ParsedTask[] {
