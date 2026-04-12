@@ -15,6 +15,7 @@ import { pluginRoutes } from "./api/plugins";
 import { skillRoutes } from "./api/skills";
 import { fileRoutes } from "./api/files";
 import { ingestRoutes } from "./api/ingest";
+import { threadRoutes } from "./api/threads";
 import { IngestRouter } from "./ingest/router";
 import { ActivityLog } from "./activity";
 import { loadConfig, type ScryptConfig } from "./config";
@@ -71,6 +72,7 @@ export function createApp(config: AppConfig) {
     activity,
   });
   ingestRoutes(router, ingestRouter);
+  threadRoutes(router, fm, config.vaultPath, activity);
 
   // File watcher → reindex → WS broadcast
   fm.watchFiles(async (event) => {

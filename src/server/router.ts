@@ -38,6 +38,7 @@ export class Router {
   post(path: string, handler: Handler) { this.add("POST", path, handler); }
   put(path: string, handler: Handler) { this.add("PUT", path, handler); }
   delete(path: string, handler: Handler) { this.add("DELETE", path, handler); }
+  patch(path: string, handler: Handler) { this.add("PATCH", path, handler); }
 
   handle(req: Request): Response | Promise<Response> | null {
     const url = new URL(req.url);
