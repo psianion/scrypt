@@ -1,8 +1,10 @@
 // tests/client/graph-view.test.tsx
-import { describe, test, expect } from "bun:test";
-import { render, screen } from "@testing-library/react";
+import { describe, test, expect, afterEach } from "bun:test";
+import { render, screen, cleanup } from "@testing-library/react";
 import { BrowserRouter } from "react-router";
 import { GraphView } from "../../src/client/views/GraphView";
+
+afterEach(() => cleanup());
 
 globalThis.fetch = (async () =>
   new Response(JSON.stringify({

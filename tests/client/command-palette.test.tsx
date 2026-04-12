@@ -1,6 +1,6 @@
 // tests/client/command-palette.test.tsx
-import { describe, test, expect, beforeEach } from "bun:test";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { describe, test, expect, beforeEach, afterEach } from "bun:test";
+import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { CommandPalette } from "../../src/client/components/CommandPalette";
 import { useStore } from "../../src/client/store";
@@ -19,6 +19,8 @@ beforeEach(() => {
     { path: "notes/recent.md", title: "Recent Note", tags: [], created: "", modified: "2026-04-11", aliases: [] },
   ]});
 });
+
+afterEach(() => cleanup());
 
 function renderPalette() {
   return render(

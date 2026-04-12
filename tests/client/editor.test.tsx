@@ -1,6 +1,6 @@
 // tests/client/editor.test.tsx
-import { describe, test, expect, beforeEach } from "bun:test";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { describe, test, expect, beforeEach, afterEach } from "bun:test";
+import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { Editor } from "../../src/client/views/Editor";
 import { useStore } from "../../src/client/store";
@@ -25,6 +25,8 @@ beforeEach(() => {
   lastFetchMethod = "";
   useStore.setState({ currentNote: null });
 });
+
+afterEach(() => cleanup());
 
 function renderEditor() {
   return render(

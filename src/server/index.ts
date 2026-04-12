@@ -58,10 +58,13 @@ export function createApp(config: AppConfig) {
     ws.broadcast({ type: "reindexed" });
   });
 
-  // Initial full reindex
-  indexer.fullReindex();
+  // Initial full reindex — expose the promise so callers (tests) can await
+  // before tearing down the DB, avoiding race between startup indexing and
+  // fixture cleanup.
+  const ready = indexer.fullReindex();
 
   return {
+    ready,
     fetch(req: Request, server: any): Response | Promise<Response> {
       // WebSocket upgrade
       const url = new URL(req.url);

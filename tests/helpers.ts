@@ -33,8 +33,12 @@ export function createTestEnv() {
       // Give file watcher time to pick up the change and reindex
       await Bun.sleep(200);
     },
-    cleanup() {
+    async cleanup() {
       app.fm.stopWatching();
+      // Wait for the startup reindex so no queries run after db.close().
+      try {
+        await app.ready;
+      } catch {}
       server.stop();
       app.db.close();
       rmSync(vaultPath, { recursive: true, force: true });

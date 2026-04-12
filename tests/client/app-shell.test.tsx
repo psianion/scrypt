@@ -1,6 +1,6 @@
 // tests/client/app-shell.test.tsx
-import { describe, test, expect, beforeEach } from "bun:test";
-import { render, screen, fireEvent, within } from "@testing-library/react";
+import { describe, test, expect, beforeEach, afterEach } from "bun:test";
+import { render, screen, fireEvent, within, cleanup } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { AppContent } from "../../src/client/App";
 import { useStore } from "../../src/client/store";
@@ -18,6 +18,10 @@ beforeEach(() => {
     commandPaletteOpen: false,
     sidebarCollapsed: false,
   });
+});
+
+afterEach(() => {
+  cleanup();
 });
 
 describe("App Shell", () => {

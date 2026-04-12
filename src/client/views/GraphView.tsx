@@ -12,10 +12,15 @@ export function GraphView() {
   const setGraph = useStore((s) => s.setGraph);
 
   useEffect(() => {
-    api.graph.full().then(({ nodes, edges }) => {
-      setGraph(nodes, edges);
-      renderGraph(nodes, edges);
-    });
+    api.graph
+      .full()
+      .then((res: any) => {
+        const nodes = res?.nodes ?? [];
+        const edges = res?.edges ?? [];
+        setGraph(nodes, edges);
+        renderGraph(nodes, edges);
+      })
+      .catch(() => {});
   }, []);
 
   function renderGraph(nodes: GraphNode[], edges: GraphEdge[]) {

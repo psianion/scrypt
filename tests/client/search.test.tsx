@@ -1,8 +1,10 @@
 // tests/client/search.test.tsx
-import { describe, test, expect } from "bun:test";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { describe, test, expect, afterEach } from "bun:test";
+import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { BrowserRouter } from "react-router";
 import { SearchView } from "../../src/client/views/SearchView";
+
+afterEach(() => cleanup());
 
 globalThis.fetch = (async (url: string) => {
   if (url.includes("/api/search?q=test")) {
