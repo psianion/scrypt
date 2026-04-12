@@ -14,6 +14,9 @@ import { dataRoutes } from "./api/data";
 import { pluginRoutes } from "./api/plugins";
 import { skillRoutes } from "./api/skills";
 import { fileRoutes } from "./api/files";
+import { ingestRoutes } from "./api/ingest";
+import { IngestRouter } from "./ingest/router";
+import { ActivityLog } from "./activity";
 import { loadConfig, type ScryptConfig } from "./config";
 import { checkAuth, unauthorizedResponse } from "./auth";
 
@@ -58,6 +61,16 @@ export function createApp(config: AppConfig) {
   pluginRoutes(router, config.vaultPath);
   skillRoutes(router, config.vaultPath);
   fileRoutes(router, config.vaultPath);
+
+  const activity = new ActivityLog(db);
+  const ingestRouter = new IngestRouter({
+    vaultPath: config.vaultPath,
+    db,
+    fm,
+    indexer,
+    activity,
+  });
+  ingestRoutes(router, ingestRouter);
 
   // File watcher → reindex → WS broadcast
   fm.watchFiles(async (event) => {
@@ -123,6 +136,8 @@ export function createApp(config: AppConfig) {
     indexer,
     fm,
     db,
+    activity,
+    ingestRouter,
   };
 }
 
