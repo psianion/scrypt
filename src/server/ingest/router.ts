@@ -66,16 +66,14 @@ export class IngestRouter {
     }
 
     const now = new Date();
+
+    if (req.kind === "journal") {
+      return this.ingestJournal(req.content, now);
+    }
+
     const slug = slugify(req.title);
     const relPath = destinationFor(req.kind, slug, now);
     const absPath = join(this.deps.vaultPath, relPath);
-
-    if (req.kind === "journal") {
-      throw new IngestError(
-        "journal kind not yet implemented",
-        "internal",
-      );
-    }
 
     const existed = existsSync(absPath);
     if (existed && !req.replace) {
@@ -124,5 +122,55 @@ export class IngestRouter {
     const end = content.indexOf("\n---\n", 4);
     if (end === -1) return content;
     return content.slice(end + 5);
+  }
+
+  private async ingestJournal(content: string, now: Date): Promise<IngestResult> {
+    const y = now.getUTCFullYear();
+    const m = String(now.getUTCMonth() + 1).padStart(2, "0");
+    const d = String(now.getUTCDate()).padStart(2, "0");
+    const relPath = `journal/${y}-${m}-${d}.md`;
+    const absPath = join(this.deps.vaultPath, relPath);
+    const existed = existsSync(absPath);
+
+    const hh = String(now.getUTCHours()).padStart(2, "0");
+    const mm = String(now.getUTCMinutes()).padStart(2, "0");
+    const entryHeading = `## ${hh}:${mm} UTC`;
+    const body = this.stripFrontmatterFromBody(content).trim();
+
+    let markdown: string;
+    if (existed) {
+      const current = await Bun.file(absPath).text();
+      markdown = current.trimEnd() + `\n\n${entryHeading}\n\n${body}\n`;
+    } else {
+      const fm: Record<string, unknown> = {
+        title: `${y}-${m}-${d}`,
+        kind: "journal",
+        created: now.toISOString(),
+        modified: now.toISOString(),
+        source: "claude",
+        tags: ["journal", "daily"],
+      };
+      markdown = stringifyFrontmatter(
+        fm,
+        `# ${y}-${m}-${d}\n\n${entryHeading}\n\n${body}\n`,
+      );
+    }
+
+    await mkdir(dirname(absPath), { recursive: true });
+    await Bun.write(absPath, markdown);
+
+    this.deps.activity.record({
+      action: existed ? "append" : "create",
+      kind: "journal",
+      path: relPath,
+      actor: "claude",
+      meta: { bytes: markdown.length },
+    });
+
+    return {
+      path: relPath,
+      kind: "journal",
+      created: !existed,
+    };
   }
 }
