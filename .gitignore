@@ -1,17 +1,52 @@
+# Dependencies
 node_modules/
+
+# Build output
 dist/
+*.tsbuildinfo
+coverage/
+
+# Runtime / local state
 .scrypt/scrypt.db
+.scrypt/scrypt.db-shm
+.scrypt/scrypt.db-wal
 .scrypt/trash/
 *.log
-.DS_Store
-test-results
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Test output
+test-results/
+test-screenshots/
+.playwright-mcp/
 *.png
-test-screenshots
-.playwright-mcp
-.superpowers
-.claude
-*.tsbuildinfo
-coverage
-docs
-.github
-.cursor
+
+# Editor / IDE
+.cursor/
+.vscode/
+.idea/
+.fleet/
+.zed/
+*.swp
+*.swo
+*~
+
+# AI assistant state
+.claude/
+.superpowers/
+
+# OS
+.DS_Store
+Thumbs.db
+ehthumbs.db
+
+# Merge / diff artifacts
+*.orig
+*.rej
+
+# Misc project dirs kept local only
+docs/
+.github/
