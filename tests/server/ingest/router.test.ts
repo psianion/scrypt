@@ -1,5 +1,12 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { mkdtempSync, rmSync, existsSync, readFileSync } from "node:fs";
+import {
+  mkdtempSync,
+  rmSync,
+  existsSync,
+  readFileSync,
+  chmodSync,
+  readdirSync,
+} from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createDatabase, initSchema } from "../../../src/server/db";
@@ -149,22 +156,28 @@ describe("IngestRouter.ingest — journal kind", () => {
     expect(raw).toContain("First entry of the day");
   });
 
-  test("appends to existing journal file under a timestamp heading", async () => {
-    await ingest.ingest({
+  test("appends to existing journal file under a timestamp heading and bumps modified", async () => {
+    const res1 = await ingest.ingest({
       kind: "journal",
       title: "unused",
       content: "Morning thought",
     });
+    const raw1 = readFileSync(join(vaultPath, res1.path), "utf-8");
+    const fm1 = parseFrontmatter(raw1).frontmatter;
+    await Bun.sleep(10);
     const res2 = await ingest.ingest({
       kind: "journal",
       title: "unused",
       content: "Afternoon thought",
     });
-    const raw = readFileSync(join(vaultPath, res2.path), "utf-8");
-    expect(raw).toContain("Morning thought");
-    expect(raw).toContain("Afternoon thought");
-    expect(raw).toMatch(/##\s+\d{2}:\d{2}\s+UTC/);
+    const raw2 = readFileSync(join(vaultPath, res2.path), "utf-8");
+    const fm2 = parseFrontmatter(raw2).frontmatter;
+    expect(raw2).toContain("Morning thought");
+    expect(raw2).toContain("Afternoon thought");
+    expect(raw2).toMatch(/##\s+\d{2}:\d{2}\s+UTC/);
     expect(res2.created).toBe(false);
+    expect(String(fm2.modified) > String(fm1.modified)).toBe(true);
+    expect(fm2.created).toBe(fm1.created);
   });
 
   test("emits append activity log row for journal appends", async () => {
@@ -204,7 +217,7 @@ describe("IngestRouter.ingest — research_run side effects", () => {
     ).rejects.toThrow(/thread/i);
   });
 
-  test("rejects research_run when thread slug does not exist", async () => {
+  test("rejects research_run when thread slug does not exist — no orphan file, no DB row", async () => {
     await expect(
       ingest.ingest({
         kind: "research_run",
@@ -213,6 +226,102 @@ describe("IngestRouter.ingest — research_run side effects", () => {
         frontmatter: { thread: "no-such-thread" },
       }),
     ).rejects.toThrow(/unknown thread/i);
+    const researchDir = join(vaultPath, "notes/research");
+    if (existsSync(researchDir)) {
+      expect(readdirSync(researchDir)).toHaveLength(0);
+    }
+    const row = db
+      .query("SELECT count(*) AS c FROM research_runs")
+      .get() as { c: number };
+    expect(row.c).toBe(0);
+  });
+
+  test("cleans up orphan file and DB row when thread update fails", async () => {
+    await seedThread("arm-sve2");
+    const threadAbs = join(vaultPath, "notes/threads/arm-sve2.md");
+    chmodSync(threadAbs, 0o444);
+    try {
+      await expect(
+        ingest.ingest({
+          kind: "research_run",
+          title: "doomed run",
+          content: "## Summary\nthis should roll back",
+          frontmatter: {
+            thread: "arm-sve2",
+            status: "success",
+            started_at: new Date().toISOString(),
+            completed_at: new Date().toISOString(),
+          },
+        }),
+      ).rejects.toThrow();
+    } finally {
+      chmodSync(threadAbs, 0o644);
+    }
+    const researchDir = join(vaultPath, "notes/research");
+    if (existsSync(researchDir)) {
+      expect(readdirSync(researchDir)).toHaveLength(0);
+    }
+    const row = db
+      .query("SELECT count(*) AS c FROM research_runs")
+      .get() as { c: number };
+    expect(row.c).toBe(0);
+  });
+
+  test("emits both research_run and thread activity_log rows", async () => {
+    await seedThread("arm-sve2");
+    const res = await ingest.ingest({
+      kind: "research_run",
+      title: "activity check",
+      content: "## Summary\nhi",
+      frontmatter: {
+        thread: "arm-sve2",
+        status: "success",
+        started_at: new Date().toISOString(),
+        completed_at: new Date().toISOString(),
+      },
+    });
+    const runRows = activity.query({ kind: "research_run" });
+    expect(runRows).toHaveLength(1);
+    expect(runRows[0].action).toBe("create");
+    expect(runRows[0].actor).toBe("claude");
+    expect(runRows[0].path).toBe(res.path);
+
+    const threadRows = activity.query({ kind: "thread" });
+    const threadUpdate = threadRows.find(
+      (r) => r.action === "update" && r.path === "notes/threads/arm-sve2.md",
+    );
+    expect(threadUpdate).toBeDefined();
+    expect(threadUpdate!.actor).toBe("claude");
+  });
+
+  test("research_run bumps thread modified beyond the client's completed_at", async () => {
+    await seedThread("arm-sve2");
+    const before = readFileSync(
+      join(vaultPath, "notes/threads/arm-sve2.md"),
+      "utf-8",
+    );
+    const beforeFm = parseFrontmatter(before).frontmatter;
+    await Bun.sleep(10);
+    const ancientCompletedAt = "1999-01-01T00:00:00.000Z";
+    await ingest.ingest({
+      kind: "research_run",
+      title: "bump mod",
+      content: "## Summary\nx",
+      frontmatter: {
+        thread: "arm-sve2",
+        status: "success",
+        started_at: ancientCompletedAt,
+        completed_at: ancientCompletedAt,
+      },
+    });
+    const after = readFileSync(
+      join(vaultPath, "notes/threads/arm-sve2.md"),
+      "utf-8",
+    );
+    const afterFm = parseFrontmatter(after).frontmatter;
+    expect(String(afterFm.modified) > String(beforeFm.modified)).toBe(true);
+    // Crucially, client-supplied completed_at must not become the new modified.
+    expect(afterFm.modified).not.toBe(ancientCompletedAt);
   });
 
   test("creates a research_run note and inserts research_runs row", async () => {

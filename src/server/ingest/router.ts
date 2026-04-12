@@ -1,14 +1,14 @@
 // src/server/ingest/router.ts
-import { join, dirname, basename } from "node:path";
-import { mkdir } from "node:fs/promises";
+import { join, basename } from "node:path";
 import { existsSync } from "node:fs";
+import { unlink } from "node:fs/promises";
 import type { Database } from "bun:sqlite";
 import type { FileManager } from "../file-manager";
 import type { Indexer } from "../indexer";
 import { ActivityLog } from "../activity";
 import { isValidKind, destinationFor, KINDS, type Kind } from "./kinds";
 import { slugify } from "../slugger";
-import { stringifyFrontmatter } from "../parsers";
+import { parseFrontmatter } from "../parsers";
 import {
   insertResearchRun,
   appendRunToThread,
@@ -102,22 +102,18 @@ export class IngestRouter {
       ...userFm,
       title: req.title,
       kind: req.kind,
-      created: now.toISOString(),
-      modified: now.toISOString(),
       source: "claude",
     };
 
-    await mkdir(dirname(absPath), { recursive: true });
     const body = this.stripFrontmatterFromBody(req.content);
-    const markdown = stringifyFrontmatter(fullFm, body);
-    await Bun.write(absPath, markdown);
+    await this.deps.fm.writeNote(relPath, body, fullFm);
 
     this.deps.activity.record({
       action: existed ? "update" : "create",
       kind: req.kind,
       path: relPath,
       actor: "claude",
-      meta: { bytes: markdown.length },
+      meta: { bytes: body.length },
     });
 
     return {
@@ -149,19 +145,20 @@ export class IngestRouter {
       );
     }
 
+    // Validate thread existence BEFORE any disk write or DB insert.
+    // Otherwise a missing thread leaves an orphan note + research_runs row.
     const threadRel = `notes/threads/${threadSlug}.md`;
-    const threadAbs = join(this.deps.vaultPath, threadRel);
-    if (!existsSync(threadAbs)) {
+    const threadRaw = await this.deps.fm.readRaw(threadRel);
+    if (threadRaw === null) {
       throw new IngestError(
         `unknown thread: ${threadSlug}`,
-        "not_found",
-        "thread",
+        "bad_request",
+        "frontmatter.thread",
       );
     }
 
     const relPath = destinationFor("research_run", slug, now);
     const absPath = join(this.deps.vaultPath, relPath);
-
     const existed = existsSync(absPath);
     if (existed && !req.replace) {
       throw new IngestError(
@@ -209,68 +206,82 @@ export class IngestRouter {
       title: req.title,
       kind: "research_run",
       thread: threadSlug,
-      created: now.toISOString(),
-      modified: now.toISOString(),
       source: "claude",
     };
 
     const rawBody = this.stripFrontmatterFromBody(req.content);
     const linkLine = `Links: [[${threadSlug}]]`;
-    const body = rawBody.includes(linkLine)
-      ? rawBody
-      : `${linkLine}\n\n${rawBody}`;
+    const body = rawBody.includes(linkLine) ? rawBody : `${linkLine}\n\n${rawBody}`;
 
-    await mkdir(dirname(absPath), { recursive: true });
-    const markdown = stringifyFrontmatter(fullFm, body);
-    await Bun.write(absPath, markdown);
+    // Write research note via FileManager so mergeServerTimestamps sets created/modified.
+    await this.deps.fm.writeNote(relPath, body, fullFm);
 
-    const runId = insertResearchRun(this.deps.db, {
-      thread_slug: threadSlug,
-      note_path: relPath,
-      status,
-      started_at: startedAt,
-      completed_at: completedAt,
-      duration_ms: durationMs,
-      model,
-      tokens_in: tokensIn,
-      tokens_out: tokensOut,
-      error: errorMsg,
-    });
+    let runId: number | null = null;
+    try {
+      runId = insertResearchRun(this.deps.db, {
+        thread_slug: threadSlug,
+        note_path: relPath,
+        status,
+        started_at: startedAt,
+        completed_at: completedAt,
+        duration_ms: durationMs,
+        model,
+        tokens_in: tokensIn,
+        tokens_out: tokensOut,
+        error: errorMsg,
+      });
 
-    const runNoteFilename = basename(relPath, ".md");
-    const summaryText = extractRunSummary(rawBody);
-    const threadUpdated = await appendRunToThread({
-      vaultPath: this.deps.vaultPath,
-      threadSlug,
-      runNoteFilename,
-      summaryText,
-      completedAt,
-    });
+      const runNoteFilename = basename(relPath, ".md");
+      const summaryText = extractRunSummary(rawBody);
+      const threadUpdated = await appendRunToThread({
+        fm: this.deps.fm,
+        threadSlug,
+        runNoteFilename,
+        summaryText,
+        completedAt,
+      });
 
-    this.deps.activity.record({
-      action: existed ? "update" : "create",
-      kind: "research_run",
-      path: relPath,
-      actor: "claude",
-      meta: { bytes: markdown.length, thread: threadSlug },
-    });
-    this.deps.activity.record({
-      action: "update",
-      kind: "thread",
-      path: threadUpdated,
-      actor: "claude",
-      meta: { research_run_id: runId },
-    });
+      // research_run paths embed YYYY-MM-DD-HHMM + slug so collisions are
+      // structurally near-impossible; always "create".
+      this.deps.activity.record({
+        action: "create",
+        kind: "research_run",
+        path: relPath,
+        actor: "claude",
+        meta: { bytes: body.length, thread: threadSlug },
+      });
+      this.deps.activity.record({
+        action: "update",
+        kind: "thread",
+        path: threadUpdated,
+        actor: "claude",
+        meta: { research_run_id: runId },
+      });
 
-    return {
-      path: relPath,
-      kind: "research_run",
-      created: !existed,
-      side_effects: {
-        thread_updated: threadUpdated,
-        research_run_id: runId,
-      },
-    };
+      return {
+        path: relPath,
+        kind: "research_run",
+        created: !existed,
+        side_effects: {
+          thread_updated: threadUpdated,
+          research_run_id: runId,
+        },
+      };
+    } catch (err) {
+      // Best-effort cleanup: remove the orphan note and DB row so a failed
+      // thread update doesn't leave stale state behind.
+      try {
+        await unlink(absPath);
+      } catch {}
+      if (runId !== null) {
+        try {
+          this.deps.db
+            .query("DELETE FROM research_runs WHERE id = ?")
+            .run(runId);
+        } catch {}
+      }
+      throw err;
+    }
   }
 
   private async ingestJournal(content: string, now: Date): Promise<IngestResult> {
@@ -278,42 +289,40 @@ export class IngestRouter {
     const m = String(now.getUTCMonth() + 1).padStart(2, "0");
     const d = String(now.getUTCDate()).padStart(2, "0");
     const relPath = `journal/${y}-${m}-${d}.md`;
-    const absPath = join(this.deps.vaultPath, relPath);
-    const existed = existsSync(absPath);
 
     const hh = String(now.getUTCHours()).padStart(2, "0");
     const mm = String(now.getUTCMinutes()).padStart(2, "0");
     const entryHeading = `## ${hh}:${mm} UTC`;
-    const body = this.stripFrontmatterFromBody(content).trim();
+    const entryBody = this.stripFrontmatterFromBody(content).trim();
 
-    let markdown: string;
+    const priorRaw = await this.deps.fm.readRaw(relPath);
+    const existed = priorRaw !== null;
+
+    let newBody: string;
+    let fm: Record<string, unknown>;
     if (existed) {
-      const current = await Bun.file(absPath).text();
-      markdown = current.trimEnd() + `\n\n${entryHeading}\n\n${body}\n`;
+      const parsed = parseFrontmatter(priorRaw!);
+      fm = { ...parsed.frontmatter };
+      newBody =
+        parsed.body.trimEnd() + `\n\n${entryHeading}\n\n${entryBody}\n`;
     } else {
-      const fm: Record<string, unknown> = {
+      fm = {
         title: `${y}-${m}-${d}`,
         kind: "journal",
-        created: now.toISOString(),
-        modified: now.toISOString(),
         source: "claude",
         tags: ["journal", "daily"],
       };
-      markdown = stringifyFrontmatter(
-        fm,
-        `# ${y}-${m}-${d}\n\n${entryHeading}\n\n${body}\n`,
-      );
+      newBody = `# ${y}-${m}-${d}\n\n${entryHeading}\n\n${entryBody}\n`;
     }
 
-    await mkdir(dirname(absPath), { recursive: true });
-    await Bun.write(absPath, markdown);
+    await this.deps.fm.writeNote(relPath, newBody, fm);
 
     this.deps.activity.record({
       action: existed ? "append" : "create",
       kind: "journal",
       path: relPath,
       actor: "claude",
-      meta: { bytes: markdown.length },
+      meta: { bytes: newBody.length },
     });
 
     return {

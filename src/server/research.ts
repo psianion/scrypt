@@ -1,8 +1,7 @@
 // src/server/research.ts
-import { join } from "node:path";
-import { existsSync } from "node:fs";
 import type { Database } from "bun:sqlite";
-import { parseFrontmatter, stringifyFrontmatter } from "./parsers";
+import type { FileManager } from "./file-manager";
+import { parseFrontmatter } from "./parsers";
 
 export interface ResearchRunRow {
   id: number;
@@ -57,19 +56,18 @@ export function insertResearchRun(
 }
 
 export async function appendRunToThread(opts: {
-  vaultPath: string;
+  fm: FileManager;
   threadSlug: string;
   runNoteFilename: string;
   summaryText: string;
   completedAt: string;
 }): Promise<string> {
   const threadPath = `notes/threads/${opts.threadSlug}.md`;
-  const absPath = join(opts.vaultPath, threadPath);
-  if (!existsSync(absPath)) {
+  const raw = await opts.fm.readRaw(threadPath);
+  if (raw === null) {
     throw new Error(`unknown thread: ${opts.threadSlug}`);
   }
 
-  const raw = await Bun.file(absPath).text();
   const { frontmatter, body } = parseFrontmatter(raw);
 
   const runCount =
@@ -78,8 +76,10 @@ export async function appendRunToThread(opts: {
     ...frontmatter,
     last_run: opts.completedAt,
     run_count: runCount + 1,
-    modified: new Date().toISOString(),
   };
+  // Let FileManager.writeNote + mergeServerTimestamps bump `modified` itself,
+  // so a client-supplied completed_at can never become the file's modified.
+  delete (newFm as any).modified;
 
   const stamp = opts.runNoteFilename.slice(0, 15).replace(
     /^(\d{4}-\d{2}-\d{2})-(\d{2})(\d{2})$/,
@@ -96,8 +96,7 @@ export async function appendRunToThread(opts: {
     newBody = `${body.trimEnd()}\n\n## Runs\n\n${summaryBlock}\n`;
   }
 
-  const out = stringifyFrontmatter(newFm, newBody);
-  await Bun.write(absPath, out);
+  await opts.fm.writeNote(threadPath, newBody, newFm);
   return threadPath;
 }
 
