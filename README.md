@@ -11,7 +11,8 @@ Scrypt is the memory layer for how I work. Every project, research thread, inter
 - **A single place to hold the context of every project.** Specs, plans, research notes, decisions, loose ideas — all linked together as markdown. The graph view makes the shape of what you're building visible.
 - **A memory Claude (or any LLM) can read and write.** The REST API gives an agent structured access to the whole vault: pull open threads, fetch linked context, search across everything, drop a research run back. Your notes stop being a dead archive and become live context.
 - **A way to connect projects and ideas that would otherwise live in separate silos.** `[[wiki-links]]` and tags let you pull a thread from one corner of your life into another — a book you read into an app you're building, a 3D printing experiment into an art project.
-- **Scriptable.** Every feature is available over HTTP. Cron jobs, shell scripts, Claude agents, and custom tools all drive the same API.
+- **A shared workspace for parallel Claude sessions.** I run multiple Claude tmux windows continuously — one researching, one writing, one reviewing — all pointed at the same vault. Cron kicks off scheduled sessions while I'm asleep so the API quota I'm paying for is always doing something useful. The graph and backlinks mean those independent sessions still weave into one coherent knowledge base instead of fragmenting into silos.
+- **Scriptable end to end.** Every feature is available over HTTP. Cron jobs, shell scripts, Claude agents, and custom tools all drive the same API.
 
 ## How I run it
 
@@ -19,8 +20,10 @@ It's just a Bun process reading a folder of markdown, so it runs anywhere Bun ru
 
 - **Oracle Cloud Always Free ARM VM** — one tiny Ampere A1 instance hosting the vault
 - **Tailscale** — the only way in; never exposed to the public internet
-- **Termux + Termius on my phone** — SSH into a tmux session to trigger runs, check logs, or open the UI from anywhere
-- **Claude running in that tmux session** — reads from and writes back to the same vault
+- **Termux + Termius on my phone** — SSH into tmux from anywhere to trigger runs, tail logs, or open the UI
+- **Several Claude tmux windows running in parallel** — one per active workstream, each reading and writing back to the same vault
+- **Cron** — overnight and off-hours schedules kick off research sessions, summaries, and retries so the API limits I'm paying for aren't sitting idle
+- **Telegram alerts** — simple notifications when a run finishes or something needs attention
 
 You can do the exact same thing on a Raspberry Pi, a spare laptop, or just localhost. The server has no idea where it's running — it just indexes the folder you point it at.
 
