@@ -40,6 +40,23 @@ describe("readNote", () => {
   });
 });
 
+describe("readRaw", () => {
+  test("returns raw file content including frontmatter", async () => {
+    await Bun.write(
+      join(vaultPath, "notes/raw.md"),
+      "---\ntitle: Raw\n---\n\n# Raw body",
+    );
+    const content = await fm.readRaw("notes/raw.md");
+    expect(content).toContain("---");
+    expect(content).toContain("# Raw body");
+  });
+
+  test("returns null for missing file", async () => {
+    const content = await fm.readRaw("notes/does-not-exist.md");
+    expect(content).toBeNull();
+  });
+});
+
 describe("writeNote", () => {
   test("creates file with frontmatter + content", async () => {
     await fm.writeNote("notes/new.md", "# New\n\nContent.", {

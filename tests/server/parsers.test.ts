@@ -6,6 +6,7 @@ import {
   extractWikiLinks,
   extractTags,
   extractTasks,
+  mergeServerTimestamps,
 } from "../../src/server/parsers";
 
 describe("parseFrontmatter", () => {
@@ -142,5 +143,36 @@ describe("extractTasks", () => {
     expect(tasks).toHaveLength(2);
     expect(tasks[0]).toEqual({ text: "Task one", done: false, line: 5 });
     expect(tasks[1]).toEqual({ text: "Task two", done: true, line: 6 });
+  });
+});
+
+describe("mergeServerTimestamps", () => {
+  test("sets created and modified on a brand new note", () => {
+    const before = Date.now();
+    const out = mergeServerTimestamps({}, { existingCreated: null });
+    const after = Date.now();
+    expect(out.created).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(out.modified).toBe(out.created);
+    expect(new Date(out.created as string).getTime()).toBeGreaterThanOrEqual(before);
+    expect(new Date(out.created as string).getTime()).toBeLessThanOrEqual(after);
+  });
+
+  test("preserves existing created and bumps modified", async () => {
+    const existingCreated = "2026-01-01T00:00:00.000Z";
+    await Bun.sleep(2);
+    const out = mergeServerTimestamps(
+      { title: "X", created: "should-be-ignored" },
+      { existingCreated },
+    );
+    expect(out.created).toBe(existingCreated);
+    expect(out.modified).not.toBe(existingCreated);
+  });
+
+  test("ignores client-set modified", () => {
+    const out = mergeServerTimestamps(
+      { modified: "2020-01-01T00:00:00.000Z" },
+      { existingCreated: null },
+    );
+    expect(out.modified).not.toBe("2020-01-01T00:00:00.000Z");
   });
 });

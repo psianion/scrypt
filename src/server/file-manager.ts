@@ -33,6 +33,13 @@ export class FileManager {
     };
   }
 
+  async readRaw(path: string): Promise<string | null> {
+    const absPath = join(this.vaultPath, path);
+    const file = Bun.file(absPath);
+    if (!(await file.exists())) return null;
+    return await file.text();
+  }
+
   async writeNote(
     path: string,
     content: string,

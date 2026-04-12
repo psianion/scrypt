@@ -86,3 +86,21 @@ export function extractTasks(content: string): ParsedTask[] {
   }
   return tasks;
 }
+
+export interface TimestampContext {
+  existingCreated: string | null;
+}
+
+export function mergeServerTimestamps(
+  frontmatter: Record<string, unknown>,
+  ctx: TimestampContext,
+): Record<string, unknown> {
+  const now = new Date().toISOString();
+  const { created: _clientCreated, modified: _clientModified, ...rest } =
+    frontmatter as Record<string, unknown>;
+  return {
+    ...rest,
+    created: ctx.existingCreated ?? now,
+    modified: now,
+  };
+}
