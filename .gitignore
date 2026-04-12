@@ -23,6 +23,7 @@ test-results/
 test-screenshots/
 .playwright-mcp/
 *.png
+!assets/screenshots/*.png
 
 # Editor / IDE
 .cursor/
