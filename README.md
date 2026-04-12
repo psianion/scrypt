@@ -1,10 +1,28 @@
 # Scrypt
 
-> A markdown knowledge base with a graph view, full-text search, a kanban board, CSV embeds, and a REST API you can automate against.
+> A personal second brain for the AI era. Markdown on disk, SQLite-indexed, with a browser UI and a REST API that humans and LLMs both talk to.
 
-Point it at any folder of `.md` files and you get a browser UI for reading, writing, and navigating them — plus an HTTP API for scripts, cron jobs, and Claude to do the same.
+Scrypt is the memory layer for how I work. Every project, research thread, interest, and half-baked idea lives here as a `.md` file, and Claude reads and writes into the same vault I do. The result is a knowledge base that keeps its own context across sessions instead of starting from scratch every time I open a new chat.
 
 ![Editor with backlinks](assets/screenshots/editor.png)
+
+## What it's for
+
+- **A single place to hold the context of every project.** Specs, plans, research notes, decisions, loose ideas — all linked together as markdown. The graph view makes the shape of what you're building visible.
+- **A memory Claude (or any LLM) can read and write.** The REST API gives an agent structured access to the whole vault: pull open threads, fetch linked context, search across everything, drop a research run back. Your notes stop being a dead archive and become live context.
+- **A way to connect projects and ideas that would otherwise live in separate silos.** `[[wiki-links]]` and tags let you pull a thread from one corner of your life into another — a book you read into an app you're building, a 3D printing experiment into an art project.
+- **Scriptable.** Every feature is available over HTTP. Cron jobs, shell scripts, Claude agents, and custom tools all drive the same API.
+
+## How I run it
+
+It's just a Bun process reading a folder of markdown, so it runs anywhere Bun runs. My setup:
+
+- **Oracle Cloud Always Free ARM VM** — one tiny Ampere A1 instance hosting the vault
+- **Tailscale** — the only way in; never exposed to the public internet
+- **Termux + Termius on my phone** — SSH into a tmux session to trigger runs, check logs, or open the UI from anywhere
+- **Claude running in that tmux session** — reads from and writes back to the same vault
+
+You can do the exact same thing on a Raspberry Pi, a spare laptop, or just localhost. The server has no idea where it's running — it just indexes the folder you point it at.
 
 ## What you get
 
