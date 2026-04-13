@@ -1,5 +1,6 @@
 // src/server/index.ts
 import { join } from "node:path";
+import { mkdirSync } from "node:fs";
 import { createDatabase, initSchema } from "./db";
 import { FileManager } from "./file-manager";
 import { Indexer } from "./indexer";
@@ -54,6 +55,9 @@ export function createApp(config: AppConfig) {
   const scryptPath = join(config.vaultPath, ".scrypt");
   const dbPath = join(scryptPath, "scrypt.db");
   const staticDir = config.staticDir || join(config.vaultPath, "dist");
+
+  mkdirSync(scryptPath, { recursive: true });
+  mkdirSync(join(scryptPath, "trash"), { recursive: true });
 
   const db = createDatabase(dbPath);
   initSchema(db);
@@ -183,7 +187,9 @@ export function createApp(config: AppConfig) {
 
 // CLI entry point
 if (import.meta.main) {
-  const config = loadConfig({ vaultPath: process.cwd() });
+  const vaultPath = process.env.SCRYPT_VAULT_PATH || process.cwd();
+  const staticDir = process.env.SCRYPT_STATIC_DIR;
+  const config = loadConfig({ vaultPath, staticDir });
   const app = createApp({
     vaultPath: config.vaultPath,
     staticDir: config.staticDir,
