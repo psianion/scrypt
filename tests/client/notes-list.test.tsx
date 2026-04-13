@@ -1,9 +1,9 @@
-import { describe, test, expect, afterEach } from "bun:test";
+import { describe, test, expect, afterEach, beforeEach } from "bun:test";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { BrowserRouter } from "react-router";
 import { NotesList } from "../../src/client/views/NotesList";
 
-globalThis.fetch = (async (url: string) => {
+const mockFetch = (async (url: string) => {
   if (url.startsWith("/api/notes")) {
     return new Response(
       JSON.stringify([
@@ -29,7 +29,15 @@ globalThis.fetch = (async (url: string) => {
   return new Response("[]");
 }) as any;
 
-afterEach(() => cleanup());
+let originalFetch: typeof globalThis.fetch;
+beforeEach(() => {
+  originalFetch = globalThis.fetch;
+  globalThis.fetch = mockFetch;
+});
+afterEach(() => {
+  cleanup();
+  globalThis.fetch = originalFetch;
+});
 
 describe("NotesList", () => {
   test("renders all notes with titles", async () => {

@@ -4,12 +4,15 @@ import { MemoryRouter } from "react-router";
 import { AppContent } from "../../src/client/App";
 import { useStore } from "../../src/client/store";
 
-globalThis.fetch = (async () =>
+const mockFetch = (async () =>
   new Response(JSON.stringify([]), {
     headers: { "Content-Type": "application/json" },
   })) as any;
 
+let originalFetch: typeof globalThis.fetch;
 beforeEach(() => {
+  originalFetch = globalThis.fetch;
+  globalThis.fetch = mockFetch;
   useStore.setState({
     notes: [
       {
@@ -51,7 +54,10 @@ beforeEach(() => {
     sidebarCollapsed: false,
   });
 });
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  globalThis.fetch = originalFetch;
+});
 
 describe("Sidebar grouping", () => {
   test("shows collapsible section headers", () => {

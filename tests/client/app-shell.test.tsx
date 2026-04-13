@@ -5,12 +5,17 @@ import { MemoryRouter } from "react-router";
 import { AppContent } from "../../src/client/App";
 import { useStore } from "../../src/client/store";
 
-// Mock fetch to return empty arrays for API calls
-globalThis.fetch = (async () =>
+// Mock fetch to return empty arrays for API calls. Saved/restored per-test so
+// the full-suite run does not leak into unrelated test files.
+const mockFetch = (async () =>
   new Response(JSON.stringify([]), { headers: { "Content-Type": "application/json" } })
 ) as any;
 
+let originalFetch: typeof globalThis.fetch;
+
 beforeEach(() => {
+  originalFetch = globalThis.fetch;
+  globalThis.fetch = mockFetch;
   useStore.setState({
     tabs: [],
     activeTab: null,
@@ -22,6 +27,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  globalThis.fetch = originalFetch;
 });
 
 describe("App Shell", () => {
