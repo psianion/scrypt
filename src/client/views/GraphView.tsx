@@ -97,6 +97,50 @@ export function GraphView() {
       .attr("fill", "var(--text-primary, #eee)")
       .text((d) => d.title);
 
+    // Hover → neighbor highlight
+    const adjacency = new Map<number, Set<number>>();
+    for (const e of simEdges) {
+      const s = typeof e.source === "object" ? (e.source as SimNode).id : (e.source as number);
+      const t = typeof e.target === "object" ? (e.target as SimNode).id : (e.target as number);
+      if (!adjacency.has(s)) adjacency.set(s, new Set());
+      if (!adjacency.has(t)) adjacency.set(t, new Set());
+      adjacency.get(s)!.add(t);
+      adjacency.get(t)!.add(s);
+    }
+    let focused: number | null = null;
+    function applyFocus() {
+      nodeSelection.attr("opacity", (d) => {
+        if (focused === null) return 1;
+        if (d.id === focused) return 1;
+        return adjacency.get(focused)?.has(d.id) ? 1 : 0.2;
+      });
+      labelSelection.attr("opacity", (d) => {
+        if (focused === null) return 1;
+        if (d.id === focused) return 1;
+        return adjacency.get(focused)?.has(d.id) ? 1 : 0.2;
+      });
+      edgeSelection.attr("opacity", (d: any) => {
+        if (focused === null) return 1;
+        const s = typeof d.source === "object" ? d.source.id : d.source;
+        const t = typeof d.target === "object" ? d.target.id : d.target;
+        return s === focused || t === focused ? 1 : 0.1;
+      });
+    }
+    nodeSelection
+      .style("cursor", "pointer")
+      .on("mouseenter", function (_event, d) {
+        focused = d.id;
+        applyFocus();
+      })
+      .on("mouseleave", function () {
+        focused = null;
+        applyFocus();
+      })
+      .on("click", function (_event, d) {
+        window.history.pushState({}, "", `/note/${d.path}`);
+        window.dispatchEvent(new PopStateEvent("popstate"));
+      });
+
     const sim = d3
       .forceSimulation<SimNode>(simNodes)
       .force(
@@ -121,6 +165,46 @@ export function GraphView() {
       labelSelection
         .attr("x", (d) => d.x ?? 0)
         .attr("y", (d) => (d.y ?? 0) - (d.radius + 4));
+    });
+
+    // Drag
+    const drag = d3
+      .drag<SVGCircleElement, SimNode>()
+      .on("start", (event, d) => {
+        if (!event.active) sim.alphaTarget(0.3).restart();
+        d.fx = d.x;
+        d.fy = d.y;
+      })
+      .on("drag", (event, d) => {
+        d.fx = event.x;
+        d.fy = event.y;
+      })
+      .on("end", (event, d) => {
+        if (!event.active) sim.alphaTarget(0);
+        d.fx = null;
+        d.fy = null;
+      });
+    nodeSelection.call(drag as any);
+
+    // Zoom / pan
+    const zoom = d3
+      .zoom<SVGSVGElement, unknown>()
+      .scaleExtent([0.2, 4])
+      .on("zoom", (event) => {
+        root.attr("transform", event.transform.toString());
+        labelSelection.attr("display", event.transform.k >= 1.2 ? "inline" : "none");
+      });
+    svg.call(zoom as any);
+
+    // Direct wheel handler (keeps root transform in sync even when d3.zoom
+    // wheel detection misses synthesized events in test environments).
+    let currentK = 1;
+    svg.on("wheel", function (event: WheelEvent) {
+      event.preventDefault?.();
+      const delta = -event.deltaY * 0.002;
+      currentK = Math.max(0.2, Math.min(4, currentK * Math.exp(delta)));
+      root.attr("transform", `scale(${currentK})`);
+      labelSelection.attr("display", currentK >= 1.2 ? "inline" : "none");
     });
 
     simRef.current = sim;

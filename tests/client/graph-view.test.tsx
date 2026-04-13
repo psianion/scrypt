@@ -62,3 +62,31 @@ describe("GraphView", () => {
     expect(tagLines.length).toBe(1);
   });
 });
+
+describe("GraphView interactions", () => {
+  test("hovering a node fades non-neighbors", async () => {
+    render(
+      <BrowserRouter>
+        <GraphView />
+      </BrowserRouter>,
+    );
+    await new Promise((r) => setTimeout(r, 50));
+    const nodes = document.querySelectorAll("circle[data-testid='graph-node']") as NodeListOf<SVGCircleElement>;
+    expect(nodes.length).toBe(3);
+    fireEvent.mouseEnter(nodes[0]);
+    expect(nodes[0].getAttribute("opacity")).not.toBe("0.2");
+  });
+
+  test("scrolling the SVG updates the root transform (zoom)", async () => {
+    render(
+      <BrowserRouter>
+        <GraphView />
+      </BrowserRouter>,
+    );
+    await new Promise((r) => setTimeout(r, 50));
+    const svg = document.querySelector("svg") as SVGSVGElement;
+    fireEvent.wheel(svg, { deltaY: -100, clientX: 400, clientY: 300 });
+    const rootG = svg.querySelector("g.root") as SVGGElement;
+    expect(rootG.getAttribute("transform")).toMatch(/scale\(/);
+  });
+});
