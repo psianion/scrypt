@@ -21,6 +21,28 @@ export class Indexer {
     private fm: FileManager
   ) {}
 
+  private slugifyTitle(title: string): string {
+    return title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+  }
+
+  private writeLinkIndexRows(path: string, title: string): void {
+    this.db.query("DELETE FROM link_index WHERE path = ?").run(path);
+
+    const basename = path.replace(/^.*\//, "").replace(/\.md$/, "");
+    const pathSlug = path.replace(/\.md$/, "");
+    const titleSlug = title ? this.slugifyTitle(title) : "";
+
+    const insert = this.db.query(
+      "INSERT OR IGNORE INTO link_index (slug, path, title) VALUES (?, ?, ?)",
+    );
+    insert.run(basename, path, title);
+    if (pathSlug !== basename) insert.run(pathSlug, path, title);
+    if (titleSlug && titleSlug !== basename) insert.run(titleSlug, path, title);
+  }
+
   async fullReindex(): Promise<void> {
     const notes = await this.fm.listNotes();
     const indexedPaths = new Set(notes.map((n) => n.path));
@@ -131,6 +153,8 @@ export class Indexer {
     for (const task of tasks) {
       taskStmt.run(noteId, task.text, task.done ? 1 : 0, task.line);
     }
+
+    this.writeLinkIndexRows(note.path, note.title ?? "");
   }
 
   async removeNote(path: string): Promise<void> {
@@ -142,6 +166,7 @@ export class Indexer {
     this.clearNoteRelations(row.id);
     this.db.query("DELETE FROM notes_fts WHERE rowid = ?").run(row.id);
     this.db.query("DELETE FROM notes WHERE id = ?").run(row.id);
+    this.db.query("DELETE FROM link_index WHERE path = ?").run(path);
   }
 
   search(query: string): SearchResult[] {

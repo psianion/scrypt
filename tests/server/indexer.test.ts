@@ -243,3 +243,37 @@ describe("getTasks", () => {
     expect(tasks[0].notePath).toBe("notes/taskn.md");
   });
 });
+
+describe("link_index population", () => {
+  test("each note produces three rows: basename, full path, title slug", async () => {
+    mkdirSync(join(vaultPath, "notes/inbox"), { recursive: true });
+    await writeTestNote(
+      "notes/inbox/foo-bar.md",
+      "---\ntitle: Foo Bar Note\n---\n\nbody",
+    );
+    await indexer.fullReindex();
+
+    const rows = db
+      .query("SELECT slug, path, title FROM link_index ORDER BY slug")
+      .all() as any[];
+    const slugs = rows.map((r) => r.slug);
+    expect(slugs).toContain("foo-bar");
+    expect(slugs).toContain("notes/inbox/foo-bar");
+    expect(slugs).toContain("foo-bar-note");
+    expect(rows.every((r) => r.path === "notes/inbox/foo-bar.md")).toBe(true);
+  });
+
+  test("deleting a note clears its link_index rows", async () => {
+    await writeTestNote("notes/a.md", "---\ntitle: A\n---\nbody");
+    await indexer.fullReindex();
+    expect(
+      (db.query("SELECT COUNT(*) as c FROM link_index").get() as any).c,
+    ).toBeGreaterThan(0);
+
+    await indexer.removeNote("notes/a.md");
+
+    expect(
+      (db.query("SELECT COUNT(*) as c FROM link_index WHERE path = 'notes/a.md'").get() as any).c,
+    ).toBe(0);
+  });
+});
