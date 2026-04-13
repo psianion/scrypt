@@ -90,3 +90,32 @@ describe("GraphView interactions", () => {
     expect(rootG.getAttribute("transform")).toMatch(/scale\(/);
   });
 });
+
+describe("GraphView filter panel", () => {
+  test("unchecking 'tag' hides tag-type edges", async () => {
+    render(
+      <BrowserRouter>
+        <GraphView />
+      </BrowserRouter>,
+    );
+    await new Promise((r) => setTimeout(r, 50));
+    const tagBox = screen.getByLabelText("Tag") as HTMLInputElement;
+    expect(document.querySelectorAll("line[data-edge-type='tag']").length).toBe(1);
+    fireEvent.click(tagBox);
+    expect(document.querySelectorAll("line[data-edge-type='tag'][data-hidden='true']").length).toBe(1);
+  });
+
+  test("'domain' is unchecked by default and domain edges are hidden initially", async () => {
+    render(
+      <BrowserRouter>
+        <GraphView />
+      </BrowserRouter>,
+    );
+    await new Promise((r) => setTimeout(r, 50));
+    const domainBox = screen.getByLabelText("Domain") as HTMLInputElement;
+    expect(domainBox.checked).toBe(false);
+    expect(
+      document.querySelectorAll("line[data-edge-type='domain'][data-hidden='true']").length,
+    ).toBe(1);
+  });
+});

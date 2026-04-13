@@ -39,6 +39,12 @@ export function GraphView() {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const [data, setData] = useState<GraphResponse | null>(null);
   const simRef = useRef<d3.Simulation<SimNode, SimEdge> | null>(null);
+  const [filters, setFilters] = useState({
+    wikilink: true,
+    subdomain: true,
+    domain: false,
+    tag: true,
+  });
 
   useEffect(() => {
     fetch("/api/graph")
@@ -46,6 +52,21 @@ export function GraphView() {
       .then(setData)
       .catch(() => setData({ nodes: [], edges: [] }));
   }, []);
+
+  useEffect(() => {
+    if (!svgRef.current) return;
+    const lines = svgRef.current.querySelectorAll("line[data-edge-type]");
+    lines.forEach((l) => {
+      const type = l.getAttribute("data-edge-type") as keyof typeof filters;
+      if (filters[type]) {
+        l.removeAttribute("data-hidden");
+        (l as unknown as SVGLineElement).style.opacity = "";
+      } else {
+        l.setAttribute("data-hidden", "true");
+        (l as unknown as SVGLineElement).style.opacity = "0";
+      }
+    });
+  }, [filters, data]);
 
   useEffect(() => {
     if (!data || !svgRef.current) return;
@@ -75,9 +96,11 @@ export function GraphView() {
       .data(simEdges)
       .join("line")
       .attr("data-edge-type", (d) => d.type)
+      .attr("data-hidden", (d) => (filters[d.type] ? null : "true"))
       .attr("stroke", (d) => edgeStroke(d.type))
       .attr("stroke-width", (d) => edgeWidth(d.type))
-      .attr("stroke-dasharray", (d) => (d.type === "tag" ? "2 3" : null));
+      .attr("stroke-dasharray", (d) => (d.type === "tag" ? "2 3" : null))
+      .style("opacity", (d) => (filters[d.type] ? "" : "0"));
 
     const nodeSelection = nodesG
       .selectAll("circle")
@@ -216,6 +239,22 @@ export function GraphView() {
   return (
     <div className="h-full w-full relative bg-[var(--bg-primary)]">
       <svg ref={svgRef} className="h-full w-full" />
+      <div className="absolute top-3 right-3 bg-[var(--bg-secondary)] border border-[var(--border)] rounded p-3 text-xs text-[var(--text-primary)] space-y-1">
+        <div className="uppercase text-[var(--text-muted)] mb-1">Edges</div>
+        {(["wikilink", "subdomain", "domain", "tag"] as const).map((k) => (
+          <label key={k} className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={filters[k]}
+              onChange={(e) =>
+                setFilters((f) => ({ ...f, [k]: e.target.checked }))
+              }
+              aria-label={k.charAt(0).toUpperCase() + k.slice(1)}
+            />
+            <span>{k.charAt(0).toUpperCase() + k.slice(1)}</span>
+          </label>
+        ))}
+      </div>
     </div>
   );
 }
