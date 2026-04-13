@@ -24,12 +24,19 @@ import { IngestRouter } from "./ingest/router";
 import { ActivityLog } from "./activity";
 import { loadConfig, type ScryptConfig } from "./config";
 import { checkAuth, unauthorizedResponse } from "./auth";
+import {
+  initRepo,
+  startAutocommitLoop,
+  type AutocommitLoop,
+} from "./git-autocommit";
 
 export interface AppConfig {
   vaultPath: string;
   staticDir?: string;
   authToken?: string;
   isProduction?: boolean;
+  gitAutocommit?: boolean;
+  gitAutocommitInterval?: number;
 }
 
 export function createApp(config: AppConfig) {
@@ -39,8 +46,8 @@ export function createApp(config: AppConfig) {
     port: 3777,
     authToken: config.authToken,
     isProduction: config.isProduction ?? false,
-    gitAutocommit: false,
-    gitAutocommitInterval: 900,
+    gitAutocommit: config.gitAutocommit ?? false,
+    gitAutocommitInterval: config.gitAutocommitInterval ?? 900,
     trashRetentionDays: 30,
     logLevel: "info",
   };
@@ -81,6 +88,26 @@ export function createApp(config: AppConfig) {
   memoryRoutes(router, fm);
   dailyContextRoutes(router, fm, indexer, config.vaultPath);
   activityRoutes(router, activity);
+
+  let autocommit: AutocommitLoop | undefined;
+  if (scryptConfig.gitAutocommit) {
+    initRepo(config.vaultPath).catch((e) =>
+      console.error("[scrypt] git init failed:", e),
+    );
+    autocommit = startAutocommitLoop({
+      vaultPath: config.vaultPath,
+      intervalSeconds: scryptConfig.gitAutocommitInterval,
+      onCommit: (r) => {
+        activity.record({
+          action: "snapshot",
+          kind: null,
+          path: ".",
+          actor: "system",
+          meta: { sha: r.sha, fileCount: r.fileCount },
+        });
+      },
+    });
+  }
 
   // File watcher → reindex → WS broadcast
   fm.watchFiles(async (event) => {
@@ -148,6 +175,9 @@ export function createApp(config: AppConfig) {
     db,
     activity,
     ingestRouter,
+    stop: () => {
+      autocommit?.stop();
+    },
   };
 }
 
@@ -159,6 +189,8 @@ if (import.meta.main) {
     staticDir: config.staticDir,
     authToken: config.authToken,
     isProduction: config.isProduction,
+    gitAutocommit: config.gitAutocommit,
+    gitAutocommitInterval: config.gitAutocommitInterval,
   });
   const server = Bun.serve({
     port: config.port,
