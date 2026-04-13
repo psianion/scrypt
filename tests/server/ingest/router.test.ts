@@ -346,7 +346,7 @@ describe("IngestRouter.ingest — research_run side effects", () => {
 
     const row = db
       .query("SELECT * FROM research_runs WHERE id = ?")
-      .get(res.side_effects?.research_run_id) as any;
+      .get(res.side_effects!.research_run_id as number) as any;
     expect(row.thread_slug).toBe("arm-sve2");
     expect(row.note_path).toBe(res.path);
     expect(row.status).toBe("success");

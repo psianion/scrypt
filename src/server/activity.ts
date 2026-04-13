@@ -47,7 +47,7 @@ export class ActivityLog {
 
   query(q: ActivityQuery): ActivityRow[] {
     const where: string[] = [];
-    const params: unknown[] = [];
+    const params: (string | number)[] = [];
     if (q.since) {
       where.push("timestamp >= ?");
       params.push(q.since);
@@ -75,7 +75,7 @@ export class ActivityLog {
                  ${whereClause}
                  ORDER BY timestamp DESC, id DESC
                  LIMIT ?`;
-    const rows = this.db.query(sql).all(...params, limit) as any[];
+    const rows = this.db.query(sql).all(...params, limit) as unknown as any[];
     return rows.map((r) => ({
       ...r,
       meta: r.meta ? JSON.parse(r.meta) : null,

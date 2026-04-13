@@ -52,7 +52,7 @@ export function researchRoutes(
     const limit = Math.min(Number(limitStr) || 100, 500);
 
     const where: string[] = [];
-    const params: unknown[] = [];
+    const params: (string | number)[] = [];
     if (thread) {
       where.push("thread_slug = ?");
       params.push(thread);

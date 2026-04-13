@@ -277,7 +277,7 @@ export class Indexer {
       JOIN notes n ON n.id = t.note_id
       WHERE 1=1
     `;
-    const params: unknown[] = [];
+    const params: (string | number)[] = [];
 
     if (filters?.board) {
       sql += " AND t.board = ?";

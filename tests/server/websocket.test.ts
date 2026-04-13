@@ -7,7 +7,7 @@ let env: Awaited<ReturnType<typeof createTestEnv>>;
 beforeAll(async () => { env = createTestEnv(); });
 afterAll(() => env.cleanup());
 
-function connectWs(port: number): Promise<WebSocket> {
+function connectWs(port: number | undefined): Promise<WebSocket> {
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(`ws://localhost:${port}/ws`);
     ws.onopen = () => resolve(ws);

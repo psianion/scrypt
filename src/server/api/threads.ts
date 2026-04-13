@@ -71,7 +71,7 @@ export function threadRoutes(
       if (b.priority !== a.priority) return b.priority - a.priority;
       if (!a.last_run && b.last_run) return -1;
       if (a.last_run && !b.last_run) return 1;
-      return (a.last_run ?? "").localeCompare(b.last_run ?? "");
+      return String(a.last_run ?? "").localeCompare(String(b.last_run ?? ""));
     });
     if (filters.limit) return threads.slice(0, filters.limit);
     return threads;
