@@ -237,7 +237,7 @@ export function GraphView() {
   }, [data]);
 
   return (
-    <div className="h-full w-full relative bg-[var(--bg-primary)]">
+    <div data-testid="graph-view" className="h-full w-full relative bg-[var(--bg-primary)]">
       <svg ref={svgRef} className="h-full w-full" />
       <div className="absolute top-3 right-3 bg-[var(--bg-secondary)] border border-[var(--border)] rounded p-3 text-xs text-[var(--text-primary)] space-y-1">
         <div className="uppercase text-[var(--text-muted)] mb-1">Edges</div>
