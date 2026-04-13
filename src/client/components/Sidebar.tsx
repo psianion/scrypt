@@ -4,7 +4,7 @@ import { useStore } from "../store";
 import { api } from "../api";
 
 const NAV_ITEMS = [
-  { label: "Notes", path: "/" },
+  { label: "Notes", path: "/notes" },
   { label: "Journal", path: "/journal" },
   { label: "Tasks", path: "/tasks" },
   { label: "Graph", path: "/graph" },
@@ -33,19 +33,25 @@ export function Sidebar() {
       </div>
 
       <div className="flex flex-col gap-0.5 px-2">
-        {NAV_ITEMS.map((item) => (
-          <button
-            key={item.path}
-            onClick={() => navigate(item.path)}
-            className={`text-left px-2 py-1 text-sm rounded ${
-              location.pathname === item.path
-                ? "bg-[var(--bg-tertiary)] text-[var(--text-primary)]"
-                : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-            }`}
-          >
-            {item.label}
-          </button>
-        ))}
+        {NAV_ITEMS.map((item) => {
+          const isActive =
+            location.pathname === item.path ||
+            (item.path === "/journal" && location.pathname === "/");
+          return (
+            <button
+              key={item.path}
+              onClick={() => navigate(item.path)}
+              aria-current={isActive ? "page" : undefined}
+              className={`text-left px-2 py-1 text-sm rounded ${
+                isActive
+                  ? "bg-[var(--bg-tertiary)] text-[var(--text-primary)]"
+                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              }`}
+            >
+              {item.label}
+            </button>
+          );
+        })}
       </div>
 
       <div className="mt-4 px-3 text-xs text-[var(--text-muted)] uppercase tracking-wide">

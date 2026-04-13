@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { BrowserRouter, Routes, Route } from "react-router";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router";
 import { Sidebar } from "./components/Sidebar";
 import { TabBar } from "./components/TabBar";
 import { StatusBar } from "./components/StatusBar";
@@ -39,7 +39,7 @@ export function AppContent() {
           <main className="flex flex-1 min-h-0">
             <div className="flex-1 min-w-0">
               <Routes>
-                <Route path="/" element={<JournalView />} />
+                <Route path="/" element={<Navigate to="/journal" replace />} />
                 <Route path="/note/*" element={<Editor />} />
                 <Route path="/graph" element={<GraphView />} />
                 <Route path="/journal" element={<JournalView />} />

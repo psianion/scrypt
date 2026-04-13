@@ -1,6 +1,6 @@
 // tests/client/app-shell.test.tsx
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { render, screen, fireEvent, within, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, within, cleanup, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { AppContent } from "../../src/client/App";
 import { useStore } from "../../src/client/store";
@@ -54,5 +54,30 @@ describe("App Shell", () => {
     render(<MemoryRouter initialEntries={["/"]}><AppContent /></MemoryRouter>);
     fireEvent.keyDown(document, { key: "k", metaKey: true });
     expect(useStore.getState().commandPaletteOpen).toBe(true);
+  });
+
+  test("root route / redirects to /journal", async () => {
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <AppContent />
+      </MemoryRouter>,
+    );
+    await waitFor(() => {
+      expect(screen.getByText(/Today/i)).toBeDefined();
+    });
+  });
+
+  test("sidebar highlights Journal when on /", () => {
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <AppContent />
+      </MemoryRouter>,
+    );
+    const sidebar = screen.getByTestId("sidebar");
+    const journalBtn = within(sidebar).getByText("Journal");
+    expect(
+      journalBtn.className.includes("bg-") ||
+        journalBtn.getAttribute("aria-current") === "page",
+    ).toBe(true);
   });
 });
