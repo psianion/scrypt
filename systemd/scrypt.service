@@ -1,0 +1,18 @@
+[Unit]
+Description=Scrypt knowledge server
+Documentation=https://github.com/your-org/scrypt
+After=network.target
+
+[Service]
+Type=simple
+User=scrypt
+WorkingDirectory=/home/scrypt/vault
+EnvironmentFile=/etc/scrypt/scrypt.env
+ExecStart=/home/scrypt/.bun/bin/bun /opt/scrypt/src/server/index.ts
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
