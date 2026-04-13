@@ -121,4 +121,14 @@ export function initSchema(db: Database): void {
   `);
   db.run(`CREATE INDEX IF NOT EXISTS idx_runs_thread ON research_runs(thread_slug, started_at DESC)`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_runs_status ON research_runs(status, started_at DESC)`);
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS link_index (
+      slug TEXT NOT NULL,
+      path TEXT NOT NULL,
+      title TEXT,
+      PRIMARY KEY (slug, path)
+    );
+    CREATE INDEX IF NOT EXISTS link_index_slug_idx ON link_index (slug);
+  `);
 }

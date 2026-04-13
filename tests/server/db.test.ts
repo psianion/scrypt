@@ -71,6 +71,26 @@ describe("initSchema", () => {
     initSchema(db);
     db.close();
   });
+
+  test("creates link_index table with slug/path/title columns and slug index", () => {
+    const db = new Database(":memory:");
+    initSchema(db);
+    const cols = db
+      .query("PRAGMA table_info(link_index)")
+      .all() as any[];
+    const names = cols.map((c) => c.name);
+    expect(names).toContain("slug");
+    expect(names).toContain("path");
+    expect(names).toContain("title");
+
+    const idxs = db
+      .query(
+        "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='link_index'",
+      )
+      .all() as any[];
+    expect(idxs.some((i) => i.name === "link_index_slug_idx")).toBe(true);
+    db.close();
+  });
 });
 
 describe("initSchema > new research node tables", () => {
