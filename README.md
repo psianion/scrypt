@@ -240,6 +240,85 @@ src/
 3. `bun run test` must pass
 4. Open a PR against `main`
 
+## Deploying to Oracle Cloud (ARM Always Free)
+
+Scrypt is designed to run on an Oracle Cloud Ampere A1 Always-Free VM (aarch64, 1GB RAM). It can run in Docker or directly via systemd.
+
+### Prerequisites
+
+- An Ampere A1 VM (Ubuntu 22.04 or similar)
+- A Tailscale-connected network (recommended — keeps the API off the public internet)
+- A secret token you'll generate yourself and pass as `SCRYPT_AUTH_TOKEN`
+
+### Option A: Docker
+
+```bash
+# On the VM
+sudo apt-get update && sudo apt-get install -y docker.io docker-compose-v2 git
+sudo usermod -aG docker $USER
+# Log out / back in for group change
+
+git clone https://github.com/your-org/scrypt.git
+cd scrypt
+cp .env.example .env
+# Edit .env — set SCRYPT_AUTH_TOKEN to a strong random value
+mkdir vault
+docker compose up -d
+
+# Verify
+curl -s -H "Authorization: Bearer $(grep SCRYPT_AUTH_TOKEN .env | cut -d= -f2)" \
+  http://localhost:3777/api/daily_context
+```
+
+### Option B: systemd (lower RAM ceiling)
+
+```bash
+# Install Bun
+curl -fsSL https://bun.sh/install | bash
+
+# Clone and install dependencies
+sudo useradd -m -s /bin/bash scrypt
+sudo mkdir -p /opt/scrypt /etc/scrypt
+sudo chown scrypt:scrypt /opt/scrypt
+sudo -u scrypt git clone https://github.com/your-org/scrypt.git /opt/scrypt
+sudo -u scrypt bash -lc "cd /opt/scrypt && bun install && bun run build"
+
+# Configure
+sudo tee /etc/scrypt/scrypt.env > /dev/null <<EOF
+SCRYPT_AUTH_TOKEN=change-me
+SCRYPT_VAULT_PATH=/home/scrypt/vault
+NODE_ENV=production
+EOF
+sudo mkdir -p /home/scrypt/vault
+sudo chown -R scrypt:scrypt /home/scrypt/vault
+
+# Install and start
+sudo cp /opt/scrypt/systemd/scrypt.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now scrypt
+sudo systemctl status scrypt
+```
+
+### Nightly maintenance cron
+
+Prune trash, vacuum the DB, and rebuild FTS once a day:
+
+```
+0 3 * * * cd /home/scrypt/vault && /home/scrypt/.bun/bin/bun /opt/scrypt/src/server/cli.ts maintenance
+```
+
+### Smoke test from the orchestrator
+
+```bash
+TOKEN=your-token
+HOST=http://scrypt.tailnet:3777
+
+curl -s -H "Authorization: Bearer $TOKEN" "$HOST/api/daily_context" | jq .
+curl -s -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"kind":"thought","title":"Smoke","content":"hello"}' \
+  "$HOST/api/ingest"
+```
+
 ## License
 
 MIT
