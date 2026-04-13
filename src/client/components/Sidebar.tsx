@@ -13,7 +13,11 @@ const NAV_ITEMS = [
   { label: "Tags", path: "/tags" },
 ];
 
-export function Sidebar() {
+interface SidebarProps {
+  onNewNote?: () => void;
+}
+
+export function Sidebar({ onNewNote }: SidebarProps = {}) {
   const navigate = useNavigate();
   const location = useLocation();
   const setNotes = useStore((s) => s.setNotes);
@@ -53,6 +57,15 @@ export function Sidebar() {
           );
         })}
       </div>
+
+      {onNewNote && (
+        <button
+          onClick={onNewNote}
+          className="mx-2 mt-2 px-3 py-1 text-left text-sm text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] rounded"
+        >
+          + New note
+        </button>
+      )}
 
       <div className="flex-1 overflow-y-auto px-2 py-1">
         <FolderTree />

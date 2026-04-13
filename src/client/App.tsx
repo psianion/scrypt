@@ -1,9 +1,10 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router";
 import { Sidebar } from "./components/Sidebar";
 import { TabBar } from "./components/TabBar";
 import { StatusBar } from "./components/StatusBar";
 import { CommandPalette } from "./components/CommandPalette";
+import { NewNoteModal } from "./components/NewNoteModal";
 import { Editor } from "./views/Editor";
 import { GraphView } from "./views/GraphView";
 import { JournalView } from "./views/JournalView";
@@ -19,6 +20,7 @@ import { useStore } from "./store";
 export function AppContent() {
   const commandPaletteOpen = useStore((s) => s.commandPaletteOpen);
   const toggleCommandPalette = useStore((s) => s.toggleCommandPalette);
+  const [newNoteOpen, setNewNoteOpen] = useState(false);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -31,10 +33,21 @@ export function AppContent() {
     return () => document.removeEventListener("keydown", handler);
   }, []);
 
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "n") {
+        e.preventDefault();
+        setNewNoteOpen(true);
+      }
+    };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, []);
+
   return (
     <>
       <div className="flex h-screen w-screen overflow-hidden">
-        <Sidebar />
+        <Sidebar onNewNote={() => setNewNoteOpen(true)} />
         <div className="flex flex-col flex-1 min-w-0">
           <TabBar />
           <main className="flex flex-1 min-h-0">
@@ -58,6 +71,7 @@ export function AppContent() {
         </div>
       </div>
       {commandPaletteOpen && <CommandPalette />}
+      <NewNoteModal open={newNoteOpen} onClose={() => setNewNoteOpen(false)} />
     </>
   );
 }
