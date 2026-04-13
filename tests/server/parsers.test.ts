@@ -2,12 +2,14 @@
 import { describe, test, expect } from "bun:test";
 import {
   parseFrontmatter,
+  parseTag,
   stringifyFrontmatter,
   extractWikiLinks,
   extractTags,
   extractTasks,
   mergeServerTimestamps,
 } from "../../src/server/parsers";
+import { RESERVED_NAMESPACES } from "../../src/shared/types";
 
 describe("parseFrontmatter", () => {
   test("extracts YAML frontmatter and body", () => {
@@ -225,5 +227,95 @@ describe("mergeServerTimestamps", () => {
       { existingCreated: null },
     );
     expect(out.modified).not.toBe("2020-01-01T00:00:00.000Z");
+  });
+});
+
+describe("parseTag", () => {
+  test("flat tag has null namespace", () => {
+    expect(parseTag("architecture")).toEqual({
+      namespace: null,
+      value: "architecture",
+      raw: "architecture",
+    });
+  });
+
+  test("namespaced tag splits on first colon", () => {
+    expect(parseTag("type:research")).toEqual({
+      namespace: "type",
+      value: "research",
+      raw: "type:research",
+    });
+  });
+
+  test("value portion is slugified", () => {
+    expect(parseTag("project:LongRest 2.0")).toEqual({
+      namespace: "project",
+      value: "longrest-2-0",
+      raw: "project:LongRest 2.0",
+    });
+  });
+
+  test("value with internal colons keeps them", () => {
+    expect(parseTag("url:https://example.com")).toEqual({
+      namespace: "url",
+      value: "https-example-com",
+      raw: "url:https://example.com",
+    });
+  });
+});
+
+describe("parseFrontmatter — domain/subdomain/tags", () => {
+  test("reads domain and subdomain fields", () => {
+    const raw = `---
+title: Foo
+domain: dnd
+subdomain: research
+---
+
+body`;
+    const result = parseFrontmatter(raw);
+    expect(result.meta.domain).toBe("dnd");
+    expect(result.meta.subdomain).toBe("research");
+  });
+
+  test("splits identifierTags from topicTags", () => {
+    const raw = `---
+title: Foo
+tags:
+  - type:research
+  - project:longrest
+  - architecture
+  - landing-page
+---
+
+body`;
+    const result = parseFrontmatter(raw);
+    expect(result.meta.identifierTags.map((t) => t.raw)).toEqual([
+      "type:research",
+      "project:longrest",
+    ]);
+    expect(result.meta.topicTags).toEqual(["architecture", "landing-page"]);
+  });
+
+  test("missing domain/subdomain are null, not undefined", () => {
+    const raw = `---
+title: Foo
+---
+
+body`;
+    const result = parseFrontmatter(raw);
+    expect(result.meta.domain).toBeNull();
+    expect(result.meta.subdomain).toBeNull();
+  });
+
+  test("legacy tags array still populated with raw strings", () => {
+    const raw = `---
+title: Foo
+tags: ["type:research", "architecture"]
+---
+
+body`;
+    const result = parseFrontmatter(raw);
+    expect(result.meta.tags).toEqual(["type:research", "architecture"]);
   });
 });

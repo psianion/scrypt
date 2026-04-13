@@ -1,5 +1,19 @@
 // src/shared/types.ts
 
+export interface Tag {
+  namespace: string | null;
+  value: string;
+  raw: string;
+}
+
+export const RESERVED_NAMESPACES = new Set([
+  "type",
+  "project",
+  "stage",
+  "status",
+  "owner",
+]);
+
 export interface NoteMeta {
   path: string;
   title: string;
@@ -7,6 +21,10 @@ export interface NoteMeta {
   created: string;
   modified: string;
   aliases: string[];
+  domain: string | null;
+  subdomain: string | null;
+  identifierTags: Tag[];
+  topicTags: string[];
 }
 
 export interface Note extends NoteMeta {

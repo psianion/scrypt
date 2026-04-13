@@ -1,16 +1,82 @@
 // src/server/parsers.ts
 import matter from "gray-matter";
-import type { WikiLink, ParsedTask } from "../shared/types";
+import type { WikiLink, ParsedTask, Tag } from "../shared/types";
+
+function slugifyValue(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+export function parseTag(raw: string): Tag {
+  const colonIdx = raw.indexOf(":");
+  if (colonIdx === -1) {
+    return { namespace: null, value: raw, raw };
+  }
+  const namespace = raw.slice(0, colonIdx);
+  const value = slugifyValue(raw.slice(colonIdx + 1));
+  return { namespace, value, raw };
+}
+
+export interface ParsedFrontmatterMeta {
+  tags: string[];
+  domain: string | null;
+  subdomain: string | null;
+  identifierTags: Tag[];
+  topicTags: string[];
+}
 
 export function parseFrontmatter(content: string): {
   frontmatter: Record<string, unknown>;
   body: string;
+  meta: ParsedFrontmatterMeta;
 } {
   if (!content || !content.startsWith("---")) {
-    return { frontmatter: {}, body: content };
+    return {
+      frontmatter: {},
+      body: content,
+      meta: {
+        tags: [],
+        domain: null,
+        subdomain: null,
+        identifierTags: [],
+        topicTags: [],
+      },
+    };
   }
   const { data, content: body } = matter(content);
-  return { frontmatter: data, body };
+  const frontmatter = data;
+
+  const rawTags: string[] = Array.isArray(frontmatter.tags)
+    ? frontmatter.tags.map(String)
+    : [];
+  const parsedTags = rawTags.map(parseTag);
+  const identifierTags = parsedTags.filter((t) => t.namespace !== null);
+  const topicTags = parsedTags
+    .filter((t) => t.namespace === null)
+    .map((t) => t.value);
+
+  const domain =
+    typeof frontmatter.domain === "string" && frontmatter.domain.trim()
+      ? frontmatter.domain.trim()
+      : null;
+  const subdomain =
+    typeof frontmatter.subdomain === "string" && frontmatter.subdomain.trim()
+      ? frontmatter.subdomain.trim()
+      : null;
+
+  return {
+    frontmatter,
+    body,
+    meta: {
+      tags: rawTags,
+      domain,
+      subdomain,
+      identifierTags,
+      topicTags,
+    },
+  };
 }
 
 export function stringifyFrontmatter(

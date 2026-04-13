@@ -19,15 +19,19 @@ export class FileManager {
     if (!(await file.exists())) return null;
 
     const raw = await file.text();
-    const { frontmatter, body } = parseFrontmatter(raw);
+    const { frontmatter, body, meta } = parseFrontmatter(raw);
 
     return {
       path,
       title: String(frontmatter.title || path.split("/").pop()?.replace(".md", "") || ""),
-      tags: Array.isArray(frontmatter.tags) ? frontmatter.tags.map(String) : [],
+      tags: meta.tags,
       created: String(frontmatter.created || ""),
       modified: String(frontmatter.modified || ""),
       aliases: Array.isArray(frontmatter.aliases) ? frontmatter.aliases.map(String) : [],
+      domain: meta.domain,
+      subdomain: meta.subdomain,
+      identifierTags: meta.identifierTags,
+      topicTags: meta.topicTags,
       content: body,
       frontmatter,
     };
