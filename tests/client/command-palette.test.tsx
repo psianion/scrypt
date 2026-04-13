@@ -17,7 +17,7 @@ beforeEach(() => { globalThis.fetch = __mockFetch; });
 
 beforeEach(() => {
   useStore.setState({ commandPaletteOpen: true, notes: [
-    { path: "notes/recent.md", title: "Recent Note", tags: [], created: "", modified: "2026-04-11", aliases: [] },
+    { path: "notes/recent.md", title: "Recent Note", tags: [], created: "", modified: "2026-04-11", aliases: [], domain: null, subdomain: null, identifierTags: [], topicTags: [] },
   ]});
 });
 

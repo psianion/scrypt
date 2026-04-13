@@ -20,6 +20,7 @@ describe("BacklinksPanel", () => {
       currentNote: {
         path: "notes/current.md", title: "Current", content: "", tags: [],
         created: "", modified: "", aliases: [], frontmatter: {},
+        domain: null, subdomain: null, identifierTags: [], topicTags: [],
       },
     });
     render(<BrowserRouter><BacklinksPanel /></BrowserRouter>);
@@ -31,6 +32,7 @@ describe("BacklinksPanel", () => {
       currentNote: {
         path: "notes/x.md", title: "X", content: "", tags: [],
         created: "", modified: "", aliases: [], frontmatter: {},
+        domain: null, subdomain: null, identifierTags: [], topicTags: [],
       },
     });
     render(<BrowserRouter><BacklinksPanel /></BrowserRouter>);
@@ -43,6 +45,7 @@ describe("BacklinksPanel", () => {
       currentNote: {
         path: "notes/lonely.md", title: "Lonely", content: "", tags: [],
         created: "", modified: "", aliases: [], frontmatter: {},
+        domain: null, subdomain: null, identifierTags: [], topicTags: [],
       },
     });
     render(<BrowserRouter><BacklinksPanel /></BrowserRouter>);

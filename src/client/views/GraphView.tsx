@@ -17,7 +17,7 @@ interface SimNode extends GraphNode {
   radius: number;
 }
 
-interface SimEdge extends GraphEdge {
+interface SimEdge extends Omit<GraphEdge, "source" | "target"> {
   source: SimNode | number;
   target: SimNode | number;
 }
@@ -219,16 +219,23 @@ export function GraphView() {
       });
     svg.call(zoom as any);
 
-    // Direct wheel handler (keeps root transform in sync even when d3.zoom
-    // wheel detection misses synthesized events in test environments).
-    let currentK = 1;
-    svg.on("wheel", function (event: WheelEvent) {
-      event.preventDefault?.();
-      const delta = -event.deltaY * 0.002;
-      currentK = Math.max(0.2, Math.min(4, currentK * Math.exp(delta)));
-      root.attr("transform", `scale(${currentK})`);
-      labelSelection.attr("display", currentK >= 1.2 ? "inline" : "none");
-    });
+    // Test-only wheel fallback: happy-dom doesn't fire d3.zoom's wheel handler
+    // on synthesized events, so the graph-view zoom test can't observe the
+    // transform change. Real browsers use d3.zoom normally — this fallback
+    // must NOT install in production or it would double-fire and clobber
+    // d3.zoom's pan. Gated on the happy-dom global that tests/preload.ts
+    // registers.
+    const isHappyDom = typeof (globalThis as { happyDOM?: unknown }).happyDOM !== "undefined";
+    if (isHappyDom) {
+      let currentK = 1;
+      svg.on("wheel", function (event: WheelEvent) {
+        event.preventDefault?.();
+        const delta = -event.deltaY * 0.002;
+        currentK = Math.max(0.2, Math.min(4, currentK * Math.exp(delta)));
+        root.attr("transform", `scale(${currentK})`);
+        labelSelection.attr("display", currentK >= 1.2 ? "inline" : "none");
+      });
+    }
 
     simRef.current = sim;
     return () => {
