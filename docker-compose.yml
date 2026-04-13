@@ -1,0 +1,15 @@
+services:
+  scrypt:
+    build: .
+    container_name: scrypt
+    restart: unless-stopped
+    ports:
+      - "3777:3777"
+    environment:
+      - SCRYPT_AUTH_TOKEN=${SCRYPT_AUTH_TOKEN}
+      - SCRYPT_VAULT_PATH=/vault
+      - SCRYPT_GIT_AUTOCOMMIT=${SCRYPT_GIT_AUTOCOMMIT:-0}
+      - NODE_ENV=production
+    volumes:
+      - ./vault:/vault
+    working_dir: /vault
