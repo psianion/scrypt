@@ -131,4 +131,16 @@ export function initSchema(db: Database): void {
     );
     CREATE INDEX IF NOT EXISTS link_index_slug_idx ON link_index (slug);
   `);
+
+  // Additive migration: notes.domain / subdomain / tags were introduced in
+  // Wave 7 for the domain-aware graph. Older DBs may not have them, so add
+  // each column only when PRAGMA table_info confirms it's missing.
+  const noteCols = db
+    .query("PRAGMA table_info(notes)")
+    .all() as { name: string }[];
+  const have = new Set(noteCols.map((c) => c.name));
+  if (!have.has("domain")) db.run("ALTER TABLE notes ADD COLUMN domain TEXT");
+  if (!have.has("subdomain"))
+    db.run("ALTER TABLE notes ADD COLUMN subdomain TEXT");
+  if (!have.has("tags")) db.run("ALTER TABLE notes ADD COLUMN tags TEXT");
 }

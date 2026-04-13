@@ -83,21 +83,40 @@ export class Indexer {
 
     if (existing && existing.content_hash === contentHash) return;
 
+    const tagsJson = JSON.stringify(note.tags ?? []);
     let noteId: number;
     if (existing) {
       this.db
         .query(
-          "UPDATE notes SET title = ?, content_hash = ?, created = ?, modified = ? WHERE id = ?"
+          "UPDATE notes SET title = ?, content_hash = ?, created = ?, modified = ?, domain = ?, subdomain = ?, tags = ? WHERE id = ?"
         )
-        .run(note.title, contentHash, note.created, note.modified, existing.id);
+        .run(
+          note.title,
+          contentHash,
+          note.created,
+          note.modified,
+          note.domain,
+          note.subdomain,
+          tagsJson,
+          existing.id,
+        );
       noteId = existing.id;
       this.clearNoteRelations(noteId);
     } else {
       this.db
         .query(
-          "INSERT INTO notes (path, title, content_hash, created, modified) VALUES (?, ?, ?, ?, ?)"
+          "INSERT INTO notes (path, title, content_hash, created, modified, domain, subdomain, tags) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
         )
-        .run(path, note.title, contentHash, note.created, note.modified);
+        .run(
+          path,
+          note.title,
+          contentHash,
+          note.created,
+          note.modified,
+          note.domain,
+          note.subdomain,
+          tagsJson,
+        );
       noteId = Number(
         (this.db.query("SELECT last_insert_rowid() as id").get() as any).id
       );

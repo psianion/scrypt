@@ -21,6 +21,7 @@ import { researchRoutes } from "./api/research";
 import { memoryRoutes } from "./api/memories";
 import { dailyContextRoutes } from "./api/daily-context";
 import { activityRoutes } from "./api/activity";
+import { graphRoutes } from "./api/graph";
 import { IngestRouter } from "./ingest/router";
 import { ActivityLog } from "./activity";
 import { loadConfig, type ScryptConfig } from "./config";
@@ -92,6 +93,7 @@ export function createApp(config: AppConfig) {
   memoryRoutes(router, fm);
   dailyContextRoutes(router, fm, indexer, config.vaultPath);
   activityRoutes(router, activity);
+  graphRoutes(router, db);
 
   let autocommit: AutocommitLoop | undefined;
   if (scryptConfig.gitAutocommit) {

@@ -21,10 +21,7 @@ export function searchRoutes(router: Router, indexer: Indexer): void {
     return Response.json(filtered);
   });
 
-  router.get("/api/graph", () => {
-    return Response.json(indexer.getGraph());
-  });
-
+  // /api/graph (root) is now owned by graphRoutes — Wave 7 domain-aware shape.
   router.get("/api/graph/*path", (req, params) => {
     const url = new URL(req.url);
     const depth = parseInt(url.searchParams.get("depth") || "2", 10);
