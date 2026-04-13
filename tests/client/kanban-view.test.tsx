@@ -1,9 +1,9 @@
-import { describe, test, expect, afterEach } from "bun:test";
+import { describe, test, expect, afterEach, beforeEach } from "bun:test";
 import { render, screen, cleanup } from "@testing-library/react";
 import { BrowserRouter } from "react-router";
 import { KanbanView } from "../../src/client/views/KanbanView";
 
-globalThis.fetch = (async () =>
+const __mockFetch = (async () =>
   new Response(
     JSON.stringify([
       {
@@ -41,6 +41,7 @@ globalThis.fetch = (async () =>
       },
     ]),
   )) as any;
+beforeEach(() => { globalThis.fetch = __mockFetch; });
 
 afterEach(() => cleanup());
 

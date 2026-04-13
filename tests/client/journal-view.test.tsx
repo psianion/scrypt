@@ -1,10 +1,10 @@
 // tests/client/journal-view.test.tsx
-import { describe, test, expect, afterEach } from "bun:test";
+import { describe, test, expect, afterEach, beforeEach } from "bun:test";
 import { render, screen, cleanup } from "@testing-library/react";
 import { BrowserRouter } from "react-router";
 import { JournalView } from "../../src/client/views/JournalView";
 
-globalThis.fetch = (async (url: string) => {
+const __mockFetch = (async (url: string) => {
   if (url.includes("/api/journal/today")) {
     return new Response(JSON.stringify({
       path: "journal/2026-04-12.md", title: "2026-04-12", content: "# Today\n\nNotes.",
@@ -13,6 +13,7 @@ globalThis.fetch = (async (url: string) => {
   }
   return new Response(JSON.stringify({}));
 }) as any;
+beforeEach(() => { globalThis.fetch = __mockFetch; });
 
 afterEach(cleanup);
 

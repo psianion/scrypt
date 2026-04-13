@@ -1,14 +1,15 @@
-import { describe, test, expect, afterEach } from "bun:test";
+import { describe, test, expect, afterEach, beforeEach } from "bun:test";
 import { render, screen, cleanup } from "@testing-library/react";
 import { CsvEmbed } from "../../src/client/views/CsvEmbed";
 
-globalThis.fetch = (async () =>
+const __mockFetch = (async () =>
   new Response(
     JSON.stringify([
       { title: "Dune", author: "Herbert" },
       { title: "1984", author: "Orwell" },
     ]),
   )) as any;
+beforeEach(() => { globalThis.fetch = __mockFetch; });
 
 afterEach(() => cleanup());
 

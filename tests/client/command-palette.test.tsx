@@ -5,7 +5,7 @@ import { MemoryRouter } from "react-router";
 import { CommandPalette } from "../../src/client/components/CommandPalette";
 import { useStore } from "../../src/client/store";
 
-globalThis.fetch = (async (url: string) => {
+const __mockFetch = (async (url: string) => {
   if (url.includes("/api/search")) {
     return new Response(JSON.stringify([
       { path: "notes/test.md", title: "Test Note", snippet: "A test" },
@@ -13,6 +13,7 @@ globalThis.fetch = (async (url: string) => {
   }
   return new Response(JSON.stringify([]));
 }) as any;
+beforeEach(() => { globalThis.fetch = __mockFetch; });
 
 beforeEach(() => {
   useStore.setState({ commandPaletteOpen: true, notes: [

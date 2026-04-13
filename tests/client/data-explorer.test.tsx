@@ -1,9 +1,9 @@
-import { describe, test, expect, afterEach } from "bun:test";
+import { describe, test, expect, afterEach, beforeEach } from "bun:test";
 import { render, screen, cleanup } from "@testing-library/react";
 import { BrowserRouter } from "react-router";
 import { DataExplorer } from "../../src/client/views/DataExplorer";
 
-globalThis.fetch = (async (url: string) => {
+const __mockFetch = (async (url: string) => {
   if (url === "/api/data") {
     return new Response(
       JSON.stringify([{ file: "books.csv" }, { file: "movies.csv" }]),
@@ -11,6 +11,7 @@ globalThis.fetch = (async (url: string) => {
   }
   return new Response(JSON.stringify([]));
 }) as any;
+beforeEach(() => { globalThis.fetch = __mockFetch; });
 
 afterEach(() => cleanup());
 

@@ -7,7 +7,7 @@ import { useStore } from "../../src/client/store";
 
 let lastFetchUrl = "";
 let lastFetchMethod = "";
-globalThis.fetch = (async (url: string, init?: RequestInit) => {
+const __mockFetch = (async (url: string, init?: RequestInit) => {
   lastFetchUrl = url;
   lastFetchMethod = init?.method || "GET";
   if (url.includes("/api/notes/") && !init?.method) {
@@ -19,6 +19,7 @@ globalThis.fetch = (async (url: string, init?: RequestInit) => {
   }
   return new Response(JSON.stringify({}));
 }) as any;
+beforeEach(() => { globalThis.fetch = __mockFetch; });
 
 beforeEach(() => {
   lastFetchUrl = "";

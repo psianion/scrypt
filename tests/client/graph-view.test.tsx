@@ -1,12 +1,12 @@
 // tests/client/graph-view.test.tsx
-import { describe, test, expect, afterEach } from "bun:test";
+import { describe, test, expect, afterEach, beforeEach } from "bun:test";
 import { render, screen, cleanup } from "@testing-library/react";
 import { BrowserRouter } from "react-router";
 import { GraphView } from "../../src/client/views/GraphView";
 
 afterEach(() => cleanup());
 
-globalThis.fetch = (async () =>
+const __mockFetch = (async () =>
   new Response(JSON.stringify({
     nodes: [
       { id: 1, path: "notes/a.md", title: "A", tags: [], connections: 1 },
@@ -15,6 +15,7 @@ globalThis.fetch = (async () =>
     edges: [{ source: 1, target: 2, type: "link" }],
   }))
 ) as any;
+beforeEach(() => { globalThis.fetch = __mockFetch; });
 
 describe("GraphView", () => {
   test("fetches graph data and renders SVG", async () => {

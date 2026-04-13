@@ -1,9 +1,9 @@
-import { describe, test, expect, afterEach } from "bun:test";
+import { describe, test, expect, afterEach, beforeEach } from "bun:test";
 import { render, screen, cleanup } from "@testing-library/react";
 import { BrowserRouter } from "react-router";
 import { TagBrowser } from "../../src/client/views/TagBrowser";
 
-globalThis.fetch = (async () =>
+const __mockFetch = (async () =>
   new Response(
     JSON.stringify([
       { tag: "project", count: 5 },
@@ -12,6 +12,7 @@ globalThis.fetch = (async () =>
       { tag: "reference", count: 8 },
     ]),
   )) as any;
+beforeEach(() => { globalThis.fetch = __mockFetch; });
 
 afterEach(() => cleanup());
 
