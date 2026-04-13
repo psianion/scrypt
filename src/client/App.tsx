@@ -7,6 +7,7 @@ import { CommandPalette } from "./components/CommandPalette";
 import { Editor } from "./views/Editor";
 import { GraphView } from "./views/GraphView";
 import { JournalView } from "./views/JournalView";
+import { NotesList } from "./views/NotesList";
 import { SearchView } from "./views/SearchView";
 import { BacklinksPanel } from "./views/BacklinksPanel";
 import { KanbanView } from "./views/KanbanView";
@@ -43,6 +44,7 @@ export function AppContent() {
                 <Route path="/note/*" element={<Editor />} />
                 <Route path="/graph" element={<GraphView />} />
                 <Route path="/journal" element={<JournalView />} />
+                <Route path="/notes" element={<NotesList />} />
                 <Route path="/search" element={<SearchView />} />
                 <Route path="/tasks" element={<KanbanView />} />
                 <Route path="/data" element={<DataExplorer />} />
