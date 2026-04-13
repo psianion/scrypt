@@ -1,112 +1,163 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router";
 import * as d3 from "d3";
-import { api } from "../api";
-import { useStore } from "../store";
-import type { GraphNode, GraphEdge } from "../../shared/types";
+import type {
+  GraphResponse,
+  GraphNodeV2 as GraphNode,
+  GraphEdgeV2 as GraphEdge,
+  GraphEdgeType,
+} from "../../shared/graph-types";
+
+interface SimNode extends GraphNode {
+  x?: number;
+  y?: number;
+  vx?: number;
+  vy?: number;
+  fx?: number | null;
+  fy?: number | null;
+  radius: number;
+}
+
+interface SimEdge extends GraphEdge {
+  source: SimNode | number;
+  target: SimNode | number;
+}
+
+function hashDomainColor(domain: string | null): string {
+  if (!domain) return "hsl(0, 0%, 55%)";
+  let hash = 0;
+  for (let i = 0; i < domain.length; i++) {
+    hash = (hash * 31 + domain.charCodeAt(i)) | 0;
+  }
+  return `hsl(${Math.abs(hash) % 360}, 60%, 55%)`;
+}
+
+function radiusFor(node: GraphNode): number {
+  return 4 + Math.sqrt(node.connectionCount) * 3;
+}
 
 export function GraphView() {
-  const svgRef = useRef<SVGSVGElement>(null);
-  const navigate = useNavigate();
-  const [filter, setFilter] = useState("");
-  const setGraph = useStore((s) => s.setGraph);
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  const [data, setData] = useState<GraphResponse | null>(null);
+  const simRef = useRef<d3.Simulation<SimNode, SimEdge> | null>(null);
 
   useEffect(() => {
-    api.graph
-      .full()
-      .then((res: any) => {
-        const nodes = res?.nodes ?? [];
-        const edges = res?.edges ?? [];
-        setGraph(nodes, edges);
-        renderGraph(nodes, edges);
-      })
-      .catch(() => {});
+    fetch("/api/graph")
+      .then((r) => r.json())
+      .then(setData)
+      .catch(() => setData({ nodes: [], edges: [] }));
   }, []);
 
-  function renderGraph(nodes: GraphNode[], edges: GraphEdge[]) {
-    if (!svgRef.current) return;
+  useEffect(() => {
+    if (!data || !svgRef.current) return;
     const svg = d3.select(svgRef.current);
     svg.selectAll("*").remove();
 
     const width = svgRef.current.clientWidth || 800;
     const height = svgRef.current.clientHeight || 600;
 
-    const g = svg.append("g");
+    const root = svg.append("g").attr("class", "root");
+    const edgesG = root.append("g").attr("class", "edges");
+    const nodesG = root.append("g").attr("class", "nodes");
+    const labelsG = root.append("g").attr("class", "labels");
 
-    // Zoom
-    svg.call(
-      d3.zoom<SVGSVGElement, unknown>()
-        .scaleExtent([0.1, 4])
-        .on("zoom", (event) => g.attr("transform", event.transform))
-    );
+    const simNodes: SimNode[] = data.nodes.map((n) => ({
+      ...n,
+      radius: radiusFor(n),
+    }));
+    const simEdges: SimEdge[] = data.edges.map((e) => ({
+      ...e,
+      source: e.source,
+      target: e.target,
+    }));
 
-    const simulation = d3
-      .forceSimulation(nodes as any)
-      .force("link", d3.forceLink(edges).id((d: any) => d.id).distance(80))
-      .force("charge", d3.forceManyBody().strength(-200))
-      .force("center", d3.forceCenter(width / 2, height / 2));
-
-    const link = g
+    const edgeSelection = edgesG
       .selectAll("line")
-      .data(edges)
+      .data(simEdges)
       .join("line")
-      .attr("stroke", "#333")
-      .attr("stroke-width", 1);
+      .attr("data-edge-type", (d) => d.type)
+      .attr("stroke", (d) => edgeStroke(d.type))
+      .attr("stroke-width", (d) => edgeWidth(d.type))
+      .attr("stroke-dasharray", (d) => (d.type === "tag" ? "2 3" : null));
 
-    const node = g
+    const nodeSelection = nodesG
       .selectAll("circle")
-      .data(nodes)
+      .data(simNodes)
       .join("circle")
-      .attr("r", (d) => Math.max(4, Math.min(12, (d.connections || 1) * 2)))
-      .attr("fill", "#666")
-      .attr("stroke", "#888")
-      .attr("stroke-width", 1)
-      .style("cursor", "pointer")
-      .on("click", (_e, d) => {
-        useStore.getState().openTab(d.path, d.title);
-        navigate(`/note/${d.path}`);
-      })
-      .on("mouseover", function () { d3.select(this).attr("fill", "#aaa"); })
-      .on("mouseout", function () { d3.select(this).attr("fill", "#666"); })
-      .call(d3.drag<any, any>()
-        .on("start", (event, d) => { if (!event.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
-        .on("drag", (event, d) => { d.fx = event.x; d.fy = event.y; })
-        .on("end", (event, d) => { if (!event.active) simulation.alphaTarget(0); d.fx = null; d.fy = null; })
-      );
+      .attr("data-testid", "graph-node")
+      .attr("data-path", (d) => d.path)
+      .attr("r", (d) => d.radius)
+      .attr("fill", (d) => hashDomainColor(d.domain));
 
-    const label = g
+    const labelSelection = labelsG
       .selectAll("text")
-      .data(nodes)
+      .data(simNodes)
       .join("text")
-      .text((d) => d.title)
+      .attr("text-anchor", "middle")
       .attr("font-size", 10)
-      .attr("dx", 12)
-      .attr("dy", 4)
-      .attr("fill", "var(--text-secondary)");
+      .attr("fill", "var(--text-primary, #eee)")
+      .text((d) => d.title);
 
-    simulation.on("tick", () => {
-      link
+    const sim = d3
+      .forceSimulation<SimNode>(simNodes)
+      .force(
+        "link",
+        d3
+          .forceLink<SimNode, SimEdge>(simEdges)
+          .id((d) => d.id)
+          .strength((d) => d.weight / 5),
+      )
+      .force("charge", d3.forceManyBody().strength(-220))
+      .force("collide", d3.forceCollide().radius((d) => (d as SimNode).radius + 4))
+      .force("center", d3.forceCenter(width / 2, height / 2))
+      .alphaDecay(0.025);
+
+    sim.on("tick", () => {
+      edgeSelection
         .attr("x1", (d: any) => d.source.x)
         .attr("y1", (d: any) => d.source.y)
         .attr("x2", (d: any) => d.target.x)
         .attr("y2", (d: any) => d.target.y);
-      node.attr("cx", (d: any) => d.x).attr("cy", (d: any) => d.y);
-      label.attr("x", (d: any) => d.x).attr("y", (d: any) => d.y);
+      nodeSelection.attr("cx", (d) => d.x ?? 0).attr("cy", (d) => d.y ?? 0);
+      labelSelection
+        .attr("x", (d) => d.x ?? 0)
+        .attr("y", (d) => (d.y ?? 0) - (d.radius + 4));
     });
-  }
+
+    simRef.current = sim;
+    return () => {
+      sim.stop();
+    };
+  }, [data]);
 
   return (
-    <div data-testid="graph-view" className="flex flex-col h-full">
-      <div className="flex items-center gap-2 p-2 border-b border-[var(--border)]">
-        <input
-          type="text"
-          placeholder="Filter by title..."
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          className="px-2 py-1 text-sm bg-[var(--bg-secondary)] border border-[var(--border)] rounded text-[var(--text-primary)] outline-none"
-        />
-      </div>
-      <svg ref={svgRef} className="flex-1 w-full" />
+    <div className="h-full w-full relative bg-[var(--bg-primary)]">
+      <svg ref={svgRef} className="h-full w-full" />
     </div>
   );
+}
+
+function edgeStroke(type: GraphEdgeType): string {
+  switch (type) {
+    case "wikilink":
+      return "rgba(255,255,255,0.75)";
+    case "subdomain":
+      return "rgba(180,200,255,0.7)";
+    case "domain":
+      return "rgba(140,140,140,0.5)";
+    case "tag":
+      return "rgba(120,200,140,0.6)";
+  }
+}
+
+function edgeWidth(type: GraphEdgeType): number {
+  switch (type) {
+    case "wikilink":
+      return 1.5;
+    case "subdomain":
+      return 1.25;
+    case "domain":
+      return 1;
+    case "tag":
+      return 1;
+  }
 }
