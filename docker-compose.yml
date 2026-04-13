@@ -8,8 +8,12 @@ services:
     environment:
       - SCRYPT_AUTH_TOKEN=${SCRYPT_AUTH_TOKEN}
       - SCRYPT_VAULT_PATH=/vault
+      - SCRYPT_STATIC_DIR=/app/dist
       - SCRYPT_GIT_AUTOCOMMIT=${SCRYPT_GIT_AUTOCOMMIT:-0}
       - NODE_ENV=production
     volumes:
-      - ./vault:/vault
+      # Vault lives on the host. Override by setting SCRYPT_VAULT_DIR in .env
+      # to any absolute path (e.g. /Users/you/scrypt-vault) so your notes
+      # stay outside the repo and survive container rebuilds.
+      - ${SCRYPT_VAULT_DIR:-./vault}:/vault
     working_dir: /vault
