@@ -408,3 +408,74 @@ describe("IngestRouter.ingest — research_run side effects", () => {
     );
   });
 });
+
+describe("IngestRouter domain routing", () => {
+  test("domain + subdomain writes to {domain}/{subdomain}/{slug}.md", async () => {
+    const res = await ingest.ingest({
+      kind: "note",
+      title: "DnD Landing",
+      content: "body",
+      frontmatter: { domain: "dnd", subdomain: "landing" },
+    });
+    expect(res.path).toBe("dnd/landing/dnd-landing.md");
+  });
+
+  test("domain without subdomain writes to {domain}/{slug}.md", async () => {
+    const res = await ingest.ingest({
+      kind: "note",
+      title: "Scrypt Overview",
+      content: "body",
+      frontmatter: { domain: "scrypt-dev" },
+    });
+    expect(res.path).toBe("scrypt-dev/scrypt-overview.md");
+  });
+
+  test("missing domain falls back to kind-based routing", async () => {
+    const res = await ingest.ingest({
+      kind: "spec",
+      title: "Legacy Spec",
+      content: "body",
+      frontmatter: {},
+    });
+    expect(res.path).toMatch(/^docs\/specs\//);
+  });
+
+  test("invalid domain (contains slash) returns 400", async () => {
+    await expect(
+      ingest.ingest({
+        kind: "note",
+        title: "Bad",
+        content: "body",
+        frontmatter: { domain: "dnd/../etc" },
+      }),
+    ).rejects.toMatchObject({ code: "bad_request", field: "domain" });
+  });
+
+  test("invalid subdomain returns 400", async () => {
+    await expect(
+      ingest.ingest({
+        kind: "note",
+        title: "Bad",
+        content: "body",
+        frontmatter: { domain: "dnd", subdomain: "../escape" },
+      }),
+    ).rejects.toMatchObject({ code: "bad_request", field: "subdomain" });
+  });
+
+  test("slug collision in domain folder returns 409", async () => {
+    await ingest.ingest({
+      kind: "note",
+      title: "Dup",
+      content: "one",
+      frontmatter: { domain: "dnd" },
+    });
+    await expect(
+      ingest.ingest({
+        kind: "note",
+        title: "Dup",
+        content: "two",
+        frontmatter: { domain: "dnd" },
+      }),
+    ).rejects.toMatchObject({ code: "conflict" });
+  });
+});

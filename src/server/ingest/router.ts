@@ -54,6 +54,26 @@ export class IngestError extends Error {
 export class IngestRouter {
   constructor(private deps: IngestDeps) {}
 
+  private readonly DOMAIN_RE = /^[a-z0-9][a-z0-9-]*$/;
+
+  private validateDomainSegment(
+    value: unknown,
+    field: "domain" | "subdomain",
+  ): string | null {
+    if (value === undefined || value === null || value === "") return null;
+    if (typeof value !== "string") {
+      throw new IngestError(`${field} must be a string`, "bad_request", field);
+    }
+    if (!this.DOMAIN_RE.test(value)) {
+      throw new IngestError(
+        `${field} must be lowercase slug (a-z, 0-9, -)`,
+        "bad_request",
+        field,
+      );
+    }
+    return value;
+  }
+
   async ingest(req: IngestRequest): Promise<IngestResult> {
     if (!req.kind) throw new IngestError("kind is required", "bad_request", "kind");
     if (!isValidKind(req.kind)) {
@@ -82,7 +102,20 @@ export class IngestRouter {
       return this.ingestResearchRun(req, now, slug);
     }
 
-    const relPath = destinationFor(req.kind, slug, now);
+    const domain = this.validateDomainSegment(
+      req.frontmatter?.domain,
+      "domain",
+    );
+    const subdomain = this.validateDomainSegment(
+      req.frontmatter?.subdomain,
+      "subdomain",
+    );
+
+    const relPath = domain
+      ? subdomain
+        ? `${domain}/${subdomain}/${slug}.md`
+        : `${domain}/${slug}.md`
+      : destinationFor(req.kind, slug, now);
     const absPath = join(this.deps.vaultPath, relPath);
 
     const existed = existsSync(absPath);
