@@ -3,8 +3,8 @@ import type { Router } from "../router";
 import type { Database } from "bun:sqlite";
 import type {
   GraphResponse,
-  GraphNodeV2,
-  GraphEdgeV2,
+  GraphNode,
+  GraphEdge,
 } from "../../shared/graph-types";
 import { RESERVED_NAMESPACES, type Tag } from "../../shared/types";
 import { parseTag } from "../parsers";
@@ -38,7 +38,7 @@ export function graphRoutes(router: Router, db: Database): void {
       (r) => !RESERVED_PREFIXES.some((p) => r.path.startsWith(p)),
     );
 
-    const nodes: GraphNodeV2[] = visible.map((r) => ({
+    const nodes: GraphNode[] = visible.map((r) => ({
       id: r.id,
       path: r.path,
       title: r.title ?? r.path,
@@ -49,7 +49,7 @@ export function graphRoutes(router: Router, db: Database): void {
     }));
 
     const visibleIds = new Set(nodes.map((n) => n.id));
-    const edges: GraphEdgeV2[] = [];
+    const edges: GraphEdge[] = [];
 
     // 1. wikilink edges — persisted in graph_edges as type='link'
     const linkRows = db

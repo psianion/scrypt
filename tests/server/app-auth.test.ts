@@ -90,6 +90,8 @@ describe("createApp > auth wiring > Wave 3 routes require auth in production", (
     ["GET /api/memories", "http://example.com/api/memories", undefined],
     ["GET /api/daily_context", "http://example.com/api/daily_context", undefined],
     ["GET /api/activity", "http://example.com/api/activity", undefined],
+    ["GET /api/graph", "http://example.com/api/graph", undefined],
+    ["GET /api/graph/*path", "http://example.com/api/graph/notes/x.md", undefined],
   ];
 
   for (const [label, url, init] of routes) {

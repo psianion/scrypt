@@ -11,8 +11,8 @@ import { resolveSlug } from "./slug-resolver";
 import type {
   SearchResult,
   Backlink,
-  GraphNode,
-  GraphEdge,
+  LocalGraphNode,
+  LocalGraphEdge,
   Task,
 } from "../shared/types";
 
@@ -220,14 +220,14 @@ export class Indexer {
       .all(path) as Backlink[];
   }
 
-  getGraph(): { nodes: GraphNode[]; edges: GraphEdge[] } {
+  getGraph(): { nodes: LocalGraphNode[]; edges: LocalGraphEdge[] } {
     const nodes = this.db
       .query(
         `SELECT n.id, n.path, n.title,
                 (SELECT count(*) FROM graph_edges WHERE source_id = n.id OR target_id = n.id) as connections
          FROM notes n`
       )
-      .all() as (GraphNode & { id: number })[];
+      .all() as (LocalGraphNode & { id: number })[];
 
     // Attach tags to nodes
     for (const node of nodes) {
@@ -239,7 +239,7 @@ export class Indexer {
 
     const edges = this.db
       .query("SELECT source_id as source, target_id as target, type FROM graph_edges")
-      .all() as GraphEdge[];
+      .all() as LocalGraphEdge[];
 
     return { nodes, edges };
   }
@@ -247,7 +247,7 @@ export class Indexer {
   getLocalGraph(
     path: string,
     depth: number = 2
-  ): { nodes: GraphNode[]; edges: GraphEdge[] } {
+  ): { nodes: LocalGraphNode[]; edges: LocalGraphEdge[] } {
     const startNote = this.db
       .query("SELECT id FROM notes WHERE path = ?")
       .get(path) as { id: number } | null;
@@ -285,7 +285,7 @@ export class Indexer {
                 (SELECT count(*) FROM graph_edges WHERE source_id = n.id OR target_id = n.id) as connections
          FROM notes n WHERE n.id IN (${placeholders})`
       )
-      .all(...ids) as GraphNode[];
+      .all(...ids) as LocalGraphNode[];
 
     for (const node of nodes) {
       const tags = this.db
@@ -300,7 +300,7 @@ export class Indexer {
          FROM graph_edges
          WHERE source_id IN (${placeholders}) AND target_id IN (${placeholders})`
       )
-      .all(...ids, ...ids) as GraphEdge[];
+      .all(...ids, ...ids) as LocalGraphEdge[];
 
     return { nodes, edges };
   }

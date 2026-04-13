@@ -5,7 +5,45 @@ import tailwindcss from "@tailwindcss/vite";
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   root: ".",
-  build: { outDir: "dist" },
+  build: {
+    outDir: "dist",
+    rollupOptions: {
+      output: {
+        // Split heavy vendor groups into their own chunks so the initial
+        // payload for /notes, /journal, /tasks etc. doesn't include code
+        // users only need when they actually open /graph or an editor.
+        manualChunks: {
+          // d3 force + zoom + drag + selection — only loaded on /graph
+          d3: [
+            "d3",
+            "d3-force",
+            "d3-zoom",
+            "d3-drag",
+            "d3-selection",
+            "d3-array",
+            "d3-scale",
+            "d3-shape",
+            "d3-hierarchy",
+          ],
+          // CodeMirror — only loaded when the Editor view mounts
+          codemirror: [
+            "@codemirror/state",
+            "@codemirror/view",
+            "@codemirror/commands",
+            "@codemirror/language",
+            "@codemirror/lang-markdown",
+            "@codemirror/autocomplete",
+          ],
+          // Excel parsing — only loaded on /data for .xlsx files
+          xlsx: ["xlsx"],
+          // React + router core — stable, cache-friendly vendor group
+          react: ["react", "react-dom", "react-router"],
+          // DnD-kit — only loaded on /tasks (Kanban)
+          dnd: ["@dnd-kit/core", "@dnd-kit/sortable"],
+        },
+      },
+    },
+  },
   server: {
     port: 5173,
     proxy: {

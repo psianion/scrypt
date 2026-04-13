@@ -1,6 +1,6 @@
 // src/client/store.ts
 import { create } from "zustand";
-import type { NoteMeta, Note, SearchResult, Task, GraphNode, GraphEdge } from "../shared/types";
+import type { NoteMeta, Note, SearchResult, Task } from "../shared/types";
 
 interface Tab {
   path: string;
@@ -34,11 +34,6 @@ interface AppState {
   // Command palette
   commandPaletteOpen: boolean;
   toggleCommandPalette: () => void;
-
-  // Graph
-  graphNodes: GraphNode[];
-  graphEdges: GraphEdge[];
-  setGraph: (nodes: GraphNode[], edges: GraphEdge[]) => void;
 
   // Tasks
   tasks: Task[];
@@ -85,9 +80,6 @@ export const useStore = create<AppState>((set) => ({
   toggleCommandPalette: () =>
     set((s) => ({ commandPaletteOpen: !s.commandPaletteOpen })),
 
-  graphNodes: [],
-  graphEdges: [],
-  setGraph: (nodes, edges) => set({ graphNodes: nodes, graphEdges: edges }),
 
   tasks: [],
   setTasks: (tasks) => set({ tasks }),

@@ -38,7 +38,10 @@ export interface Backlink {
   context: string;
 }
 
-export interface GraphNode {
+// Legacy indexer-table shapes used by GET /api/graph/*path (the local
+// subgraph walk). The canonical full-graph types with 4 edge weights live
+// in `./graph-types.ts` and are used by GET /api/graph.
+export interface LocalGraphNode {
   id: number;
   path: string;
   title: string;
@@ -46,7 +49,7 @@ export interface GraphNode {
   connections: number;
 }
 
-export interface GraphEdge {
+export interface LocalGraphEdge {
   source: number;
   target: number;
   type: "link" | "tag" | "embed";

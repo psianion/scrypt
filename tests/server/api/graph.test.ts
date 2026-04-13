@@ -133,9 +133,17 @@ describe("GET /api/graph", () => {
   });
 });
 
-describe("GET /api/graph auth", () => {
-  test("route responds (auth gate covered separately)", async () => {
+// Auth is covered end-to-end by the parameterized list in
+// tests/server/app-auth.test.ts → "Wave 3 routes require auth in production"
+// which now includes /api/graph and /api/graph/*path. The dev localhost
+// env used by this test file is auth-bypassed, so we only assert the
+// happy-path shape here.
+describe("GET /api/graph response shape (dev bypass)", () => {
+  test("returns 200 in localhost dev mode with array nodes + edges", async () => {
     const res = await fetch(`${env.baseUrl}/api/graph`);
-    expect([200, 401]).toContain(res.status);
+    expect(res.status).toBe(200);
+    const data = (await res.json()) as { nodes: unknown[]; edges: unknown[] };
+    expect(Array.isArray(data.nodes)).toBe(true);
+    expect(Array.isArray(data.edges)).toBe(true);
   });
 });

@@ -1,9 +1,15 @@
 // src/shared/graph-types.ts
+//
+// Canonical graph types used by GET /api/graph (the domain-aware full graph
+// with four edge types: wikilink, subdomain, domain, tag). A simpler
+// `LocalGraphNode`/`LocalGraphEdge` pair lives in `./types` and is used by
+// GET /api/graph/*path (local subgraph via the indexer's graph_nodes/edges
+// tables).
 import type { Tag } from "./types";
 
 export type GraphEdgeType = "wikilink" | "subdomain" | "domain" | "tag";
 
-export interface GraphNodeV2 {
+export interface GraphNode {
   id: number;
   path: string;
   title: string;
@@ -13,7 +19,7 @@ export interface GraphNodeV2 {
   connectionCount: number;
 }
 
-export interface GraphEdgeV2 {
+export interface GraphEdge {
   source: number;
   target: number;
   type: GraphEdgeType;
@@ -21,6 +27,6 @@ export interface GraphEdgeV2 {
 }
 
 export interface GraphResponse {
-  nodes: GraphNodeV2[];
-  edges: GraphEdgeV2[];
+  nodes: GraphNode[];
+  edges: GraphEdge[];
 }

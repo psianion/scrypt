@@ -1,5 +1,6 @@
 // src/client/api.ts
-import type { Note, NoteMeta, SearchResult, Task, GraphNode, GraphEdge, WsMessage } from "../shared/types";
+import type { Note, NoteMeta, SearchResult, Task, LocalGraphNode, LocalGraphEdge, WsMessage } from "../shared/types";
+import type { GraphResponse } from "../shared/graph-types";
 
 const BASE = "";
 
@@ -37,9 +38,9 @@ export const api = {
   searchTags: (q: string) => json<{ tag: string; count: number }[]>(`/api/search/tags?q=${encodeURIComponent(q)}`),
 
   graph: {
-    full: () => json<{ nodes: GraphNode[]; edges: GraphEdge[] }>("/api/graph"),
+    full: () => json<GraphResponse>("/api/graph"),
     local: (path: string, depth = 2) =>
-      json<{ nodes: GraphNode[]; edges: GraphEdge[] }>(`/api/graph/${path}?depth=${depth}`),
+      json<{ nodes: LocalGraphNode[]; edges: LocalGraphEdge[] }>(`/api/graph/${path}?depth=${depth}`),
   },
 
   backlinks: (path: string) => json<any[]>(`/api/backlinks/${path}`),

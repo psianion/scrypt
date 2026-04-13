@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import * as d3 from "d3";
 import type {
   GraphResponse,
-  GraphNodeV2 as GraphNode,
-  GraphEdgeV2 as GraphEdge,
+  GraphNode,
+  GraphEdge,
   GraphEdgeType,
 } from "../../shared/graph-types";
 
