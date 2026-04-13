@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import { api } from "../api";
 import type { NoteMeta } from "../../shared/types";
+import { Dropzone } from "../components/Dropzone";
 
 type SortKey = "modified" | "created" | "title";
 
@@ -32,6 +33,7 @@ export function NotesList() {
   }, [notes, sort, tagFilter]);
 
   return (
+    <Dropzone>
     <div data-testid="notes-list" className="p-4 h-full overflow-auto">
       <div className="flex gap-3 items-center mb-4">
         <input
@@ -81,5 +83,6 @@ export function NotesList() {
         </tbody>
       </table>
     </div>
+    </Dropzone>
   );
 }
