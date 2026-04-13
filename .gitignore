@@ -13,6 +13,10 @@ coverage/
 .scrypt/trash/
 *.log
 
+# Local dev vault (mounted at /vault in docker; user notes only)
+vault/
+test-vault/
+
 # Environment
 .env
 .env.local
