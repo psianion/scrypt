@@ -142,3 +142,72 @@ describe("GET /api/daily_context", () => {
     expect(data.recent_notes.length).toBeLessThanOrEqual(20);
   });
 });
+
+describe("GET /api/daily_context > related", () => {
+  test("related bundle is present on response", async () => {
+    const res = await fetch(`${env.baseUrl}/api/daily_context`);
+    const data = await res.json();
+    expect(data.related).toBeDefined();
+    expect(data.related.notes).toBeDefined();
+    expect(data.related.memories).toBeDefined();
+    expect(data.related.draft_prompts).toBeDefined();
+  });
+
+  test("related.notes contains recent domain-matching notes", async () => {
+    // Rewrite today's journal so it carries a domain + tag.
+    const today = new Date();
+    const yyyy = today.getUTCFullYear();
+    const mm = String(today.getUTCMonth() + 1).padStart(2, "0");
+    const dd = String(today.getUTCDate()).padStart(2, "0");
+    await env.writeNote(
+      `journal/${yyyy}-${mm}-${dd}.md`,
+      "---\ndomain: dnd\ntags: [architecture]\n---\n# Today",
+    );
+    await env.writeNote(
+      "dnd/research/fresh.md",
+      `---\ntitle: Fresh\ndomain: dnd\nsubdomain: research\nmodified: ${new Date().toISOString()}\n---\nbody`,
+    );
+    await env.app.indexer.fullReindex();
+
+    const res = await fetch(`${env.baseUrl}/api/daily_context`);
+    const data = await res.json();
+    const paths = data.related.notes.map((n: any) => n.path);
+    expect(paths).toContain("dnd/research/fresh.md");
+  });
+
+  test("related.draft_prompts lists stage:draft notes oldest first", async () => {
+    await env.writeNote(
+      "dnd/research/draft-a.md",
+      "---\ntitle: Draft A\ndomain: dnd\ntags: [stage:draft]\ncreated: 2026-03-01T00:00:00Z\n---\nbody",
+    );
+    await env.writeNote(
+      "dnd/research/draft-b.md",
+      "---\ntitle: Draft B\ndomain: dnd\ntags: [stage:draft]\ncreated: 2026-04-01T00:00:00Z\n---\nbody",
+    );
+    await env.app.indexer.fullReindex();
+
+    const res = await fetch(`${env.baseUrl}/api/daily_context`);
+    const data = await res.json();
+    const drafts = data.related.draft_prompts;
+    expect(drafts.length).toBeGreaterThanOrEqual(2);
+    const draftPaths = drafts.map((d: any) => d.path);
+    const idxA = draftPaths.indexOf("dnd/research/draft-a.md");
+    const idxB = draftPaths.indexOf("dnd/research/draft-b.md");
+    expect(idxA).toBeGreaterThanOrEqual(0);
+    expect(idxB).toBeGreaterThanOrEqual(0);
+    expect(idxA).toBeLessThan(idxB);
+  });
+
+  test("related.memories overlap with today's tags", async () => {
+    await env.writeNote(
+      "memory/arch-interest.md",
+      "---\ntitle: Architecture\nkind: memory\nactive: true\ntags: [architecture]\n---\nbody",
+    );
+    await env.app.indexer.fullReindex();
+
+    const res = await fetch(`${env.baseUrl}/api/daily_context`);
+    const data = await res.json();
+    const mems = data.related.memories.map((m: any) => m.path);
+    expect(mems).toContain("memory/arch-interest.md");
+  });
+});
