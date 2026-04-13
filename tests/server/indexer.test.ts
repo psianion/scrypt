@@ -276,4 +276,33 @@ describe("link_index population", () => {
       (db.query("SELECT COUNT(*) as c FROM link_index WHERE path = 'notes/a.md'").get() as any).c,
     ).toBe(0);
   });
+
+  test("resolves [[basename]] wiki-links across folders", async () => {
+    mkdirSync(join(vaultPath, "notes/inbox"), { recursive: true });
+    mkdirSync(join(vaultPath, "dnd/research"), { recursive: true });
+    await writeTestNote(
+      "notes/inbox/source.md",
+      "---\ntitle: Source\n---\nSee [[target-note]] for details.",
+    );
+    await writeTestNote(
+      "dnd/research/target-note.md",
+      "---\ntitle: Target Note\n---\nbody",
+    );
+    await indexer.fullReindex();
+
+    const source = db
+      .query("SELECT id FROM notes WHERE path = 'notes/inbox/source.md'")
+      .get() as any;
+    const target = db
+      .query("SELECT id FROM notes WHERE path = 'dnd/research/target-note.md'")
+      .get() as any;
+    const edge = db
+      .query(
+        "SELECT source_id, target_id FROM graph_edges WHERE source_id = ? AND target_id = ? AND type = 'link'",
+      )
+      .get(source.id, target.id) as any;
+    expect(edge).toBeTruthy();
+    expect(edge.source_id).toBe(source.id);
+    expect(edge.target_id).toBe(target.id);
+  });
 });

@@ -7,6 +7,7 @@ import {
   extractTags,
   extractTasks,
 } from "./parsers";
+import { resolveSlug } from "./slug-resolver";
 import type {
   SearchResult,
   Backlink,
@@ -123,7 +124,8 @@ export class Indexer {
     // Wiki-links → backlinks + graph_edges
     const links = extractWikiLinks(note.content);
     for (const link of links) {
-      const targetPath = this.resolveLink(link.target);
+      const match = resolveSlug(link.target, this.db);
+      const targetPath = match ? match.path : this.resolveLink(link.target);
       if (!targetPath) continue;
 
       const target = this.db
