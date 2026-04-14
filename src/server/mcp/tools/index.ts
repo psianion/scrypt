@@ -9,6 +9,7 @@ import { getNoteTool } from "./get-note";
 import { searchNotesTool } from "./search-notes";
 import { semanticSearchTool } from "./semantic-search";
 import { findSimilarTool } from "./find-similar";
+import { walkGraphTool } from "./walk-graph";
 
 export function registerAllTools(registry: ToolRegistry): void {
   registry.register(createNoteTool);
@@ -20,4 +21,5 @@ export function registerAllTools(registry: ToolRegistry): void {
   registry.register(searchNotesTool);
   registry.register(semanticSearchTool);
   registry.register(findSimilarTool);
+  registry.register(walkGraphTool);
 }
