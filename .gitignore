@@ -11,7 +11,14 @@ coverage/
 .scrypt/scrypt.db-shm
 .scrypt/scrypt.db-wal
 .scrypt/trash/
+.scrypt/config.json
+.scrypt/public/
 *.log
+
+# Sample vault content — runtime only, never committed
+/notes/
+/journal/
+/data/
 
 # Local dev vault (mounted at /vault in docker; user notes only)
 vault/
