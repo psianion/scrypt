@@ -111,6 +111,6 @@ alpha body only
     const remaining = repo
       .listByNote("a.md", engine.model)
       .map((r) => r.chunk_id);
-    expect(remaining).toEqual(["a:alpha"]);
+    expect(remaining).toEqual(["a_md:alpha"]);
   });
 });

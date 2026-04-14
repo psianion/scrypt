@@ -21,8 +21,8 @@ describe("chunkNote", () => {
     const parsed = parseStructural("a.md", SHORT);
     const chunks = chunkNote(parsed, { maxTokens: 450, overlapTokens: 50 });
     expect(chunks.length).toBe(2);
-    expect(chunks[0].chunk_id).toBe("a:alpha");
-    expect(chunks[1].chunk_id).toBe("a:beta");
+    expect(chunks[0].chunk_id).toBe("a_md:alpha");
+    expect(chunks[1].chunk_id).toBe("a_md:beta");
   });
 
   test("each chunk text starts with the note title", () => {
@@ -38,8 +38,8 @@ describe("chunkNote", () => {
     const parsed = parseStructural("b.md", big);
     const chunks = chunkNote(parsed, { maxTokens: 450, overlapTokens: 50 });
     expect(chunks.length).toBeGreaterThan(1);
-    expect(chunks[0].chunk_id).toMatch(/:huge:part_0$/);
-    expect(chunks[1].chunk_id).toMatch(/:huge:part_1$/);
+    expect(chunks[0].chunk_id).toBe("b_md:huge:part_0");
+    expect(chunks[1].chunk_id).toBe("b_md:huge:part_1");
     // Overlap: the last ~40 tokens of chunk 0 should appear in chunk 1.
     const c0Words = chunks[0].text.split(/\s+/);
     const tailSnippet = c0Words.slice(-30).join(" ");
@@ -51,7 +51,7 @@ describe("chunkNote", () => {
     const parsed = parseStructural("c.md", sparse);
     const chunks = chunkNote(parsed, { maxTokens: 450, overlapTokens: 50 });
     expect(chunks.length).toBe(1);
-    expect(chunks[0].chunk_id).toBe("c:hascontent");
+    expect(chunks[0].chunk_id).toBe("c_md:hascontent");
   });
 
   test("content_hash is stable across calls with identical input", () => {

@@ -44,7 +44,10 @@ function slugify(text: string): string {
 }
 
 function noteSlug(notePath: string): string {
-  return notePath.replace(/\.md$/, "").replace(/[^a-zA-Z0-9]+/g, "_");
+  // Keep .md in the slug so `a.md` → `a_md`, which reads as a real
+  // namespace prefix instead of collapsing to `a` and colliding with
+  // hypothetical top-level nodes of the same name.
+  return notePath.replace(/[^a-zA-Z0-9]+/g, "_");
 }
 
 export function parseStructural(
@@ -78,14 +81,18 @@ export function parseStructural(
   const sections: ParsedSection[] = [];
 
   const firstHeadingLine = headings[0]?.line ?? lines.length;
-  if (firstHeadingLine > 0 || headings.length === 0) {
+  const introEnd = Math.max(0, firstHeadingLine - 1);
+  const introBody = lines.slice(0, introEnd + 1).join("\n").trim();
+  const needsIntro =
+    headings.length === 0 || (firstHeadingLine > 0 && introBody.length > 0);
+  if (needsIntro) {
     sections.push({
       id: `${nslug}:h-intro-0`,
       headingSlug: "h-intro-0",
       headingText: "(intro)",
       level: 0,
       startLine: 0,
-      endLine: Math.max(0, firstHeadingLine - 1),
+      endLine: introEnd,
     });
     slugsSeen.add("h-intro-0");
   }
