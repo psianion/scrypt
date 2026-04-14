@@ -6,6 +6,7 @@ import type {
   GraphEdge,
   GraphEdgeType,
 } from "../../shared/graph-types";
+import { useEmbeddingProgress } from "../stores/embeddingProgress";
 
 interface SimNode extends GraphNode {
   x?: number;
@@ -67,6 +68,27 @@ export function GraphView() {
       }
     });
   }, [filters, data]);
+
+  // Wave 8: pulse nodes whose note is currently being embedded.
+  useEffect(() => {
+    const unsub = useEmbeddingProgress.subscribe((s) => {
+      if (!svgRef.current) return;
+      const active = new Set(Object.keys(s.inFlight));
+      svgRef.current
+        .querySelectorAll<SVGCircleElement>("circle[data-path]")
+        .forEach((el) => {
+          const path = el.getAttribute("data-path") ?? "";
+          if (active.has(path)) {
+            el.classList.add("embedding-pulse");
+          } else {
+            el.classList.remove("embedding-pulse");
+          }
+        });
+    });
+    return () => {
+      unsub();
+    };
+  }, [data]);
 
   useEffect(() => {
     if (!data || !svgRef.current) return;

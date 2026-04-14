@@ -1,5 +1,21 @@
 @import "tailwindcss";
 
+/* Wave 8: pulse nodes whose note is currently being embedded. */
+circle.embedding-pulse {
+  filter: drop-shadow(0 0 6px rgba(80, 170, 255, 0.8));
+  animation: graph-embed-pulse 1.6s ease-in-out infinite;
+  transform-origin: center;
+}
+
+@keyframes graph-embed-pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.08);
+  }
+}
+
 :root {
   --bg-primary: #111111;
   --bg-secondary: #1a1a1a;
