@@ -1,6 +1,6 @@
 // src/server/mcp/tools/get-note.ts
 import { readFileSync, existsSync } from "node:fs";
-import { resolve, isAbsolute } from "node:path";
+import { resolve, relative, isAbsolute } from "node:path";
 import matter from "gray-matter";
 import { McpError, MCP_ERROR } from "../errors";
 import type { ToolDef } from "../types";
@@ -47,7 +47,12 @@ export const getNoteTool: ToolDef<Input, Output> = {
         "path must be vault-relative",
       );
     }
-    const abs = resolve(ctx.vaultDir, input.path);
+    const vaultAbs = resolve(ctx.vaultDir);
+    const abs = resolve(vaultAbs, input.path);
+    const rel = relative(vaultAbs, abs);
+    if (rel.startsWith("..") || isAbsolute(rel)) {
+      throw new McpError(MCP_ERROR.INVALID_PARAMS, "path escapes vault");
+    }
     if (!existsSync(abs)) {
       throw new McpError(
         MCP_ERROR.NOT_FOUND,

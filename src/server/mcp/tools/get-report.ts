@@ -2,9 +2,7 @@
 import { generateReport } from "../../indexer/report";
 import type { ToolDef } from "../types";
 
-interface Input {
-  scope?: { folder?: string; tag?: string };
-}
+type Input = Record<string, never>;
 
 interface Output {
   markdown: string;
@@ -16,7 +14,7 @@ export const getReportTool: ToolDef<Input, Output> = {
     "Returns a markdown summary of the vault graph: hubs, communities, orphans, suggested questions.",
   inputSchema: {
     type: "object",
-    properties: { scope: { type: "object" } },
+    properties: {},
   },
   async handler(ctx) {
     return { markdown: generateReport(ctx.db) };

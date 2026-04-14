@@ -61,6 +61,7 @@ export const walkGraphTool: ToolDef<Input, Output> = {
         : null;
 
     const visited = new Set<string>([input.from]);
+    const seenEdges = new Set<string>();
     const edges: EdgeRow[] = [];
     let frontier = [input.from];
 
@@ -81,6 +82,9 @@ export const walkGraphTool: ToolDef<Input, Output> = {
           if (relFilter && !relFilter.has(e.relation)) continue;
           const rank = CONFIDENCE_RANK[e.confidence ?? "extracted"] ?? 2;
           if (rank < minRank) continue;
+          const key = `${e.source}\u0000${e.target}\u0000${e.relation}`;
+          if (seenEdges.has(key)) continue;
+          seenEdges.add(key);
           edges.push(e);
           const other = e.source === node ? e.target : e.source;
           if (!visited.has(other) && visited.size < MAX_NODES) {

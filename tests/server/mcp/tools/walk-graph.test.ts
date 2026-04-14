@@ -72,4 +72,13 @@ describe("walk_graph", () => {
     );
     expect(r.nodes.map((n) => n.id)).toEqual(["a.md"]);
   });
+
+  test("edges are deduped when traversal revisits them", async () => {
+    const r = await walkGraphTool.handler(ctx, { from: "a.md", depth: 3 }, "c");
+    const seen = new Set(
+      r.edges.map((e) => `${e.source}|${e.target}|${e.relation}`),
+    );
+    expect(seen.size).toBe(r.edges.length);
+    expect(r.edges.length).toBe(3);
+  });
 });

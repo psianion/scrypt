@@ -111,6 +111,23 @@ alpha body
     expect(caught).toMatchObject({ code: MCP_ERROR.NOT_FOUND });
   });
 
+  test("get_note rejects ../ path traversal outside the vault", async () => {
+    const secretDir = mkdtempSync(join(tmpdir(), "scrypt-secret-"));
+    writeFileSync(join(secretDir, "leak.md"), "TOP SECRET", "utf8");
+    try {
+      const escaped = join("..", "..", "..", secretDir, "leak.md");
+      let caught: unknown = null;
+      try {
+        await getNoteTool.handler(ctx, { path: escaped }, "c");
+      } catch (e) {
+        caught = e;
+      }
+      expect(caught).toMatchObject({ code: MCP_ERROR.INVALID_PARAMS });
+    } finally {
+      rmSync(secretDir, { recursive: true, force: true });
+    }
+  });
+
   test("search_notes returns FTS5 hits", async () => {
     const r = await searchNotesTool.handler(
       ctx,
