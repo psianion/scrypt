@@ -11,7 +11,21 @@ interface Input {
   min_score?: number;
 }
 
-export const semanticSearchTool: ToolDef<Input> = {
+interface SearchResult {
+  path: string;
+  title: string;
+  score: number;
+  snippet: string;
+  chunk_id: string;
+  chunk_range: [number, number];
+}
+
+interface Output {
+  results: SearchResult[];
+  model: string;
+}
+
+export const semanticSearchTool: ToolDef<Input, Output> = {
   name: "semantic_search",
   description:
     "Embeds the query and returns notes whose chunks are most similar by cosine.",

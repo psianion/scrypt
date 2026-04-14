@@ -9,7 +9,21 @@ interface Input {
   min_score?: number;
 }
 
-export const findSimilarTool: ToolDef<Input> = {
+interface SimilarResult {
+  path: string;
+  title: string;
+  score: number;
+  snippet: string;
+  chunk_id: string;
+}
+
+interface Output {
+  source_path: string;
+  results: SimilarResult[];
+  model: string;
+}
+
+export const findSimilarTool: ToolDef<Input, Output> = {
   name: "find_similar",
   description:
     "Finds notes similar to the given note using its stored chunk vectors.",

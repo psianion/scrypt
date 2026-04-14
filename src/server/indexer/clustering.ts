@@ -4,7 +4,7 @@
 // and writes community_id back to graph_nodes.
 import type { Database } from "bun:sqlite";
 import Graph from "graphology";
-// @ts-expect-error — graphology-communities-louvain has no bundled types
+// @ts-ignore — graphology-communities-louvain has no bundled types
 import louvain from "graphology-communities-louvain";
 
 export interface LouvainResult {

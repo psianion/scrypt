@@ -17,7 +17,21 @@ interface EdgeRow {
   reason: string | null;
 }
 
-export const getNoteTool: ToolDef<Input> = {
+interface Output {
+  path: string;
+  frontmatter: Record<string, unknown>;
+  body: string;
+  sections: ReturnType<
+    import("../../indexer/sections-repo").SectionsRepo["listByNote"]
+  >;
+  metadata: ReturnType<
+    import("../../indexer/metadata-repo").MetadataRepo["get"]
+  >;
+  outgoing_edges: EdgeRow[];
+  incoming_edges: EdgeRow[];
+}
+
+export const getNoteTool: ToolDef<Input, Output> = {
   name: "get_note",
   description:
     "Read a note by vault-relative path. Returns content, frontmatter, sections, metadata, edges.",

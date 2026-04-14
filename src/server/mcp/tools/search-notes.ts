@@ -15,7 +15,11 @@ interface FtsRow {
   score: number;
 }
 
-export const searchNotesTool: ToolDef<Input> = {
+interface Output {
+  results: FtsRow[];
+}
+
+export const searchNotesTool: ToolDef<Input, Output> = {
   name: "search_notes",
   description:
     "Keyword search via SQLite FTS5. Fast and exact; use for queries with specific terms.",

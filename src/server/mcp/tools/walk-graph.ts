@@ -30,7 +30,12 @@ interface NodeRow {
   community_id: number | null;
 }
 
-export const walkGraphTool: ToolDef<Input> = {
+interface Output {
+  nodes: NodeRow[];
+  edges: EdgeRow[];
+}
+
+export const walkGraphTool: ToolDef<Input, Output> = {
   name: "walk_graph",
   description:
     "BFS traversal from a starting node. Caps at 500 nodes. Filters by relation and confidence.",
