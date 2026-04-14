@@ -1,5 +1,6 @@
 // src/server/db.ts
 import { Database } from "bun:sqlite";
+import { applyWave8Migration } from "./migrations/wave8";
 
 export function createDatabase(dbPath: string): Database {
   const db = new Database(dbPath, { create: true });
@@ -190,4 +191,7 @@ export function initSchema(db: Database): void {
   if (!have.has("subdomain"))
     db.run("ALTER TABLE notes ADD COLUMN subdomain TEXT");
   if (!have.has("tags")) db.run("ALTER TABLE notes ADD COLUMN tags TEXT");
+
+  // Wave 8: note_metadata, note_sections, note_chunk_embeddings, mcp_dedup.
+  applyWave8Migration(db);
 }
