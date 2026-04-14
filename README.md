@@ -41,6 +41,10 @@ You can do the same thing on a Raspberry Pi, a spare laptop, or just localhost. 
 | **Tags** | `#tag` + namespaced identifier tags (`type:research`) with a hierarchical browser |
 | **Command palette** | `Cmd+K` fuzzy search across every note |
 | **REST API** | Full read/write surface — notes, search, graph, tasks, daily_context, ingest, threads, memories, activity |
+| **MCP server** | 12 tools over stdio + `POST /mcp` streamable-http (Wave 8). `create_note`, `update_note_metadata`, `add_section_summary`, `add_edge`, `remove_edge`, `get_note`, `search_notes`, `semantic_search`, `find_similar`, `walk_graph`, `cluster_graph`, `get_report`. JSON-RPC 2.0 envelope, bearer auth, per-call idempotency via `client_tag` |
+| **Semantic search** | Every note is chunked by heading (primary-per-`##` with sub-chunks + overlap), embedded locally with `Xenova/bge-small-en-v1.5` (384-dim), stored as Float32 BLOBs in SQLite, and searched via brute-force cosine. No external API. Falls back gracefully when `SCRYPT_EMBED_DISABLE=1` |
+| **Live embedding overlay** | A `vault:embedding` WebSocket channel broadcasts `parsing → chunking → embedding → stored → done` events in real time. The UI shows an `ActivityStrip` on the journal view, a CodeMirror `embed-pulse` overlay on the lines being embedded, and a node pulse on the graph view — all driven by one shared `ProgressBus` |
+| **Graph analytics** | Louvain community detection + `get_report` markdown summary (hub nodes, communities, orphans, suggested questions) surfaced as MCP tools |
 | **Git autocommit** | Opt-in background loop records vault history (15-min interval) |
 | **Live reload** | External edits (git pull, another editor, `cp`) appear in the UI instantly |
 
@@ -263,6 +267,57 @@ curl -H "Authorization: Bearer $TOKEN" http://localhost:3777/api/graph | jq '.ed
 
 ![Full-text search](assets/screenshots/search.png)
 
+## Using it as an MCP server (Wave 8)
+
+Scrypt exposes a Model Context Protocol server over two transports:
+
+- **stdio** — `bun run scrypt-mcp` starts a child process that Claude Code / any MCP client can spawn. Reads `SCRYPT_VAULT_DIR` + `SCRYPT_DB_PATH` from the environment.
+- **streamable-http** — `POST /mcp` on the same port as the UI, JSON-RPC 2.0 envelope, bearer auth reusing `SCRYPT_AUTH_TOKEN`. Mounted automatically when `SCRYPT_MCP_HTTP=1` (default).
+
+Both transports share one `ToolRegistry` and one embedding pipeline, so whatever happens over MCP shows up live in the browser UI.
+
+### The 12 tools
+
+| tool | purpose |
+|---|---|
+| `create_note` | Write a markdown file, run the structural parse, embed every chunk, emit progress events |
+| `update_note_metadata` | Patch-upsert `description` / `auto_tags` / `entities` / `themes` on a note |
+| `add_section_summary` | One-line summary on a specific `note_sections` row |
+| `add_edge` / `remove_edge` | Semantic edge management (`wikilink`/`subdomain`/`domain`/`tag` are reserved — managed by the parse pass) |
+| `get_note` | Frontmatter, body, sections, metadata, outgoing + incoming edges. Path-traversal-safe. |
+| `search_notes` | FTS5 bm25 keyword search with `<mark>`-highlighted snippets |
+| `semantic_search` | Embeds the query, brute-force cosine against every stored chunk, groups by note, optional `folder` / `tag` filter |
+| `find_similar` | Every source chunk vs every corpus chunk, self-excluded |
+| `walk_graph` | BFS from a starting node with `depth` / `relation_filter` / `confidence_min`, deduped edges |
+| `cluster_graph` | Louvain community detection — writes `community_id` onto `graph_nodes` |
+| `get_report` | Markdown summary: hub nodes, communities, orphans, suggested questions |
+
+### Chunking + embeddings
+
+- Every `##` heading becomes one primary chunk; sub-chunks with a configurable token overlap get added when a section blows past `SCRYPT_EMBED_MAX_TOKENS`.
+- Each chunk is prefixed with the note title before embedding so cosine matches pick up cross-section context.
+- Vectors are stored as raw `Float32Array` BLOBs in `note_chunk_embeddings` alongside a `content_hash` so re-indexing the same content is a no-op (`hasFreshChunk` check).
+- The engine is a dynamic-import wrapper around `@huggingface/transformers`; swap `SCRYPT_EMBED_MODEL` to any feature-extraction model on the HF Hub.
+
+### Live progress in the UI
+
+Every call to `embedService.embedNote` publishes on a `ProgressBus` shared with the WebSocket manager. The browser listens on `ws://localhost:3777/ws` and dispatches `vault:embedding` frames into a Zustand store, which drives three visual signals at once:
+
+- **`ActivityStrip`** on the journal view — one row per in-flight note with `stored/total` count and elapsed time
+- **CodeMirror `embed-pulse` overlay** — cm-line decoration on the `[startLine, endLine]` range of the chunk currently embedding in the open note
+- **`circle.embedding-pulse`** on the graph view — the node being embedded lights up, then fades on the `done` event
+
+A single MCP `create_note` produces exactly 9 progress events on a 3-section note (`parsing`, `chunking`, 3× `embedding`, 3× `stored`, `done`) with concurrent fs-watch triggers coalesced.
+
+### Backfill CLI
+
+```bash
+SCRYPT_VAULT_DIR=/path/to/vault SCRYPT_DB_PATH=/path/to/vault/.scrypt/scrypt.db \
+  bun run scrypt-reindex
+```
+
+Walks every `.md` in the vault, re-parses structurally, and re-runs the embedding pipeline. Use this when switching embedding models or turning embeddings on for a pre-existing vault.
+
 ## Vault layout
 
 Any `.md` file anywhere under the vault is indexed. Scrypt picks the folder based on your frontmatter; if you omit `domain`/`subdomain`, it falls back to a `kind`-based convention (specs → `docs/specs/`, plans → `docs/plans/`, notes → `notes/inbox/`, etc).
@@ -308,6 +363,14 @@ Full catalog and how they flow through `.env` → `docker-compose.yml` → `src/
 | `SCRYPT_GIT_AUTOCOMMIT_INTERVAL` | `900` | Seconds between autocommits |
 | `SCRYPT_TRASH_RETENTION_DAYS` | `30` | Nightly cron deletes older trash |
 | `SCRYPT_LOG_LEVEL` | `info` | `debug \| info \| warn \| error` |
+| `SCRYPT_MCP_HTTP` | `1` | Mount `POST /mcp` streamable-http transport |
+| `SCRYPT_EMBED_MODEL` | `Xenova/bge-small-en-v1.5` | Any transformers.js feature-extraction model |
+| `SCRYPT_EMBED_CACHE_DIR` | `{scryptPath}/embed-cache` | Where the ~33 MB model weights are cached |
+| `SCRYPT_EMBED_BATCH` | `8` | Chunks per `embedBatch()` call |
+| `SCRYPT_EMBED_MAX_TOKENS` | `450` | Max tokens per primary chunk before sub-chunking |
+| `SCRYPT_EMBED_OVERLAP` | `50` | Token overlap between sub-chunks |
+| `SCRYPT_EMBED_PREWARM` | `0` (compose default `1`) | Load the model once at boot so the first tool call is fast |
+| `SCRYPT_EMBED_DISABLE` | `0` | `1` disables the file-watch auto-embed path and makes `semantic_search` / `find_similar` return `EMBED_DISABLED` |
 
 ## Development
 
