@@ -14,7 +14,7 @@ export const MCP_ERROR = {
   INTERNAL: -32099,
 } as const;
 
-export type McpErrorCode = (typeof MCP_ERROR)[keyof typeof MCP_ERROR];
+type McpErrorCode = (typeof MCP_ERROR)[keyof typeof MCP_ERROR];
 
 export class McpError extends Error {
   constructor(

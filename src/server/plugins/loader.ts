@@ -4,7 +4,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import type { PluginManifest } from "../../shared/types";
 
-export interface LoadedPlugin {
+interface LoadedPlugin {
   manifest: PluginManifest;
   enabled: boolean;
   module: any | null;

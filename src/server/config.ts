@@ -13,7 +13,7 @@ export interface ScryptConfig {
   logLevel: LogLevel;
 }
 
-export interface LoadConfigOpts {
+interface LoadConfigOpts {
   vaultPath: string;
   staticDir?: string;
 }

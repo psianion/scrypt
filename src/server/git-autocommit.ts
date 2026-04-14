@@ -24,7 +24,7 @@ export async function initRepo(vaultPath: string): Promise<void> {
   }
 }
 
-export interface CommitResult {
+interface CommitResult {
   sha: string;
   fileCount: number;
   timestamp: string;

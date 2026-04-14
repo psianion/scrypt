@@ -3,7 +3,7 @@ import type { Database } from "bun:sqlite";
 import type { FileManager } from "./file-manager";
 import { parseFrontmatter } from "./parsers";
 
-export interface ResearchRunRow {
+interface ResearchRunRow {
   id: number;
   thread_slug: string;
   note_path: string;
@@ -17,7 +17,7 @@ export interface ResearchRunRow {
   error: string | null;
 }
 
-export interface InsertResearchRun {
+interface InsertResearchRun {
   thread_slug: string;
   note_path: string;
   status: "success" | "partial" | "failed";

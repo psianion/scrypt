@@ -5,7 +5,7 @@
 // the editor overlay, and the graph view.
 import { create } from "zustand";
 
-export interface EmbeddingEvent {
+interface EmbeddingEvent {
   type: "embedding_progress";
   correlation_id: string;
   note_path: string;

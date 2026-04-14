@@ -21,13 +21,13 @@ export interface EngineLike {
   prewarm?(): Promise<void>;
 }
 
-export interface EmbedResult {
+interface EmbedResult {
   chunks_total: number;
   chunks_embedded: number;
   embed_ms: number;
 }
 
-export interface EmbeddingServiceOptions {
+interface EmbeddingServiceOptions {
   engine: EngineLike;
   repo: ChunkEmbeddingsRepo;
   bus: ProgressBus;

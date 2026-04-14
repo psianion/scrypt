@@ -11,7 +11,7 @@ export interface NoteMetadataPatch {
   themes?: string[];
 }
 
-export interface NoteMetadata {
+interface NoteMetadata {
   note_path: string;
   description: string | null;
   auto_tags: string[] | null;

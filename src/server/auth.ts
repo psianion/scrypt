@@ -1,10 +1,10 @@
 // src/server/auth.ts
-export interface AuthState {
+interface AuthState {
   isProduction: boolean;
   authToken: string | undefined;
 }
 
-export interface AuthResult {
+interface AuthResult {
   ok: boolean;
   reason?: "missing_token" | "wrong_token" | "no_token_configured";
 }

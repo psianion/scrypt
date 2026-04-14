@@ -12,7 +12,7 @@ import type { SectionsRepo } from "../indexer/sections-repo";
 import type { MetadataRepo } from "../indexer/metadata-repo";
 import { parseStructural } from "../indexer/structural-parse";
 
-export interface ReindexOptions {
+interface ReindexOptions {
   vaultDir: string;
   db: Database;
   sections: SectionsRepo;

@@ -1,7 +1,7 @@
 // src/server/slug-resolver.ts
 import type { Database } from "bun:sqlite";
 
-export interface SlugMatch {
+interface SlugMatch {
   path: string;
   title: string | null;
 }

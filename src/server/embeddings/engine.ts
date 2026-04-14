@@ -10,7 +10,7 @@
 // import also means modules that only need the type can include the
 // engine without paying the model-load cost.
 
-export interface EngineOptions {
+interface EngineOptions {
   model: string;
   batchSize: number;
   cacheDir: string;

@@ -1,0 +1,18 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "entry": [
+    "src/server/index.ts",
+    "src/server/cli.ts",
+    "scripts/seed-research-sources.ts",
+    "tests/**/*.test.ts",
+    "tests/**/*.test.tsx"
+  ],
+  "project": [
+    "src/**/*.{ts,tsx}",
+    "scripts/**/*.ts",
+    "tests/**/*.{ts,tsx}"
+  ],
+  "ignoreDependencies": [
+    "tailwindcss"
+  ]
+}

@@ -4,7 +4,7 @@ import type { Database } from "bun:sqlite";
 export type ActivityAction = "create" | "update" | "delete" | "append" | "snapshot";
 export type ActivityActor = "claude" | "ui" | "watcher" | "system";
 
-export interface ActivityRecord {
+interface ActivityRecord {
   action: ActivityAction;
   kind: string | null;
   path: string;
@@ -12,7 +12,7 @@ export interface ActivityRecord {
   meta?: Record<string, unknown>;
 }
 
-export interface ActivityQuery {
+interface ActivityQuery {
   since?: string;
   until?: string;
   actor?: ActivityActor;
@@ -21,7 +21,7 @@ export interface ActivityQuery {
   limit?: number;
 }
 
-export interface ActivityRow {
+interface ActivityRow {
   id: number;
   timestamp: string;
   action: ActivityAction;

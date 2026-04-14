@@ -61,7 +61,7 @@ function validateInput(
   return null;
 }
 
-export interface ToolManifestEntry {
+interface ToolManifestEntry {
   name: string;
   description: string;
   inputSchema: JsonSchema;

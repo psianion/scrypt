@@ -103,7 +103,7 @@ export interface PluginManifest {
   commands?: { id: string; name: string }[];
 }
 
-export interface SkillDef {
+interface SkillDef {
   name: string;
   description: string;
   input: Record<string, string>;
@@ -111,7 +111,7 @@ export interface SkillDef {
   body: string;
 }
 
-export interface CsvSchema {
+interface CsvSchema {
   headers: string[];
   types: string[];
   rowCount: number;

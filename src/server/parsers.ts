@@ -19,7 +19,7 @@ export function parseTag(raw: string): Tag {
   return { namespace, value, raw };
 }
 
-export interface ParsedFrontmatterMeta {
+interface ParsedFrontmatterMeta {
   tags: string[];
   domain: string | null;
   subdomain: string | null;
@@ -173,7 +173,7 @@ export function extractTasks(content: string): ParsedTask[] {
   return tasks;
 }
 
-export interface TimestampContext {
+interface TimestampContext {
   existingCreated: string | null;
 }
 

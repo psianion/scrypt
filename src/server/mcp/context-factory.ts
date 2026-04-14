@@ -12,7 +12,7 @@ import { ProgressBus } from "../embeddings/progress";
 import { Idempotency } from "./idempotency";
 import type { ToolContext } from "./types";
 
-export interface ContextFactoryOptions {
+interface ContextFactoryOptions {
   dbPath: string;
   vaultDir: string;
   model: string;
@@ -22,7 +22,7 @@ export interface ContextFactoryOptions {
   chunkOverlap: number;
 }
 
-export function buildContext(
+function buildContext(
   opts: ContextFactoryOptions,
   userId: string | null,
 ): ToolContext {

@@ -30,7 +30,7 @@ export interface EmbeddingEvent {
 
 type Listener = (e: EmbeddingEvent) => void;
 
-export interface ProgressBusOptions {
+interface ProgressBusOptions {
   coalesceMs?: number;
 }
 

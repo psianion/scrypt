@@ -15,7 +15,7 @@ import {
   extractRunSummary,
 } from "../research";
 
-export interface IngestRequest {
+interface IngestRequest {
   kind: Kind;
   title: string;
   content: string;
@@ -23,7 +23,7 @@ export interface IngestRequest {
   replace?: boolean;
 }
 
-export interface IngestResult {
+interface IngestResult {
   path: string;
   kind: Kind;
   created: boolean;
@@ -33,7 +33,7 @@ export interface IngestResult {
   };
 }
 
-export interface IngestDeps {
+interface IngestDeps {
   vaultPath: string;
   db: Database;
   fm: FileManager;

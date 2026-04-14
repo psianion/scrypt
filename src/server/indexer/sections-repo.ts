@@ -4,7 +4,7 @@
 // MCP add_section_summary tool.
 import type { Database } from "bun:sqlite";
 
-export interface SectionInput {
+interface SectionInput {
   id: string;
   headingSlug: string;
   headingText: string;
@@ -13,7 +13,7 @@ export interface SectionInput {
   endLine: number;
 }
 
-export interface SectionRow {
+interface SectionRow {
   id: string;
   note_path: string;
   heading_slug: string;

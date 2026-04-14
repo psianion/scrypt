@@ -5,7 +5,7 @@
 // substitute any BroadcastFn without spinning up a real WS server.
 import type { ProgressBus, EmbeddingEvent } from "./progress";
 
-export type BroadcastFn = (
+type BroadcastFn = (
   channel: string,
   payload: Record<string, unknown>,
 ) => void;

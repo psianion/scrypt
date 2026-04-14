@@ -30,16 +30,12 @@ export default defineConfig({
             "@codemirror/state",
             "@codemirror/view",
             "@codemirror/commands",
-            "@codemirror/language",
             "@codemirror/lang-markdown",
-            "@codemirror/autocomplete",
           ],
-          // Excel parsing — only loaded on /data for .xlsx files
-          xlsx: ["xlsx"],
           // React + router core — stable, cache-friendly vendor group
           react: ["react", "react-dom", "react-router"],
           // DnD-kit — only loaded on /tasks (Kanban)
-          dnd: ["@dnd-kit/core", "@dnd-kit/sortable"],
+          dnd: ["@dnd-kit/core", "@dnd-kit/sortable", "@dnd-kit/utilities"],
         },
       },
     },

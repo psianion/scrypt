@@ -6,7 +6,7 @@
 // note don't get re-embedded.
 import type { Database } from "bun:sqlite";
 
-export interface ChunkEmbeddingInput {
+interface ChunkEmbeddingInput {
   note_path: string;
   chunk_id: string;
   chunk_text: string;

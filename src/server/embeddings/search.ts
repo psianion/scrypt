@@ -5,7 +5,7 @@
 // rows from ChunkEmbeddingsRepo.scanAll and passing them in.
 import type { ChunkEmbeddingRow } from "./chunks-repo";
 
-export interface ChunkHit {
+interface ChunkHit {
   note_path: string;
   chunk_id: string;
   chunk_text: string;
@@ -14,9 +14,9 @@ export interface ChunkHit {
   score: number;
 }
 
-export type GroupedHit = ChunkHit;
+type GroupedHit = ChunkHit;
 
-export interface SearchOpts {
+interface SearchOpts {
   limit: number;
   minScore: number;
 }

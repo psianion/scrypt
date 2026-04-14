@@ -20,7 +20,7 @@ import type {
   Task,
 } from "../shared/types";
 
-export interface Wave8Pipeline {
+interface Wave8Pipeline {
   sections: SectionsRepo;
   embedService: EmbeddingService;
 }
