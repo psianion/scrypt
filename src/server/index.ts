@@ -22,6 +22,18 @@ import { memoryRoutes } from "./api/memories";
 import { dailyContextRoutes } from "./api/daily-context";
 import { activityRoutes } from "./api/activity";
 import { graphRoutes } from "./api/graph";
+import { mcpRoutes } from "./mcp/routes";
+import { ToolRegistry } from "./mcp/registry";
+import { registerAllTools } from "./mcp/tools";
+import { SectionsRepo } from "./indexer/sections-repo";
+import { MetadataRepo } from "./indexer/metadata-repo";
+import { ChunkEmbeddingsRepo } from "./embeddings/chunks-repo";
+import { EmbeddingEngine } from "./embeddings/engine";
+import { EmbeddingService } from "./embeddings/service";
+import { ProgressBus } from "./embeddings/progress";
+import { Idempotency } from "./mcp/idempotency";
+import { wireWebSocketSink } from "./embeddings/ws-sink";
+import type { ToolContext } from "./mcp/types";
 import { IngestRouter } from "./ingest/router";
 import { ActivityLog } from "./activity";
 import { loadConfig, type ScryptConfig } from "./config";
@@ -94,6 +106,47 @@ export function createApp(config: AppConfig) {
   dailyContextRoutes(router, fm, indexer, config.vaultPath);
   activityRoutes(router, activity);
   graphRoutes(router, db);
+
+  // Wave 8: MCP streamable-http transport mounted at POST /mcp.
+  const mcpRegistry = new ToolRegistry();
+  registerAllTools(mcpRegistry);
+  const mcpBus = new ProgressBus();
+  const mcpEngine = new EmbeddingEngine({
+    model: process.env.SCRYPT_EMBED_MODEL ?? "Xenova/bge-small-en-v1.5",
+    batchSize: Number(process.env.SCRYPT_EMBED_BATCH ?? 8),
+    cacheDir: process.env.SCRYPT_EMBED_CACHE_DIR ?? join(scryptPath, "embed-cache"),
+  });
+  const mcpCtx: ToolContext = {
+    db,
+    sections: new SectionsRepo(db),
+    metadata: new MetadataRepo(db),
+    embeddings: new ChunkEmbeddingsRepo(db),
+    embedService: new EmbeddingService({
+      engine: mcpEngine,
+      repo: new ChunkEmbeddingsRepo(db),
+      bus: mcpBus,
+      chunkOpts: {
+        maxTokens: Number(process.env.SCRYPT_EMBED_MAX_TOKENS ?? 450),
+        overlapTokens: Number(process.env.SCRYPT_EMBED_OVERLAP ?? 50),
+      },
+    }),
+    engine: mcpEngine,
+    bus: mcpBus,
+    idempotency: new Idempotency(db),
+    userId: null,
+    vaultDir: config.vaultPath,
+  };
+  wireWebSocketSink(mcpBus, (channel, payload) =>
+    ws.broadcastChannel(channel, payload),
+  );
+  mcpRoutes(router, mcpRegistry, mcpCtx, async (req) => {
+    // Reuse scrypt's existing bearer token; returns a synthetic user id
+    // when the token matches, null otherwise. Local stdio is the only
+    // path for un-tokened access.
+    const token = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
+    if (!scryptConfig.authToken) return "local";
+    return token === scryptConfig.authToken ? "local" : null;
+  });
 
   let autocommit: AutocommitLoop | undefined;
   if (scryptConfig.gitAutocommit) {
