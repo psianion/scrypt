@@ -8,7 +8,8 @@
     "build": "vite build",
     "test": "bun test tests/server/ && bun test tests/client/",
     "test:server": "bun test tests/server/",
-    "test:client": "bun test tests/client/"
+    "test:client": "bun test tests/client/",
+    "scrypt-mcp": "bun run scripts/scrypt-mcp.ts"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.0.0",
