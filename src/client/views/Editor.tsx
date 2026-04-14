@@ -7,16 +7,20 @@ import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { useStore } from "../store";
 import { api } from "../api";
 import type { Note } from "../../shared/types";
+import { embeddingOverlay } from "./editor/embeddingOverlay";
+import "./editor/embedding-overlay.css";
 
 export function Editor() {
   const location = useLocation();
   const editorRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const currentPathRef = useRef<string | null>(null);
   const [note, setNote] = useState<(Note & { backlinks: any[] }) | null>(null);
   const setCurrentNote = useStore((s) => s.setCurrentNote);
 
   const notePath = location.pathname.replace("/note/", "");
+  currentPathRef.current = notePath || null;
 
   const saveNote = useCallback(async () => {
     if (!viewRef.current || !notePath) return;
@@ -54,6 +58,7 @@ export function Editor() {
             saveTimerRef.current = setTimeout(saveNote, 2000);
           }
         }),
+        embeddingOverlay(currentPathRef),
         EditorView.theme({
           "&": { height: "100%", backgroundColor: "var(--bg-primary)" },
           ".cm-content": { color: "var(--text-primary)", fontFamily: "inherit", padding: "1rem" },
