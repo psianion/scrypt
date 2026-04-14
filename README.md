@@ -1,458 +1,88 @@
 # Scrypt
 
-> A personal second brain for the AI era. Markdown on disk, SQLite-indexed, with a browser UI and a REST API that humans and LLMs both talk to.
+> A personal second brain for the AI era. Markdown on disk, SQLite-indexed, with a browser UI, a REST API, and an MCP server that humans and LLMs both talk to.
 
-Scrypt is the memory layer for how I work. Every project, research thread, interest, and half-baked idea lives here as a `.md` file, and Claude reads and writes into the same vault I do. The result is a knowledge base that keeps its own context across sessions instead of starting from scratch every time I open a new chat.
+Every project, research thread, and half-baked idea lives as a `.md` file. Claude reads and writes into the same vault you do, so your knowledge base keeps its own context across sessions instead of starting from scratch every chat.
 
 ![Editor with backlinks](assets/screenshots/editor.png)
 
-## What it's for
-
-- **A single place to hold the context of every project.** Specs, plans, research notes, decisions, loose ideas — all linked together as markdown. The graph view makes the shape of what you're building visible.
-- **A memory Claude (or any LLM) can read and write.** The REST API gives an agent structured access to the whole vault: pull open threads, fetch linked context, search across everything, drop a research run back. Your notes stop being a dead archive and become live context.
-- **A domain-aware knowledge graph.** Notes declare their `domain:` and `subdomain:` up front, the ingester routes them into a nested folder structure on disk, and the graph connects them along four axes at once: wiki-links, shared subdomain, shared domain, shared identifier tags (`type:research`, `project:longrest`, `stage:draft`).
-- **A shared workspace for parallel Claude sessions.** Run multiple Claude tmux windows at once — one researching, one writing, one reviewing — all pointed at the same vault. The graph and backlinks mean those independent sessions still weave into one coherent knowledge base instead of fragmenting into silos.
-- **Scriptable end to end.** Every feature is available over HTTP. Cron jobs, shell scripts, Claude agents, and custom tools all drive the same API.
-
-## How I run it
-
-It's just a Bun process reading a folder of markdown, so it runs anywhere Bun runs. Two common setups:
-
-**Local (Docker Desktop on your laptop).** Fastest path to a working install. Scrypt runs as a container while your laptop is on, your orchestrator talks to `localhost:3777`, and the vault lives in a folder like `~/scrypt-vault` that any editor can open. Auto-starts on login if Docker Desktop is set to.
-
-**Remote (Oracle Cloud Always Free ARM).** For 24/7 availability — research loops while you sleep, phone access when your laptop is closed. Ampere A1 instance, Tailscale for private access, same Docker Compose setup. Never exposed to the public internet.
-
-You can do the same thing on a Raspberry Pi, a spare laptop, or just localhost. The server has no idea where it's running — it just indexes the folder you point it at.
-
-## What you get
+## Features
 
 | | |
 |---|---|
-| **Editor** | CodeMirror 6 with markdown syntax, auto-save, `Cmd+S`, dark theme |
-| **Links** | `[[wiki-links]]` resolved across folders, automatic backlinks panel, clickable navigation |
-| **Graph** | D3 force-directed graph with 4 edge types (wiki-link, subdomain, domain, shared tag), hover neighbor highlight, zoom/pan, filter toggles |
-| **Sidebar folder tree** | Nested folder tree mirroring the vault, filesystem-driven, with expand-state persistence |
-| **Drop upload** | Drag a `.md` or image onto `/notes` — parsed frontmatter routes it into the right folder automatically |
-| **New note modal** | `Cmd+N` or the sidebar `+` button opens a form with domain/subdomain/tags pickers |
-| **Journal related panel** | Today's journal pane shows related notes, active memories, and draft prompts pulled from `/api/daily_context` |
-| **Search** | SQLite FTS5 full-text search with BM25 ranking, `<b>`-highlighted snippets, live results |
-| **Kanban** | Every `- [ ]` task across your vault on a drag-and-drop board |
-| **Data** | Drop a `.csv` or `.xlsx` in `data/`, get a sortable table preview |
-| **Tags** | `#tag` + namespaced identifier tags (`type:research`) with a hierarchical browser |
-| **Command palette** | `Cmd+K` fuzzy search across every note |
-| **REST API** | Full read/write surface — notes, search, graph, tasks, daily_context, ingest, threads, memories, activity |
-| **MCP server** | 12 tools over stdio + `POST /mcp` streamable-http (Wave 8). `create_note`, `update_note_metadata`, `add_section_summary`, `add_edge`, `remove_edge`, `get_note`, `search_notes`, `semantic_search`, `find_similar`, `walk_graph`, `cluster_graph`, `get_report`. JSON-RPC 2.0 envelope, bearer auth, per-call idempotency via `client_tag` |
-| **Semantic search** | Every note is chunked by heading (primary-per-`##` with sub-chunks + overlap), embedded locally with `Xenova/bge-small-en-v1.5` (384-dim), stored as Float32 BLOBs in SQLite, and searched via brute-force cosine. No external API. Falls back gracefully when `SCRYPT_EMBED_DISABLE=1` |
-| **Live embedding overlay** | A `vault:embedding` WebSocket channel broadcasts `parsing → chunking → embedding → stored → done` events in real time. The UI shows an `ActivityStrip` on the journal view, a CodeMirror `embed-pulse` overlay on the lines being embedded, and a node pulse on the graph view — all driven by one shared `ProgressBus` |
-| **Graph analytics** | Louvain community detection + `get_report` markdown summary (hub nodes, communities, orphans, suggested questions) surfaced as MCP tools |
-| **Git autocommit** | Opt-in background loop records vault history (15-min interval) |
-| **Live reload** | External edits (git pull, another editor, `cp`) appear in the UI instantly |
+| **Editor** | CodeMirror 6 markdown, auto-save, `[[wiki-links]]`, backlinks panel |
+| **Graph** | D3 force graph with 4 edge types (wiki-link, subdomain, domain, shared tag) |
+| **Search** | SQLite FTS5 keyword search + **semantic search** over local `bge-small-en-v1.5` embeddings |
+| **MCP server** | 12 tools over stdio + `POST /mcp` streamable-http (Wave 8). JSON-RPC 2.0, bearer auth, idempotent `client_tag`s |
+| **Live overlay** | Journal view ActivityStrip + CodeMirror `embed-pulse` + graph node pulse, all driven by a `vault:embedding` WebSocket channel |
+| **REST API** | Full read/write surface for notes, search, graph, tasks, threads, research runs, daily context |
+| **Kanban / Data / Tags** | Every `- [ ]` across the vault on one board; CSV/XLSX preview; hierarchical tag browser |
+| **Git autocommit** | Opt-in background loop snapshots the vault every 15 min |
 
 ![Graph view](assets/screenshots/graph.png)
 
-## Built with
-
-- **[Bun](https://bun.sh)** — runtime, bundler, test runner, SQLite driver, HTTP server
-- **React 19 + Vite + Tailwind** — client
-- **CodeMirror 6** — editor
-- **D3** — graph rendering (force, zoom, drag, selection)
-- **SQLite FTS5** — index and search
-- **Zustand** — client state
-- **`@dnd-kit`** — kanban drag-and-drop
-- **gray-matter** — frontmatter parsing
-
-Zero runtime dependencies beyond Bun. No Node, no npm, no database server to install.
-
-## Who it's for
-
-- **You, if you like markdown** and want something more capable than "a folder of files" without locking your data in a cloud app.
-- **Developers** who want to drive a knowledge base from scripts — dump research notes from a curl call, query the graph from a cron job, build a custom view on top of the API.
-- **Anyone building with Claude or another LLM** who needs a scriptable place to write and read notes. Every endpoint takes JSON in, returns JSON out, and the vault is plain markdown you can still edit by hand.
-
-## Quick start — Docker Desktop (recommended)
-
-The fastest path from zero to running. Works on macOS, Windows, Linux.
+## Quick start (Docker Desktop)
 
 ```bash
 git clone https://github.com/psianion/scrypt.git
 cd scrypt
-
-# Create your vault outside the repo so rebuilds never touch it
-mkdir -p ~/scrypt-vault
-
-# Set up .env
 cp .env.example .env
-# Edit .env and set:
-#   SCRYPT_AUTH_TOKEN=$(openssl rand -hex 32)
-#   SCRYPT_VAULT_DIR=/Users/you/scrypt-vault   # absolute path
-#   SCRYPT_GIT_AUTOCOMMIT=1
-
-# Boot
+# set SCRYPT_AUTH_TOKEN + SCRYPT_VAULT_DIR=/Users/you/scrypt-vault
+mkdir -p /Users/you/scrypt-vault
 docker compose up -d --build
-docker compose logs -f scrypt    # confirm: "Scrypt running on http://localhost:3777"
+open http://localhost:3777
 ```
 
-Open <http://localhost:3777>. Drop markdown files into `~/scrypt-vault/` from Finder, VS Code, or `cp` — they appear in the UI within 200 ms.
+Or run it directly: `SCRYPT_VAULT_PATH=~/scrypt-vault bun run src/server/index.ts`.
 
-**Auto-start at login.** Docker Desktop → Settings → General → ✅ *Start Docker Desktop when you log in*. Combined with `restart: unless-stopped` in `docker-compose.yml`, Scrypt will be up every time you boot your laptop.
+## MCP — second brain for Claude
 
-See `docs/BUILD_AND_RUN.md` for every other run mode (dev with hot reload, systemd, Oracle ARM, Raspberry Pi).
-
-## Quick start — Bun (no Docker)
+Register the Scrypt MCP server in Claude Code:
 
 ```bash
-bun install
-bun run build
-
-export SCRYPT_AUTH_TOKEN=$(openssl rand -hex 32)
-export SCRYPT_VAULT_PATH=~/scrypt-vault
-mkdir -p ~/scrypt-vault
-bun src/server/index.ts
+./scripts/install-scrypt-mcp.sh
 ```
 
-Open <http://localhost:3777>.
+That installs the 12 tools over HTTP:
 
-## Writing a note
+- **Reads** — `get_note`, `search_notes`, `semantic_search`, `find_similar`, `walk_graph`, `cluster_graph`, `get_report`
+- **Writes** — `create_note`, `update_note_metadata`, `add_section_summary`, `add_edge`, `remove_edge`
 
-Every note is a markdown file with optional YAML frontmatter. Minimum:
+Every `create_note` runs the full chunking + embedding pipeline server-side and broadcasts live progress to the UI overlay.
 
-```markdown
----
-title: Welcome
----
-
-# Welcome
-
-Your first note.
-```
-
-For the domain-aware graph and folder routing, declare a domain and subdomain:
-
-```markdown
----
-title: DnD Landing Page Strategy
-domain: dnd                  # top-level folder
-subdomain: research          # subfolder under the domain
-tags:
-  - type:research            # namespaced identity tag — linked in graph
-  - project:longrest         # namespaced identity tag
-  - stage:draft              # namespaced identity tag
-  - landing-page             # flat topic tag
-  - cta                      # flat topic tag
----
-
-# Strategy
-
-Link to [[p2p-vs-saas-vtt-analysis]] and it'll show up in the backlinks
-panel of that note automatically. The graph will connect us via:
-- the wiki-link edge (strong)
-- the shared `subdomain: research` under `domain: dnd` (medium)
-- the shared `project:longrest` tag (medium)
-
-- [ ] Publish landing v2
-- [x] Competitor analysis
-```
-
-Drop this file into `~/scrypt-vault/notes/inbox/welcome.md` (or POST it to `/api/ingest` — see below). On save, the ingest router puts it at `dnd/research/dnd-landing-page-strategy.md`, the watcher indexes it, the backlinks panel fills in, and the graph edges appear.
-
-## Using it in the browser
-
-| Route | Shows |
-|---|---|
-| `/` | Redirects to `/journal` |
-| `/journal` | Today's daily note with a "Related" right-rail (notes, memories, draft prompts) |
-| `/notes` | All notes with sort + tag filter + drag-drop upload |
-| `/graph` | Interactive D3 force-directed graph with per-edge-type filter toggles |
-| `/tasks` | Kanban board of every inline task |
-| `/data` | CSV/XLSX browser with sortable preview |
-| `/tags` | Hierarchical tag tree with counts |
-| `/search` | Live full-text search |
-| `/settings` | Editor preferences |
-| `/note/*path` | Edit any note |
-
-**Shortcuts:** `Cmd+K` opens the command palette, `Cmd+N` opens the new-note modal, `Cmd+S` saves the current note.
-
-**Sidebar:** `+ New note` at the top, main navigation, then a filesystem-mirrored folder tree (`dnd/research/...`, `scrypt-dev/specs/...`). Folders persist their expand state across sessions. Empty folders auto-hide.
-
-![Kanban board](assets/screenshots/kanban.png)
-
-## Using it from the API
-
-The browser UI talks to the same REST API your scripts will. JSON in, JSON out. Every route in production requires a bearer token:
-
-```
-Authorization: Bearer <your-SCRYPT_AUTH_TOKEN>
-```
-
-In dev mode (not `NODE_ENV=production`), localhost requests bypass auth for convenience. Full endpoint reference lives in `docs/API.md`.
-
-### Ingest a note
-
-The smartest write path — respects frontmatter `domain`/`subdomain` routing, returns the canonical path.
-
-```bash
-curl -X POST http://localhost:3777/api/ingest \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "kind": "note",
-    "title": "Smoke test",
-    "content": "hello from curl",
-    "frontmatter": {
-      "domain": "scrypt-dev",
-      "subdomain": "smoke",
-      "tags": ["type:test"]
-    }
-  }'
-# → { "path": "scrypt-dev/smoke/smoke-test.md", "slug": "smoke-test" }
-```
-
-### Get today's orchestrator context bundle
-
-One call that gives an LLM everything it needs to start a session: today's journal entry, open threads, active memories, recent notes, tag cloud, and related items.
-
-```bash
-curl -H "Authorization: Bearer $TOKEN" http://localhost:3777/api/daily_context | jq .
-```
-
-### Search
-
-```bash
-curl -H "Authorization: Bearer $TOKEN" \
-  "http://localhost:3777/api/search?q=architecture"
-```
-
-### Graph as JSON
-
-```bash
-curl -H "Authorization: Bearer $TOKEN" http://localhost:3777/api/graph | jq '.edges | group_by(.type) | map({type: .[0].type, count: length})'
-```
-
-### Full endpoint map
-
-| Method | Path | Purpose |
-|---|---|---|
-| `POST` | `/api/ingest` | Primary write path — routes by frontmatter `kind`/`domain`/`subdomain` |
-| `GET` | `/api/notes` | List notes with `?tag`, `?folder`, `?sort` filters |
-| `GET` | `/api/notes/*path` | Read a note with frontmatter + backlinks |
-| `POST` | `/api/notes` | Create a note (lower-level than `/api/ingest`) |
-| `PUT` | `/api/notes/*path` | Update a note |
-| `DELETE` | `/api/notes/*path` | Soft-delete to `.scrypt/trash/` |
-| `GET` | `/api/daily_context` | Orchestrator daily bundle (journal + threads + memories + related) |
-| `GET` | `/api/threads` | List research threads (`?status`, `?priority`) |
-| `GET` | `/api/threads/:slug` | Read one thread with content |
-| `PATCH` | `/api/threads/:slug` | Update thread status, priority, run_count |
-| `POST` | `/api/research_runs` | Record an LLM research run |
-| `GET` | `/api/research_runs` | List runs (`?thread`, `?status`, `?since`) |
-| `GET` | `/api/memories` | List memory profiles (`?active`, `?category`) |
-| `GET` | `/api/activity` | Write history (`?kind`, `?actor`, `?limit`, `?since`, `?until`) |
-| `GET` | `/api/search?q=` | Full-text search with FTS5 |
-| `GET` | `/api/search/tags?q=` | Tag completion |
-| `GET` | `/api/graph` | Whole-vault graph with 4 edge types |
-| `GET` | `/api/graph/*path?depth=N` | Local subgraph walk |
-| `GET` | `/api/backlinks/*path` | Notes linking to this one |
-| `GET` | `/api/journal/today` | Today's note (auto-create from template) |
-| `GET` | `/api/journal/:date` | Entry for a specific date |
-| `GET` | `/api/templates` | List templates |
-| `POST` | `/api/templates/apply` | Create a note from a template |
-| `GET` | `/api/tasks` | Inline tasks (`?board`, `?done`, `?tag`) |
-| `PUT` | `/api/tasks/:id` | Update task state |
-| `GET` | `/api/data` | List CSV/XLSX files |
-| `GET` | `/api/data/*file` | Parsed CSV as JSON |
-| `GET` | `/api/data/*file/schema` | Headers, types, row count |
-| `POST` | `/api/files/upload` | Upload an asset (image, PDF) |
-| `GET` | `/api/files/*path` | Serve an uploaded asset |
-| `GET` | `/api/plugins` | List installed plugins |
-| `GET` | `/api/skills` | List skill definitions |
-
-![Full-text search](assets/screenshots/search.png)
-
-## Using it as an MCP server (Wave 8)
-
-Scrypt exposes a Model Context Protocol server over two transports:
-
-- **stdio** — `bun run scrypt-mcp` starts a child process that Claude Code / any MCP client can spawn. Reads `SCRYPT_VAULT_DIR` + `SCRYPT_DB_PATH` from the environment.
-- **streamable-http** — `POST /mcp` on the same port as the UI, JSON-RPC 2.0 envelope, bearer auth reusing `SCRYPT_AUTH_TOKEN`. Mounted automatically when `SCRYPT_MCP_HTTP=1` (default).
-
-Both transports share one `ToolRegistry` and one embedding pipeline, so whatever happens over MCP shows up live in the browser UI.
-
-### The 12 tools
-
-| tool | purpose |
-|---|---|
-| `create_note` | Write a markdown file, run the structural parse, embed every chunk, emit progress events |
-| `update_note_metadata` | Patch-upsert `description` / `auto_tags` / `entities` / `themes` on a note |
-| `add_section_summary` | One-line summary on a specific `note_sections` row |
-| `add_edge` / `remove_edge` | Semantic edge management (`wikilink`/`subdomain`/`domain`/`tag` are reserved — managed by the parse pass) |
-| `get_note` | Frontmatter, body, sections, metadata, outgoing + incoming edges. Path-traversal-safe. |
-| `search_notes` | FTS5 bm25 keyword search with `<mark>`-highlighted snippets |
-| `semantic_search` | Embeds the query, brute-force cosine against every stored chunk, groups by note, optional `folder` / `tag` filter |
-| `find_similar` | Every source chunk vs every corpus chunk, self-excluded |
-| `walk_graph` | BFS from a starting node with `depth` / `relation_filter` / `confidence_min`, deduped edges |
-| `cluster_graph` | Louvain community detection — writes `community_id` onto `graph_nodes` |
-| `get_report` | Markdown summary: hub nodes, communities, orphans, suggested questions |
-
-### Chunking + embeddings
-
-- Every `##` heading becomes one primary chunk; sub-chunks with a configurable token overlap get added when a section blows past `SCRYPT_EMBED_MAX_TOKENS`.
-- Each chunk is prefixed with the note title before embedding so cosine matches pick up cross-section context.
-- Vectors are stored as raw `Float32Array` BLOBs in `note_chunk_embeddings` alongside a `content_hash` so re-indexing the same content is a no-op (`hasFreshChunk` check).
-- The engine is a dynamic-import wrapper around `@huggingface/transformers`; swap `SCRYPT_EMBED_MODEL` to any feature-extraction model on the HF Hub.
-
-### Live progress in the UI
-
-Every call to `embedService.embedNote` publishes on a `ProgressBus` shared with the WebSocket manager. The browser listens on `ws://localhost:3777/ws` and dispatches `vault:embedding` frames into a Zustand store, which drives three visual signals at once:
-
-- **`ActivityStrip`** on the journal view — one row per in-flight note with `stored/total` count and elapsed time
-- **CodeMirror `embed-pulse` overlay** — cm-line decoration on the `[startLine, endLine]` range of the chunk currently embedding in the open note
-- **`circle.embedding-pulse`** on the graph view — the node being embedded lights up, then fades on the `done` event
-
-A single MCP `create_note` produces exactly 9 progress events on a 3-section note (`parsing`, `chunking`, 3× `embedding`, 3× `stored`, `done`) with concurrent fs-watch triggers coalesced.
-
-### Backfill CLI
-
-```bash
-SCRYPT_VAULT_DIR=/path/to/vault SCRYPT_DB_PATH=/path/to/vault/.scrypt/scrypt.db \
-  bun run scrypt-reindex
-```
-
-Walks every `.md` in the vault, re-parses structurally, and re-runs the embedding pipeline. Use this when switching embedding models or turning embeddings on for a pre-existing vault.
-
-## Vault layout
-
-Any `.md` file anywhere under the vault is indexed. Scrypt picks the folder based on your frontmatter; if you omit `domain`/`subdomain`, it falls back to a `kind`-based convention (specs → `docs/specs/`, plans → `docs/plans/`, notes → `notes/inbox/`, etc).
-
-```
-~/scrypt-vault/
-├── dnd/                        ← domain: dnd
-│   ├── research/               ← subdomain: research
-│   │   ├── post-map-runner.md
-│   │   └── p2p-vs-saas.md
-│   └── plans/
-│       └── landing-v2.md
-├── scrypt-dev/                 ← domain: scrypt-dev
-│   ├── specs/
-│   └── plans/
-├── notes/
-│   └── inbox/                  ← fallback for notes without a domain
-├── journal/                    ← daily entries (YYYY-MM-DD.md)
-├── memory/                     ← active interest profiles for orchestrator context
-├── data/                       ← CSV/XLSX files, browsable in the Data view
-├── templates/                  ← markdown templates with {date}, {title}, {now}
-├── assets/                     ← uploaded images and attachments
-└── .scrypt/                    ← Scrypt's own state (gitignored)
-    ├── scrypt.db               SQLite index — regenerated if deleted
-    └── trash/                  Soft-deleted notes
-```
-
-![CSV preview in Data view](assets/screenshots/data-csv.png)
+For stdio instead of HTTP: `bun run scrypt-mcp`.
 
 ## Environment variables
 
-Full catalog and how they flow through `.env` → `docker-compose.yml` → `src/server/config.ts` lives in `docs/BUILD_AND_RUN.md`. Quick reference:
+Core:
 
-| Var | Default | Required? |
+| Var | Default | Note |
 |---|---|---|
-| `SCRYPT_AUTH_TOKEN` | — | **Yes** in production |
-| `SCRYPT_VAULT_PATH` | `process.cwd()` | Yes — path inside the container |
-| `SCRYPT_VAULT_DIR` | `./vault` | Compose-only — host path mounted as `/vault` |
-| `SCRYPT_STATIC_DIR` | `{vault}/dist` | Yes under Docker — point at `/app/dist` |
-| `SCRYPT_PORT` | `3777` | No |
-| `NODE_ENV` | `development` | Set to `production` in deployment |
-| `SCRYPT_GIT_AUTOCOMMIT` | `0` | Opt-in (`1` enables the 15-min loop) |
-| `SCRYPT_GIT_AUTOCOMMIT_INTERVAL` | `900` | Seconds between autocommits |
-| `SCRYPT_TRASH_RETENTION_DAYS` | `30` | Nightly cron deletes older trash |
-| `SCRYPT_LOG_LEVEL` | `info` | `debug \| info \| warn \| error` |
-| `SCRYPT_MCP_HTTP` | `1` | Mount `POST /mcp` streamable-http transport |
-| `SCRYPT_EMBED_MODEL` | `Xenova/bge-small-en-v1.5` | Any transformers.js feature-extraction model |
-| `SCRYPT_EMBED_CACHE_DIR` | `{scryptPath}/embed-cache` | Where the ~33 MB model weights are cached |
-| `SCRYPT_EMBED_BATCH` | `8` | Chunks per `embedBatch()` call |
-| `SCRYPT_EMBED_MAX_TOKENS` | `450` | Max tokens per primary chunk before sub-chunking |
-| `SCRYPT_EMBED_OVERLAP` | `50` | Token overlap between sub-chunks |
-| `SCRYPT_EMBED_PREWARM` | `0` (compose default `1`) | Load the model once at boot so the first tool call is fast |
-| `SCRYPT_EMBED_DISABLE` | `0` | `1` disables the file-watch auto-embed path and makes `semantic_search` / `find_similar` return `EMBED_DISABLED` |
+| `SCRYPT_AUTH_TOKEN` | — | Required in production for non-localhost callers |
+| `SCRYPT_VAULT_PATH` | `cwd` | Where your notes live (inside the container: `/vault`) |
+| `SCRYPT_VAULT_DIR` | `./vault` | Host path mounted as `/vault` by docker compose |
+| `SCRYPT_PORT` | `3777` | |
+| `SCRYPT_GIT_AUTOCOMMIT` | `0` | `1` enables the 15-min vault snapshot loop |
 
-## Development
+Wave 8 embeddings (all optional, sensible defaults):
 
-```bash
-bun install
-bun run dev           # server with hot reload on :3777
-bun run dev:client    # Vite on :5173 for the React side
-bun run test          # full suite (server + client) — currently 358 pass / 0 fail
-bun run build         # production client bundle
-bunx tsc --noEmit     # type check — currently 0 errors
-```
+| Var | Default |
+|---|---|
+| `SCRYPT_EMBED_MODEL` | `Xenova/bge-small-en-v1.5` |
+| `SCRYPT_EMBED_CACHE_DIR` | `/data/embed-cache` (named volume in compose) |
+| `SCRYPT_EMBED_MAX_TOKENS` / `SCRYPT_EMBED_OVERLAP` / `SCRYPT_EMBED_BATCH` | `450` / `50` / `8` |
+| `SCRYPT_EMBED_PREWARM` | `1` (compose) — load the model at boot |
+| `SCRYPT_EMBED_DISABLE` | `0` — set `1` to skip embeddings entirely |
 
-```
-src/
-├── server/                   Bun server — API, indexer, watcher, WebSocket
-│   ├── api/                  REST route handlers (one file per endpoint group)
-│   ├── ingest/               IngestRouter + kind-specific path resolvers
-│   ├── db.ts                 SQLite schema, FTS5, migrations
-│   ├── indexer.ts            Two-pass reindex pipeline + link_index writer
-│   ├── file-manager.ts       Single owner of disk writes (fm.writeNote)
-│   ├── parsers.ts            Frontmatter, wiki-links, tags, tasks, parseTag
-│   ├── slug-resolver.ts      Cross-folder [[wiki-link]] resolution
-│   ├── git-autocommit.ts     Background vault history loop
-│   ├── cli.ts                Maintenance CLI (trash prune, vacuum, FTS rebuild)
-│   ├── config.ts             env → ScryptConfig
-│   ├── auth.ts               Bearer token gate
-│   ├── router.ts             Route matcher
-│   └── websocket.ts          Live-reload broadcaster
-├── client/                   React + Vite + Tailwind
-│   ├── views/                Routed views (GraphView, NotesList, Editor, etc.)
-│   ├── components/           Sidebar, FolderTree, NewNoteModal, RelatedPanel, etc.
-│   ├── store.ts              Zustand
-│   └── api.ts                Fetch wrapper for the REST API
-└── shared/
-    ├── types.ts              Types used on both sides (Note, NoteMeta, Tag, etc.)
-    └── graph-types.ts        GraphNode/Edge/Response for /api/graph
-```
+Full catalog and three-layer flow (`.env → docker-compose → loadConfig`) in `docs/BUILD_AND_RUN.md`.
 
-## Architecture + deep docs
+## Docs
 
-The `docs/` directory (gitignored — lives on your disk only) has the deep architecture notes:
+`docs/` is gitignored (your local-only copy):
 
-- **`docs/BUILD_AND_RUN.md`** — every run mode, env var walkthrough, troubleshooting, maintenance
-- **`docs/ARCHITECTURE.md`** — data flow, indexer pipeline, invariants, graph builder, why things are the way they are
-- **`docs/API.md`** — every endpoint with auth, params, request/response shapes, status codes, error forms
-
-## Contributing
-
-1. Fork, create a feature branch
-2. Write tests first — TDD is the house style, check existing tests for the pattern
-3. `bun run test` must pass, `bunx tsc --noEmit` must be clean
-4. Open a PR against `main`
-
-## Deploying to Oracle Cloud (ARM Always Free)
-
-Scrypt is designed to run on an Oracle Cloud Ampere A1 Always-Free VM (aarch64, 1 GB RAM minimum, 6 GB recommended). Runs in Docker or directly via systemd — `docs/BUILD_AND_RUN.md` has the full walkthrough.
-
-### Short version
-
-```bash
-# On the VM, after SSH
-sudo apt-get update && sudo apt-get install -y docker.io docker-compose-v2 git
-sudo usermod -aG docker $USER
-# Log out / back in
-
-git clone https://github.com/psianion/scrypt.git
-cd scrypt
-cp .env.example .env
-# Edit .env — set SCRYPT_AUTH_TOKEN, SCRYPT_VAULT_DIR=/home/ubuntu/vault
-mkdir -p /home/ubuntu/vault
-docker compose up -d --build
-```
-
-Install Tailscale, join your tailnet, and hit `http://<tailnet-ip>:3777` from your laptop or phone.
-
-### Nightly maintenance cron
-
-Prune trash, vacuum the DB, and rebuild FTS once a day:
-
-```
-0 3 * * * docker exec scrypt bun /app/src/server/cli.ts maintenance
-```
+- `docs/BUILD_AND_RUN.md` — every run mode, env walkthrough, maintenance, troubleshooting
+- `docs/ARCHITECTURE.md` — data model, indexer pipeline, Wave 8 MCP + embeddings chapter, load-bearing invariants
+- `docs/API.md` — every REST endpoint, every MCP tool, auth, error codes
 
 ## License
 
