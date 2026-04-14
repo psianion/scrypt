@@ -54,8 +54,13 @@ describe("handleMcpHttp", () => {
       }),
     });
     const res = await handleMcpHttp(req, reg, stubCtx, async () => "user-1");
-    const body = (await res.json()) as { result: { echoed: string } };
-    expect(body.result.echoed).toBe("hi");
+    const body = (await res.json()) as {
+      result: { content: Array<{ type: string; text: string }> };
+    };
+    expect(body.result.content).toHaveLength(1);
+    expect(body.result.content[0].type).toBe("text");
+    const inner = JSON.parse(body.result.content[0].text) as { echoed: string };
+    expect(inner.echoed).toBe("hi");
   });
 
   test("missing auth returns 401", async () => {

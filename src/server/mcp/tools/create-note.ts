@@ -141,6 +141,25 @@ export const createNoteTool: ToolDef<Input, Output> = {
 
         const embed = await ctx.embedService.embedNote(parsed, correlationId);
 
+        // Delegate to the legacy indexer if one is wired in. Docker's
+        // fsevents propagation through bind mounts is unreliable on
+        // macOS, so relying on the file watcher alone leaves the
+        // `notes` / `notes_fts` / tags / backlinks / tasks tables out of
+        // sync after an MCP write. Calling reindexNote directly makes
+        // the update synchronous and reliable. The embedding pipeline
+        // that runs inside reindexNote coalesces on (path, content_hash)
+        // against the call we just made, so it's a fast-path no-op.
+        if (ctx.legacyIndexer) {
+          try {
+            await ctx.legacyIndexer.reindexNote(input.path);
+          } catch (err) {
+            console.error(
+              `[create_note] legacyIndexer.reindexNote(${input.path}) failed:`,
+              err,
+            );
+          }
+        }
+
         const result: Output = {
           note_path: input.path,
           node_id: input.path,

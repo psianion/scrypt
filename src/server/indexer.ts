@@ -1,5 +1,6 @@
 // src/server/indexer.ts
 import type { Database } from "bun:sqlite";
+import { randomUUID } from "node:crypto";
 import type { FileManager } from "./file-manager";
 import {
   parseFrontmatter,
@@ -8,6 +9,9 @@ import {
   extractTasks,
 } from "./parsers";
 import { resolveSlug } from "./slug-resolver";
+import { parseStructural } from "./indexer/structural-parse";
+import type { SectionsRepo } from "./indexer/sections-repo";
+import type { EmbeddingService } from "./embeddings/service";
 import type {
   SearchResult,
   Backlink,
@@ -16,10 +20,16 @@ import type {
   Task,
 } from "../shared/types";
 
+export interface Wave8Pipeline {
+  sections: SectionsRepo;
+  embedService: EmbeddingService;
+}
+
 export class Indexer {
   constructor(
     private db: Database,
-    private fm: FileManager
+    private fm: FileManager,
+    private wave8?: Wave8Pipeline,
   ) {}
 
   private slugifyTitle(title: string): string {
@@ -202,6 +212,31 @@ export class Indexer {
     }
 
     this.writeLinkIndexRows(note.path, note.title ?? "");
+
+    if (this.wave8) {
+      const raw = await this.fm.readRaw(path);
+      if (raw !== null) {
+        const parsed = parseStructural(path, raw);
+        this.wave8.sections.replaceNoteSections(
+          path,
+          parsed.sections.map((s) => ({
+            id: s.id,
+            headingSlug: s.headingSlug,
+            headingText: s.headingText,
+            level: s.level,
+            startLine: s.startLine,
+            endLine: s.endLine,
+          })),
+        );
+        if (process.env.SCRYPT_EMBED_DISABLE !== "1") {
+          try {
+            await this.wave8.embedService.embedNote(parsed, randomUUID());
+          } catch (err) {
+            console.error(`[scrypt] embed failed for ${path}:`, err);
+          }
+        }
+      }
+    }
   }
 
   async removeNote(path: string): Promise<void> {

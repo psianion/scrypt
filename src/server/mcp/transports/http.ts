@@ -61,6 +61,32 @@ export async function handleMcpHttp(
   const correlationId = randomUUID();
 
   try {
+    // MCP SDK handshake — Claude Code / any MCP client sends these
+    // before tools/list or tools/call. Keep stateless; we don't track
+    // sessions since the HTTP transport is request-scoped.
+    if (body.method === "initialize") {
+      const clientProtocol =
+        (body.params as { protocolVersion?: string } | undefined)
+          ?.protocolVersion ?? "2024-11-05";
+      return jsonRpcResponse(body.id, {
+        result: {
+          protocolVersion: clientProtocol,
+          capabilities: { tools: {} },
+          serverInfo: { name: "scrypt", version: "0.8.0" },
+        },
+      });
+    }
+    if (
+      body.method === "notifications/initialized" ||
+      body.method === "initialized"
+    ) {
+      // Notification — spec-wise has no id, but some clients still
+      // POST it as a request. Acknowledge with an empty result.
+      return jsonRpcResponse(body.id, { result: {} });
+    }
+    if (body.method === "ping") {
+      return jsonRpcResponse(body.id, { result: {} });
+    }
     if (body.method === "tools/list") {
       return jsonRpcResponse(body.id, {
         result: { tools: registry.listTools() },
@@ -77,8 +103,39 @@ export async function handleMcpHttp(
           },
         });
       }
-      const result = await registry.call(name, args, ctx, correlationId);
-      return jsonRpcResponse(body.id, { result });
+      // MCP spec: tools/call must return { content: [{type, text}], isError? }.
+      // Tool-execution errors land in result.isError, NOT in the JSON-RPC
+      // error envelope — that's reserved for protocol-level failures.
+      try {
+        const toolResult = await registry.call(
+          name,
+          args,
+          ctx,
+          correlationId,
+        );
+        return jsonRpcResponse(body.id, {
+          result: {
+            content: [
+              { type: "text", text: JSON.stringify(toolResult) },
+            ],
+          },
+        });
+      } catch (toolErr) {
+        if (toolErr instanceof McpError) {
+          return jsonRpcResponse(body.id, {
+            result: {
+              isError: true,
+              content: [
+                {
+                  type: "text",
+                  text: JSON.stringify(toolErr.toJsonRpc(correlationId)),
+                },
+              ],
+            },
+          });
+        }
+        throw toolErr;
+      }
     }
     return jsonRpcResponse(body.id, {
       error: {

@@ -1,5 +1,6 @@
 // src/client/api.ts
 import type { Note, NoteMeta, SearchResult, Task, LocalGraphNode, LocalGraphEdge, WsMessage } from "../shared/types";
+import { useEmbeddingProgress } from "./stores/embeddingProgress";
 import type { GraphResponse } from "../shared/graph-types";
 
 const BASE = "";
@@ -80,18 +81,34 @@ export const api = {
   },
 };
 
-// WebSocket
+// WebSocket — multiplexes the legacy note-change stream with the Wave 8
+// `vault:embedding` channel. Re-creates itself on close so the embedding
+// progress bridge stays attached across reconnects.
 export function connectWebSocket(onMessage: (msg: WsMessage) => void): WebSocket {
   const protocol = location.protocol === "https:" ? "wss:" : "ws:";
   const ws = new WebSocket(`${protocol}//${location.host}/ws`);
 
   ws.onmessage = (event) => {
-    const msg = JSON.parse(event.data) as WsMessage;
-    onMessage(msg);
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(String(event.data));
+    } catch {
+      return;
+    }
+    const frame = parsed as { channel?: string; type?: string };
+    if (
+      frame?.channel === "vault:embedding" &&
+      frame?.type === "embedding_progress"
+    ) {
+      useEmbeddingProgress.getState().onEvent(frame as Parameters<
+        ReturnType<typeof useEmbeddingProgress.getState>["onEvent"]
+      >[0]);
+      return;
+    }
+    onMessage(parsed as WsMessage);
   };
 
   ws.onclose = () => {
-    // Reconnect after 2 seconds
     setTimeout(() => connectWebSocket(onMessage), 2000);
   };
 

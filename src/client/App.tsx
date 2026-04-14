@@ -16,6 +16,7 @@ import { DataExplorer } from "./views/DataExplorer";
 import { TagBrowser } from "./views/TagBrowser";
 import { Settings } from "./views/Settings";
 import { useStore } from "./store";
+import { connectWebSocket } from "./api";
 
 export function AppContent() {
   const commandPaletteOpen = useStore((s) => s.commandPaletteOpen);
@@ -42,6 +43,14 @@ export function AppContent() {
     };
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
+  }, []);
+
+  useEffect(() => {
+    // Single app-level WebSocket. connectWebSocket routes vault:embedding
+    // frames into the embedding-progress store (driving ActivityStrip +
+    // CodeMirror overlay + GraphView node pulses) and forwards all other
+    // frames to the caller.
+    connectWebSocket(() => {});
   }, []);
 
   return (

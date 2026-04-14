@@ -35,14 +35,57 @@ export interface EmbeddingServiceOptions {
 }
 
 export class EmbeddingService {
+  private inflight = new Map<string, Promise<EmbedResult>>();
+
   constructor(private opts: EmbeddingServiceOptions) {}
 
   async embedNote(
     parsed: ParsedStructural,
     correlationId: string,
   ): Promise<EmbedResult> {
+    // Coalesce concurrent embeds for the same (path, content_hash) so
+    // that MCP create_note + the fs watcher's follow-up reindexNote
+    // share a single pipeline run instead of racing and double-firing
+    // every UI overlay event.
+    const key = `${parsed.notePath}\u0000${parsed.contentHash}`;
+    const existing = this.inflight.get(key);
+    if (existing) return existing;
+    const promise = this.embedNoteImpl(parsed, correlationId).finally(() => {
+      this.inflight.delete(key);
+    });
+    this.inflight.set(key, promise);
+    return promise;
+  }
+
+  private async embedNoteImpl(
+    parsed: ParsedStructural,
+    correlationId: string,
+  ): Promise<EmbedResult> {
     const { engine, repo, bus, chunkOpts } = this.opts;
     const startedAt = Date.now();
+
+    const chunks = chunkNote(parsed, chunkOpts);
+
+    // Fast-path: if every chunk is already cached with matching hash
+    // (sequential re-invocation with unchanged content), skip the
+    // pipeline and emit nothing so the UI overlay isn't re-pulsed.
+    if (
+      chunks.length > 0 &&
+      chunks.every((c) =>
+        repo.hasFreshChunk(
+          c.note_path,
+          c.chunk_id,
+          engine.model,
+          c.content_hash,
+        ),
+      )
+    ) {
+      return {
+        chunks_total: chunks.length,
+        chunks_embedded: chunks.length,
+        embed_ms: 0,
+      };
+    }
 
     bus.emit({
       type: "embedding_progress",
@@ -50,8 +93,6 @@ export class EmbeddingService {
       note_path: parsed.notePath,
       phase: "parsing",
     });
-
-    const chunks = chunkNote(parsed, chunkOpts);
 
     bus.emit({
       type: "embedding_progress",

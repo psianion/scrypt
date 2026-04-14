@@ -5,6 +5,13 @@ import { tmpdir } from "node:os";
 import { createApp, type AppConfig } from "../src/server/index";
 
 export function createTestEnv() {
+  // Disable the Wave 8 auto-embed path in the file-watch indexer so
+  // tests driving createApp don't pay the ~33MB model download or
+  // trip transformers.js's URL parse bug under Bun. The env var is
+  // restored on cleanup so semantic-search tests in the same process
+  // still see their own scoped value.
+  const prevEmbedDisable = process.env.SCRYPT_EMBED_DISABLE;
+  process.env.SCRYPT_EMBED_DISABLE = "1";
   const vaultPath = mkdtempSync(join(tmpdir(), "scrypt-test-"));
 
   for (const dir of [
@@ -43,6 +50,11 @@ export function createTestEnv() {
       server.stop();
       app.db.close();
       rmSync(vaultPath, { recursive: true, force: true });
+      if (prevEmbedDisable === undefined) {
+        delete process.env.SCRYPT_EMBED_DISABLE;
+      } else {
+        process.env.SCRYPT_EMBED_DISABLE = prevEmbedDisable;
+      }
     },
     authFetch(path: string, init?: RequestInit) {
       const headers = new Headers(init?.headers);

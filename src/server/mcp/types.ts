@@ -15,6 +15,10 @@ import type {
 import type { ProgressBus } from "../embeddings/progress";
 import type { Idempotency } from "./idempotency";
 
+export interface LegacyReindexHook {
+  reindexNote(path: string): Promise<void>;
+}
+
 export interface ToolContext {
   db: Database;
   sections: SectionsRepo;
@@ -26,6 +30,11 @@ export interface ToolContext {
   idempotency: Idempotency;
   userId: string | null;
   vaultDir: string;
+  // Optional: when set, create_note will delegate to the legacy indexer
+  // after writing the file so the notes / notes_fts / tags / backlinks /
+  // tasks tables get populated the same way an external editor write
+  // would. Left undefined in tests that use minimal fake contexts.
+  legacyIndexer?: LegacyReindexHook;
 }
 
 export interface JsonSchemaProp {

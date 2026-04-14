@@ -76,7 +76,37 @@ export function createApp(config: AppConfig) {
   initSchema(db);
 
   const fm = new FileManager(config.vaultPath, scryptPath);
-  const indexer = new Indexer(db, fm);
+
+  // Wave 8: construct the embedding pipeline up front so the indexer
+  // can reuse the same SectionsRepo/ProgressBus/EmbeddingEngine that
+  // the MCP streamable-http transport will later share.
+  const wave8Sections = new SectionsRepo(db);
+  const wave8Metadata = new MetadataRepo(db);
+  const wave8Embeddings = new ChunkEmbeddingsRepo(db);
+  const wave8Bus = new ProgressBus();
+  const wave8Engine = new EmbeddingEngine({
+    model: process.env.SCRYPT_EMBED_MODEL ?? "Xenova/bge-small-en-v1.5",
+    batchSize: Number(process.env.SCRYPT_EMBED_BATCH ?? 8),
+    cacheDir:
+      process.env.SCRYPT_EMBED_CACHE_DIR ?? join(scryptPath, "embed-cache"),
+  });
+  const wave8EmbedService = new EmbeddingService({
+    engine: wave8Engine,
+    repo: wave8Embeddings,
+    bus: wave8Bus,
+    chunkOpts: {
+      maxTokens: Number(process.env.SCRYPT_EMBED_MAX_TOKENS ?? 450),
+      overlapTokens: Number(process.env.SCRYPT_EMBED_OVERLAP ?? 50),
+    },
+  });
+
+  const indexer = new Indexer(
+    db,
+    fm,
+    process.env.SCRYPT_EMBED_DISABLE === "1"
+      ? undefined
+      : { sections: wave8Sections, embedService: wave8EmbedService },
+  );
   const ws = new WebSocketManager();
   const router = new Router();
 
@@ -107,36 +137,28 @@ export function createApp(config: AppConfig) {
   activityRoutes(router, activity);
   graphRoutes(router, db);
 
-  // Wave 8: MCP streamable-http transport mounted at POST /mcp.
+  // Wave 8: MCP streamable-http transport mounted at POST /mcp. Reuses
+  // the same embedding pipeline as the file-watch indexer so a single
+  // ProgressBus drives the UI overlay and both paths share one model.
   const mcpRegistry = new ToolRegistry();
   registerAllTools(mcpRegistry);
-  const mcpBus = new ProgressBus();
-  const mcpEngine = new EmbeddingEngine({
-    model: process.env.SCRYPT_EMBED_MODEL ?? "Xenova/bge-small-en-v1.5",
-    batchSize: Number(process.env.SCRYPT_EMBED_BATCH ?? 8),
-    cacheDir: process.env.SCRYPT_EMBED_CACHE_DIR ?? join(scryptPath, "embed-cache"),
-  });
   const mcpCtx: ToolContext = {
     db,
-    sections: new SectionsRepo(db),
-    metadata: new MetadataRepo(db),
-    embeddings: new ChunkEmbeddingsRepo(db),
-    embedService: new EmbeddingService({
-      engine: mcpEngine,
-      repo: new ChunkEmbeddingsRepo(db),
-      bus: mcpBus,
-      chunkOpts: {
-        maxTokens: Number(process.env.SCRYPT_EMBED_MAX_TOKENS ?? 450),
-        overlapTokens: Number(process.env.SCRYPT_EMBED_OVERLAP ?? 50),
-      },
-    }),
-    engine: mcpEngine,
-    bus: mcpBus,
+    sections: wave8Sections,
+    metadata: wave8Metadata,
+    embeddings: wave8Embeddings,
+    embedService: wave8EmbedService,
+    engine: wave8Engine,
+    bus: wave8Bus,
     idempotency: new Idempotency(db),
     userId: null,
     vaultDir: config.vaultPath,
+    // Wire the legacy indexer so MCP write tools repopulate notes /
+    // notes_fts / backlinks / tags / tasks / link_index without having
+    // to wait for the fs watcher (unreliable under Docker on macOS).
+    legacyIndexer: indexer,
   };
-  wireWebSocketSink(mcpBus, (channel, payload) =>
+  wireWebSocketSink(wave8Bus, (channel, payload) =>
     ws.broadcastChannel(channel, payload),
   );
   mcpRoutes(router, mcpRegistry, mcpCtx, async (req) => {

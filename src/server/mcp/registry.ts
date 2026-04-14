@@ -26,7 +26,26 @@ function validateInput(
   if (obj && schema.properties) {
     for (const [key, spec] of Object.entries(schema.properties)) {
       if (!(key in obj)) continue;
-      const v = obj[key];
+      let v = obj[key];
+      // Loose coerce: MCP clients (including Claude Code's tool_use
+      // serialization) sometimes hand us stringified numbers / booleans.
+      // Coerce in place so handlers always see the declared type.
+      if (spec.type === "number" && typeof v === "string") {
+        const n = Number(v);
+        if (!Number.isNaN(n)) {
+          obj[key] = n;
+          v = n;
+        }
+      }
+      if (spec.type === "boolean" && typeof v === "string") {
+        if (v === "true") {
+          obj[key] = true;
+          v = true;
+        } else if (v === "false") {
+          obj[key] = false;
+          v = false;
+        }
+      }
       if (spec.type === "string" && typeof v !== "string")
         return `field ${key}: expected string`;
       if (spec.type === "number" && typeof v !== "number")
