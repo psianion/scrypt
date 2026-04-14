@@ -7,6 +7,8 @@ import { addEdgeTool } from "./add-edge";
 import { removeEdgeTool } from "./remove-edge";
 import { getNoteTool } from "./get-note";
 import { searchNotesTool } from "./search-notes";
+import { semanticSearchTool } from "./semantic-search";
+import { findSimilarTool } from "./find-similar";
 
 export function registerAllTools(registry: ToolRegistry): void {
   registry.register(createNoteTool);
@@ -16,4 +18,6 @@ export function registerAllTools(registry: ToolRegistry): void {
   registry.register(removeEdgeTool);
   registry.register(getNoteTool);
   registry.register(searchNotesTool);
+  registry.register(semanticSearchTool);
+  registry.register(findSimilarTool);
 }
