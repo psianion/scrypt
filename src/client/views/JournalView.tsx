@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { api } from "../api";
 import type { Note } from "../../shared/types";
 import { RelatedPanel } from "../components/RelatedPanel";
+import { ActivityStrip } from "../components/ActivityStrip";
 
 export function JournalView() {
   const [note, setNote] = useState<Note | null>(null);
@@ -47,8 +48,11 @@ export function JournalView() {
           )}
         </div>
       </div>
-      <aside className="w-[260px] border-l border-[var(--border)] overflow-y-auto">
-        <RelatedPanel />
+      <aside className="w-[260px] border-l border-[var(--border)] overflow-y-auto flex flex-col">
+        <div className="flex-1 overflow-y-auto">
+          <RelatedPanel />
+        </div>
+        <ActivityStrip />
       </aside>
     </div>
   );
