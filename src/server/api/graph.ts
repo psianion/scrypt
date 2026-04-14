@@ -10,7 +10,6 @@ import { RESERVED_NAMESPACES, type Tag } from "../../shared/types";
 import { parseTag } from "../parsers";
 
 interface NoteRow {
-  id: number;
   path: string;
   title: string | null;
   domain: string | null;
@@ -30,7 +29,7 @@ export function graphRoutes(router: Router, db: Database): void {
   router.get("/api/graph", async () => {
     const noteRows = db
       .query(
-        `SELECT id, path, title, domain, subdomain, tags FROM notes ORDER BY id`,
+        `SELECT path, title, domain, subdomain, tags FROM notes ORDER BY path`,
       )
       .all() as NoteRow[];
 
@@ -39,7 +38,7 @@ export function graphRoutes(router: Router, db: Database): void {
     );
 
     const nodes: GraphNode[] = visible.map((r) => ({
-      id: r.id,
+      id: r.path,
       path: r.path,
       title: r.title ?? r.path,
       domain: r.domain,
@@ -51,18 +50,18 @@ export function graphRoutes(router: Router, db: Database): void {
     const visibleIds = new Set(nodes.map((n) => n.id));
     const edges: GraphEdge[] = [];
 
-    // 1. wikilink edges — persisted in graph_edges as type='link'
+    // 1. wikilink edges — Wave 8 graph_edges uses relation='wikilink'.
     const linkRows = db
       .query(
-        `SELECT source_id, target_id FROM graph_edges WHERE type = 'link'`,
+        `SELECT source, target FROM graph_edges WHERE relation = 'wikilink'`,
       )
-      .all() as { source_id: number; target_id: number }[];
+      .all() as { source: string; target: string }[];
     for (const row of linkRows) {
-      if (!visibleIds.has(row.source_id) || !visibleIds.has(row.target_id))
+      if (!visibleIds.has(row.source) || !visibleIds.has(row.target))
         continue;
       edges.push({
-        source: row.source_id,
-        target: row.target_id,
+        source: row.source,
+        target: row.target,
         type: "wikilink",
         weight: 3,
       });
@@ -106,7 +105,7 @@ export function graphRoutes(router: Router, db: Database): void {
     }
 
     // connectionCount
-    const countMap = new Map<number, number>();
+    const countMap = new Map<string, number>();
     for (const e of edges) {
       countMap.set(e.source, (countMap.get(e.source) ?? 0) + 1);
       countMap.set(e.target, (countMap.get(e.target) ?? 0) + 1);

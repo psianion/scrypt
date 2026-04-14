@@ -18,8 +18,8 @@ interface SimNode extends GraphNode {
 }
 
 interface SimEdge extends Omit<GraphEdge, "source" | "target"> {
-  source: SimNode | number;
-  target: SimNode | number;
+  source: SimNode | string;
+  target: SimNode | string;
 }
 
 function hashDomainColor(domain: string | null): string {
@@ -121,16 +121,16 @@ export function GraphView() {
       .text((d) => d.title);
 
     // Hover → neighbor highlight
-    const adjacency = new Map<number, Set<number>>();
+    const adjacency = new Map<string, Set<string>>();
     for (const e of simEdges) {
-      const s = typeof e.source === "object" ? (e.source as SimNode).id : (e.source as number);
-      const t = typeof e.target === "object" ? (e.target as SimNode).id : (e.target as number);
+      const s = typeof e.source === "object" ? (e.source as SimNode).id : (e.source as string);
+      const t = typeof e.target === "object" ? (e.target as SimNode).id : (e.target as string);
       if (!adjacency.has(s)) adjacency.set(s, new Set());
       if (!adjacency.has(t)) adjacency.set(t, new Set());
       adjacency.get(s)!.add(t);
       adjacency.get(t)!.add(s);
     }
-    let focused: number | null = null;
+    let focused: string | null = null;
     function applyFocus() {
       nodeSelection.attr("opacity", (d) => {
         if (focused === null) return 1;

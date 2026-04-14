@@ -42,7 +42,7 @@ export interface Backlink {
 // subgraph walk). The canonical full-graph types with 4 edge weights live
 // in `./graph-types.ts` and are used by GET /api/graph.
 export interface LocalGraphNode {
-  id: number;
+  id: string;
   path: string;
   title: string;
   tags: string[];
@@ -50,9 +50,9 @@ export interface LocalGraphNode {
 }
 
 export interface LocalGraphEdge {
-  source: number;
-  target: number;
-  type: "link" | "tag" | "embed";
+  source: string;
+  target: string;
+  type: string;
 }
 
 export interface Task {

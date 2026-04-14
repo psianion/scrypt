@@ -101,7 +101,7 @@ export class Indexer {
           existing.id,
         );
       noteId = existing.id;
-      this.clearNoteRelations(noteId);
+      this.clearNoteRelations(noteId, path);
     } else {
       this.db
         .query(
@@ -121,6 +121,19 @@ export class Indexer {
         (this.db.query("SELECT last_insert_rowid() as id").get() as any).id
       );
     }
+
+    // Wave 8: mirror the note into graph_nodes so the TEXT-keyed graph
+    // layer (walked by /api/graph, /api/graph/*path, Louvain, semantic
+    // edges) always has a row for every note.
+    this.db
+      .query(
+        `INSERT INTO graph_nodes (id, kind, note_path, label, content_hash)
+         VALUES (?, 'note', ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET
+           label = excluded.label,
+           content_hash = excluded.content_hash`,
+      )
+      .run(path, path, note.title ?? "", contentHash);
 
     // FTS5
     this.db.query("INSERT OR REPLACE INTO notes_fts (rowid, title, content, path) VALUES (?, ?, ?, ?)").run(noteId, note.title, note.content, path);
@@ -161,9 +174,22 @@ export class Indexer {
         .query("INSERT OR IGNORE INTO backlinks (source_id, target_id, context) VALUES (?, ?, ?)")
         .run(noteId, target.id, contextLine.trim());
 
+      // Ensure the target has a graph_nodes row even if it hasn't been
+      // fully reindexed yet (e.g. during fullReindex pass 1).
       this.db
-        .query("INSERT OR IGNORE INTO graph_edges (source_id, target_id, type) VALUES (?, ?, 'link')")
-        .run(noteId, target.id);
+        .query(
+          `INSERT OR IGNORE INTO graph_nodes (id, kind, note_path, label)
+           VALUES (?, 'note', ?, ?)`,
+        )
+        .run(targetPath, targetPath, targetPath);
+
+      this.db
+        .query(
+          `INSERT OR IGNORE INTO graph_edges
+             (source, target, relation, weight, created_at)
+           VALUES (?, ?, 'wikilink', 3, ?)`,
+        )
+        .run(path, targetPath, Date.now());
     }
 
     // Tasks
@@ -184,10 +210,17 @@ export class Indexer {
       .get(path) as { id: number } | null;
     if (!row) return;
 
-    this.clearNoteRelations(row.id);
+    this.clearNoteRelations(row.id, path);
     this.db.query("DELETE FROM notes_fts WHERE rowid = ?").run(row.id);
     this.db.query("DELETE FROM notes WHERE id = ?").run(row.id);
     this.db.query("DELETE FROM link_index WHERE path = ?").run(path);
+    // Remove the note from the TEXT graph along with any edges touching it
+    // (including semantic edges — the note is gone, so edges pointing at
+    // it are stale).
+    this.db
+      .query("DELETE FROM graph_edges WHERE source = ? OR target = ?")
+      .run(path, path);
+    this.db.query("DELETE FROM graph_nodes WHERE id = ?").run(path);
   }
 
   search(query: string): SearchResult[] {
@@ -223,22 +256,26 @@ export class Indexer {
   getGraph(): { nodes: LocalGraphNode[]; edges: LocalGraphEdge[] } {
     const nodes = this.db
       .query(
-        `SELECT n.id, n.path, n.title,
-                (SELECT count(*) FROM graph_edges WHERE source_id = n.id OR target_id = n.id) as connections
-         FROM notes n`
+        `SELECT n.path as id, n.path, n.title,
+                (SELECT count(*) FROM graph_edges
+                 WHERE source = n.path OR target = n.path) as connections
+         FROM notes n`,
       )
-      .all() as (LocalGraphNode & { id: number })[];
+      .all() as LocalGraphNode[];
 
-    // Attach tags to nodes
     for (const node of nodes) {
       const tags = this.db
-        .query("SELECT tag FROM tags WHERE note_id = ?")
+        .query(
+          "SELECT t.tag FROM tags t JOIN notes n ON n.id = t.note_id WHERE n.path = ?",
+        )
         .all(node.id) as { tag: string }[];
       node.tags = tags.map((t) => t.tag);
     }
 
     const edges = this.db
-      .query("SELECT source_id as source, target_id as target, type FROM graph_edges")
+      .query(
+        "SELECT source, target, relation as type FROM graph_edges",
+      )
       .all() as LocalGraphEdge[];
 
     return { nodes, edges };
@@ -246,16 +283,17 @@ export class Indexer {
 
   getLocalGraph(
     path: string,
-    depth: number = 2
+    depth: number = 2,
   ): { nodes: LocalGraphNode[]; edges: LocalGraphEdge[] } {
     const startNote = this.db
-      .query("SELECT id FROM notes WHERE path = ?")
-      .get(path) as { id: number } | null;
+      .query("SELECT path FROM notes WHERE path = ?")
+      .get(path) as { path: string } | null;
     if (!startNote) return { nodes: [], edges: [] };
 
-    const visited = new Set<number>();
-    const queue: { id: number; d: number }[] = [{ id: startNote.id, d: 0 }];
-    visited.add(startNote.id);
+    const visited = new Set<string>([startNote.path]);
+    const queue: { id: string; d: number }[] = [
+      { id: startNote.path, d: 0 },
+    ];
 
     while (queue.length > 0) {
       const { id, d } = queue.shift()!;
@@ -263,42 +301,46 @@ export class Indexer {
 
       const neighbors = this.db
         .query(
-          `SELECT DISTINCT CASE WHEN source_id = ? THEN target_id ELSE source_id END as neighbor_id
-           FROM graph_edges WHERE source_id = ? OR target_id = ?`
+          `SELECT DISTINCT CASE WHEN source = ? THEN target ELSE source END as neighbor
+           FROM graph_edges WHERE source = ? OR target = ?`,
         )
-        .all(id, id, id) as { neighbor_id: number }[];
+        .all(id, id, id) as { neighbor: string }[];
 
       for (const n of neighbors) {
-        if (!visited.has(n.neighbor_id)) {
-          visited.add(n.neighbor_id);
-          queue.push({ id: n.neighbor_id, d: d + 1 });
+        if (!visited.has(n.neighbor)) {
+          visited.add(n.neighbor);
+          queue.push({ id: n.neighbor, d: d + 1 });
         }
       }
     }
 
     const ids = Array.from(visited);
+    if (ids.length === 0) return { nodes: [], edges: [] };
     const placeholders = ids.map(() => "?").join(",");
 
     const nodes = this.db
       .query(
-        `SELECT n.id, n.path, n.title,
-                (SELECT count(*) FROM graph_edges WHERE source_id = n.id OR target_id = n.id) as connections
-         FROM notes n WHERE n.id IN (${placeholders})`
+        `SELECT n.path as id, n.path, n.title,
+                (SELECT count(*) FROM graph_edges
+                 WHERE source = n.path OR target = n.path) as connections
+         FROM notes n WHERE n.path IN (${placeholders})`,
       )
       .all(...ids) as LocalGraphNode[];
 
     for (const node of nodes) {
       const tags = this.db
-        .query("SELECT tag FROM tags WHERE note_id = ?")
-        .all((node as any).id) as { tag: string }[];
+        .query(
+          "SELECT t.tag FROM tags t JOIN notes n ON n.id = t.note_id WHERE n.path = ?",
+        )
+        .all(node.id) as { tag: string }[];
       node.tags = tags.map((t) => t.tag);
     }
 
     const edges = this.db
       .query(
-        `SELECT source_id as source, target_id as target, type
+        `SELECT source, target, relation as type
          FROM graph_edges
-         WHERE source_id IN (${placeholders}) AND target_id IN (${placeholders})`
+         WHERE source IN (${placeholders}) AND target IN (${placeholders})`,
       )
       .all(...ids, ...ids) as LocalGraphEdge[];
 
@@ -356,10 +398,17 @@ export class Indexer {
     }
   }
 
-  private clearNoteRelations(noteId: number): void {
+  private clearNoteRelations(noteId: number, notePath: string): void {
     this.db.query("DELETE FROM backlinks WHERE source_id = ?").run(noteId);
     this.db.query("DELETE FROM tags WHERE note_id = ?").run(noteId);
-    this.db.query("DELETE FROM graph_edges WHERE source_id = ?").run(noteId);
+    // Only clear structural edges (client_tag IS NULL). Semantic edges
+    // added by Wave 8 MCP tools are keyed by client_tag and must survive
+    // a reindex of the source note.
+    this.db
+      .query(
+        "DELETE FROM graph_edges WHERE source = ? AND client_tag IS NULL",
+      )
+      .run(notePath);
     this.db.query("DELETE FROM tasks WHERE note_id = ?").run(noteId);
     this.db.query("DELETE FROM aliases WHERE note_id = ?").run(noteId);
   }

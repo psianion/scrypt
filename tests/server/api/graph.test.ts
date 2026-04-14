@@ -117,7 +117,8 @@ describe("GET /api/graph", () => {
     const res = await fetch(`${env.baseUrl}/api/graph`);
     const data = await res.json();
     for (const e of data.edges.filter((e: any) => e.type !== "wikilink")) {
-      expect(e.source).toBeLessThan(e.target);
+      // Wave 8: node ids are note paths (strings), compared lexicographically.
+      expect(e.source < e.target).toBe(true);
     }
   });
 

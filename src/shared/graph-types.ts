@@ -10,7 +10,7 @@ import type { Tag } from "./types";
 export type GraphEdgeType = "wikilink" | "subdomain" | "domain" | "tag";
 
 export interface GraphNode {
-  id: number;
+  id: string;
   path: string;
   title: string;
   domain: string | null;
@@ -20,8 +20,8 @@ export interface GraphNode {
 }
 
 export interface GraphEdge {
-  source: number;
-  target: number;
+  source: string;
+  target: string;
   type: GraphEdgeType;
   weight: number;
 }

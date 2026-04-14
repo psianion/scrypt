@@ -86,7 +86,7 @@ describe("reindexNote", () => {
     await indexer.reindexNote("notes/target.md");
     await indexer.reindexNote("notes/fancy.md");
 
-    const edges = db.query("SELECT * FROM graph_edges WHERE type = 'link'").all();
+    const edges = db.query("SELECT * FROM graph_edges WHERE relation = 'wikilink'").all();
     expect(edges.length).toBeGreaterThanOrEqual(1);
   });
 
@@ -106,8 +106,12 @@ describe("reindexNote", () => {
     await indexer.reindexNote("notes/g2.md");
     await indexer.reindexNote("notes/g1.md");
 
-    const edges = db.query("SELECT * FROM graph_edges WHERE type = 'link'").all() as any[];
+    const edges = db
+      .query("SELECT * FROM graph_edges WHERE relation = 'wikilink'")
+      .all() as any[];
     expect(edges.length).toBeGreaterThanOrEqual(1);
+    expect(edges[0].source).toBe("notes/g1.md");
+    expect(edges[0].target).toBe("notes/g2.md");
   });
 
   test("extracts tasks with text, done state, line number", async () => {
@@ -290,19 +294,13 @@ describe("link_index population", () => {
     );
     await indexer.fullReindex();
 
-    const source = db
-      .query("SELECT id FROM notes WHERE path = 'notes/inbox/source.md'")
-      .get() as any;
-    const target = db
-      .query("SELECT id FROM notes WHERE path = 'dnd/research/target-note.md'")
-      .get() as any;
     const edge = db
       .query(
-        "SELECT source_id, target_id FROM graph_edges WHERE source_id = ? AND target_id = ? AND type = 'link'",
+        "SELECT source, target FROM graph_edges WHERE source = ? AND target = ? AND relation = 'wikilink'",
       )
-      .get(source.id, target.id) as any;
+      .get("notes/inbox/source.md", "dnd/research/target-note.md") as any;
     expect(edge).toBeTruthy();
-    expect(edge.source_id).toBe(source.id);
-    expect(edge.target_id).toBe(target.id);
+    expect(edge.source).toBe("notes/inbox/source.md");
+    expect(edge.target).toBe("dnd/research/target-note.md");
   });
 });
