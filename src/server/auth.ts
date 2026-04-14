@@ -18,8 +18,13 @@ export function checkAuth(req: Request, state: AuthState): AuthResult {
     return { ok: true };
   }
 
+  // Localhost bypass: the browser client has no mechanism to attach a
+  // bearer token, so requests originating from the same machine (Host:
+  // localhost / 127.0.0.1 / ::1) are always allowed through — in
+  // production too. Remote callers still need the token because their
+  // Host header is the tailnet / public hostname, not a loopback alias.
   const isLocalhost = LOCALHOST_HOSTS.has(url.hostname);
-  if (!state.isProduction && isLocalhost) {
+  if (isLocalhost) {
     return { ok: true };
   }
 

@@ -50,12 +50,15 @@ describe("checkAuth", () => {
     expect(result.ok).toBe(false);
   });
 
-  test("rejects production localhost without token", () => {
+  test("accepts production localhost without token (browser client bypass)", () => {
+    // The SPA running in a browser on the same machine has no way to
+    // attach a bearer header, so localhost is always allowed through.
+    // Remote hosts with their own Host header still need the token.
     const result = checkAuth(
       req("http://127.0.0.1:3777/api/notes"),
       { isProduction: true, authToken: "secret" },
     );
-    expect(result.ok).toBe(false);
+    expect(result.ok).toBe(true);
   });
 
   test("accepts case-insensitive authorization header", () => {
