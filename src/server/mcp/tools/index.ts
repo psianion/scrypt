@@ -5,6 +5,8 @@ import { updateNoteMetadataTool } from "./update-note-metadata";
 import { addSectionSummaryTool } from "./add-section-summary";
 import { addEdgeTool } from "./add-edge";
 import { removeEdgeTool } from "./remove-edge";
+import { getNoteTool } from "./get-note";
+import { searchNotesTool } from "./search-notes";
 
 export function registerAllTools(registry: ToolRegistry): void {
   registry.register(createNoteTool);
@@ -12,4 +14,6 @@ export function registerAllTools(registry: ToolRegistry): void {
   registry.register(addSectionSummaryTool);
   registry.register(addEdgeTool);
   registry.register(removeEdgeTool);
+  registry.register(getNoteTool);
+  registry.register(searchNotesTool);
 }
