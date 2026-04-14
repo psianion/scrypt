@@ -11,9 +11,24 @@ services:
       - SCRYPT_STATIC_DIR=/app/dist
       - SCRYPT_GIT_AUTOCOMMIT=${SCRYPT_GIT_AUTOCOMMIT:-0}
       - NODE_ENV=production
+      # Wave 8: MCP + embeddings config
+      - SCRYPT_MCP_HTTP=${SCRYPT_MCP_HTTP:-1}
+      - SCRYPT_EMBED_MODEL=${SCRYPT_EMBED_MODEL:-Xenova/bge-small-en-v1.5}
+      - SCRYPT_EMBED_CACHE_DIR=/data/embed-cache
+      - SCRYPT_EMBED_BATCH=${SCRYPT_EMBED_BATCH:-8}
+      - SCRYPT_EMBED_MAX_TOKENS=${SCRYPT_EMBED_MAX_TOKENS:-450}
+      - SCRYPT_EMBED_OVERLAP=${SCRYPT_EMBED_OVERLAP:-50}
+      - SCRYPT_EMBED_PREWARM=${SCRYPT_EMBED_PREWARM:-1}
+      - SCRYPT_EMBED_DISABLE=${SCRYPT_EMBED_DISABLE:-0}
     volumes:
       # Vault lives on the host. Override by setting SCRYPT_VAULT_DIR in .env
       # to any absolute path (e.g. /Users/you/scrypt-vault) so your notes
       # stay outside the repo and survive container rebuilds.
       - ${SCRYPT_VAULT_DIR:-./vault}:/vault
+      # Wave 8: embedding model cache — ~33MB download on first boot,
+      # reused across rebuilds so you only pay the download once.
+      - scrypt-embed-cache:/data/embed-cache
     working_dir: /vault
+
+volumes:
+  scrypt-embed-cache:
