@@ -30,6 +30,7 @@ import { MetadataRepo } from "./indexer/metadata-repo";
 import { ChunkEmbeddingsRepo } from "./embeddings/chunks-repo";
 import { EmbeddingEngine } from "./embeddings/engine";
 import { EmbedClient, type WorkerLike } from "./embeddings/client";
+import { embedHealthRoutes } from "./api/health";
 import { ProgressBus } from "./embeddings/progress";
 import { Worker } from "node:worker_threads";
 import { fileURLToPath } from "node:url";
@@ -145,6 +146,7 @@ export function createApp(config: AppConfig) {
   dailyContextRoutes(router, fm, indexer, config.vaultPath);
   activityRoutes(router, activity);
   graphRoutes(router, db);
+  embedHealthRoutes(router, wave8EmbedClient);
 
   // Wave 8: MCP streamable-http transport mounted at POST /mcp. Reuses
   // the same embedding pipeline as the file-watch indexer so a single
