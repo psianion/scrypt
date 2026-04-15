@@ -30,6 +30,7 @@ import { MetadataRepo } from "./indexer/metadata-repo";
 import { ChunkEmbeddingsRepo } from "./embeddings/chunks-repo";
 import { EmbeddingEngine } from "./embeddings/engine";
 import { EmbedClient, type WorkerLike } from "./embeddings/client";
+import { recoverPendingEmbeds } from "./embeddings/recovery";
 import { embedHealthRoutes } from "./api/health";
 import { ProgressBus } from "./embeddings/progress";
 import { Worker } from "node:worker_threads";
@@ -267,6 +268,7 @@ export function createApp(config: AppConfig) {
     db,
     activity,
     ingestRouter,
+    embedClient: wave8EmbedClient,
     stop: () => {
       autocommit?.stop();
     },
@@ -292,4 +294,19 @@ if (import.meta.main) {
     websocket: app.websocket,
   });
   console.log(`Scrypt running on http://localhost:${server.port}`);
+
+  // Boot self-heal: re-walk the vault and fire-and-forget an embed
+  // request per markdown file. The worker's hasFreshChunk fast-path
+  // makes already-embedded notes effectively free, so this only does
+  // real work for notes added / mutated while scrypt was down. Runs
+  // after the HTTP listener is up so the API is responsive during it.
+  if (process.env.SCRYPT_EMBED_DISABLE !== "1") {
+    recoverPendingEmbeds({
+      vaultDir: config.vaultPath,
+      client: app.embedClient,
+      log: (line) => console.log(line),
+    }).catch((err) => {
+      console.error("[embed-recover] crashed:", err);
+    });
+  }
 }
