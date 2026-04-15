@@ -9,6 +9,7 @@ import type { ProgressBus } from "../../../src/server/embeddings/progress";
 class FakeWorker implements WorkerLike {
   private msgListeners: Array<(m: WorkerOutbound) => void> = [];
   private errListeners: Array<(e: Error) => void> = [];
+  private readyFired = false;
   public sent: WorkerInbound[] = [];
   public terminated = false;
 
@@ -19,7 +20,15 @@ class FakeWorker implements WorkerLike {
   on(event: "error", cb: (e: Error) => void): void;
   on(event: "exit", cb: (code: number) => void): void;
   on(event: string, cb: any): void {
-    if (event === "message") this.msgListeners.push(cb);
+    if (event === "message") {
+      this.msgListeners.push(cb);
+      // Simulate a real worker's worker-ready handshake synchronously so
+      // the client flushes any buffered embed-note immediately.
+      if (!this.readyFired) {
+        this.readyFired = true;
+        cb({ type: "worker-ready", model: "fake" });
+      }
+    }
     if (event === "error") this.errListeners.push(cb);
   }
   terminate() {

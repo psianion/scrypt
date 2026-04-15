@@ -51,6 +51,8 @@ interface ClientStats {
 
 export class EmbedClient implements EmbedderLike {
   private worker: WorkerLike | null = null;
+  private workerReady = false;
+  private pendingOutbound: EmbedJobMessage[] = [];
   private inflight = new Map<string, PendingRequest>();
   private restartTimestamps: number[] = [];
   private circuitOpenedAt = 0;
@@ -94,7 +96,14 @@ export class EmbedClient implements EmbedderLike {
         parsed,
         correlationId,
       };
-      worker.postMessage(msg);
+      if (this.workerReady) {
+        worker.postMessage(msg);
+      } else {
+        // Worker is still bootstrapping (loading the model). node:worker_threads
+        // drops messages sent before the worker attaches its parentPort listener,
+        // so we buffer here and flush when the worker-ready handshake arrives.
+        this.pendingOutbound.push(msg);
+      }
     });
   }
 
@@ -165,6 +174,13 @@ export class EmbedClient implements EmbedderLike {
         return;
       }
       case "worker-ready": {
+        this.workerReady = true;
+        if (this.worker) {
+          const worker = this.worker;
+          const queued = this.pendingOutbound;
+          this.pendingOutbound = [];
+          for (const m of queued) worker.postMessage(m);
+        }
         return;
       }
     }
@@ -183,6 +199,8 @@ export class EmbedClient implements EmbedderLike {
       } catch {}
     }
     this.worker = null;
+    this.workerReady = false;
+    this.pendingOutbound = [];
     this.recordRestart();
   }
 
