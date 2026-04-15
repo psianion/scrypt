@@ -77,3 +77,30 @@ export function buildContextFromEnv(userId: string | null): ToolContext {
     userId,
   );
 }
+
+import { Worker } from "node:worker_threads";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
+import { EmbedClient, type WorkerLike } from "../embeddings/client";
+
+// Used by the HTTP server entrypoint (src/server/index.ts). Same
+// underlying ToolContext as buildContextFromEnv, but ctx.embedService is
+// the worker-proxy EmbedClient instead of the in-process EmbeddingService.
+// CLI tools (scrypt-reindex) keep using buildContextFromEnv directly so
+// they avoid the worker-thread round-trip overhead.
+export function buildServerContext(userId: string | null): ToolContext {
+  const ctx = buildContextFromEnv(userId);
+
+  const here = dirname(fileURLToPath(import.meta.url));
+  const workerPath = join(here, "..", "embeddings", "worker.ts");
+
+  const client = new EmbedClient({
+    spawn: () => new Worker(workerPath) as unknown as WorkerLike,
+    bus: ctx.bus,
+  });
+
+  return {
+    ...ctx,
+    embedService: client,
+  };
+}

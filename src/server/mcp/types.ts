@@ -9,7 +9,7 @@ import type { ChunkEmbeddingsRepo } from "../embeddings/chunks-repo";
 import type { SectionsRepo } from "../indexer/sections-repo";
 import type { MetadataRepo } from "../indexer/metadata-repo";
 import type {
-  EmbeddingService,
+  EmbedderLike,
   EngineLike,
 } from "../embeddings/service";
 import type { ProgressBus } from "../embeddings/progress";
@@ -24,7 +24,7 @@ export interface ToolContext {
   sections: SectionsRepo;
   metadata: MetadataRepo;
   embeddings: ChunkEmbeddingsRepo;
-  embedService: EmbeddingService;
+  embedService: EmbedderLike;
   engine: EngineLike;
   bus: ProgressBus;
   idempotency: Idempotency;

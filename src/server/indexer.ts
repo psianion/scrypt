@@ -11,7 +11,7 @@ import {
 import { resolveSlug } from "./slug-resolver";
 import { parseStructural } from "./indexer/structural-parse";
 import type { SectionsRepo } from "./indexer/sections-repo";
-import type { EmbeddingService } from "./embeddings/service";
+import type { EmbedderLike } from "./embeddings/service";
 import type {
   SearchResult,
   Backlink,
@@ -22,7 +22,7 @@ import type {
 
 interface Wave8Pipeline {
   sections: SectionsRepo;
-  embedService: EmbeddingService;
+  embedService: EmbedderLike;
 }
 
 export class Indexer {

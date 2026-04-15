@@ -29,8 +29,11 @@ import { SectionsRepo } from "./indexer/sections-repo";
 import { MetadataRepo } from "./indexer/metadata-repo";
 import { ChunkEmbeddingsRepo } from "./embeddings/chunks-repo";
 import { EmbeddingEngine } from "./embeddings/engine";
-import { EmbeddingService } from "./embeddings/service";
+import { EmbedClient, type WorkerLike } from "./embeddings/client";
 import { ProgressBus } from "./embeddings/progress";
+import { Worker } from "node:worker_threads";
+import { fileURLToPath } from "node:url";
+import { dirname } from "node:path";
 import { Idempotency } from "./mcp/idempotency";
 import { wireWebSocketSink } from "./embeddings/ws-sink";
 import type { ToolContext } from "./mcp/types";
@@ -84,20 +87,26 @@ export function createApp(config: AppConfig) {
   const wave8Metadata = new MetadataRepo(db);
   const wave8Embeddings = new ChunkEmbeddingsRepo(db);
   const wave8Bus = new ProgressBus();
+  // Parent-side engine is kept only for query-time operations (e.g.
+  // semantic search encoding). All create-time embedding is delegated
+  // to the worker thread via EmbedClient so the main JS thread stays
+  // responsive during bulk ingest. The parent engine is lazy — it
+  // never prewarms here, so the model is only loaded once (inside the
+  // worker) on a healthy path.
   const wave8Engine = new EmbeddingEngine({
     model: process.env.SCRYPT_EMBED_MODEL ?? "Xenova/bge-small-en-v1.5",
     batchSize: Number(process.env.SCRYPT_EMBED_BATCH ?? 8),
     cacheDir:
       process.env.SCRYPT_EMBED_CACHE_DIR ?? join(scryptPath, "embed-cache"),
   });
-  const wave8EmbedService = new EmbeddingService({
-    engine: wave8Engine,
-    repo: wave8Embeddings,
+  const workerPath = join(
+    dirname(fileURLToPath(import.meta.url)),
+    "embeddings",
+    "worker.ts",
+  );
+  const wave8EmbedClient = new EmbedClient({
+    spawn: () => new Worker(workerPath) as unknown as WorkerLike,
     bus: wave8Bus,
-    chunkOpts: {
-      maxTokens: Number(process.env.SCRYPT_EMBED_MAX_TOKENS ?? 450),
-      overlapTokens: Number(process.env.SCRYPT_EMBED_OVERLAP ?? 50),
-    },
   });
 
   const indexer = new Indexer(
@@ -105,7 +114,7 @@ export function createApp(config: AppConfig) {
     fm,
     process.env.SCRYPT_EMBED_DISABLE === "1"
       ? undefined
-      : { sections: wave8Sections, embedService: wave8EmbedService },
+      : { sections: wave8Sections, embedService: wave8EmbedClient },
   );
   const ws = new WebSocketManager();
   const router = new Router();
@@ -147,7 +156,7 @@ export function createApp(config: AppConfig) {
     sections: wave8Sections,
     metadata: wave8Metadata,
     embeddings: wave8Embeddings,
-    embedService: wave8EmbedService,
+    embedService: wave8EmbedClient,
     engine: wave8Engine,
     bus: wave8Bus,
     idempotency: new Idempotency(db),
