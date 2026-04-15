@@ -21,10 +21,20 @@ export interface EngineLike {
   prewarm?(): Promise<void>;
 }
 
-interface EmbedResult {
+export interface EmbedResult {
   chunks_total: number;
   chunks_embedded: number;
   embed_ms: number;
+}
+
+// Shared surface implemented by both EmbeddingService (sync, in-process,
+// used by scrypt-reindex CLI) and EmbedClient (worker-thread proxy, used
+// by every in-server consumer).
+export interface EmbedderLike {
+  embedNote(
+    parsed: ParsedStructural,
+    correlationId: string,
+  ): Promise<EmbedResult>;
 }
 
 interface EmbeddingServiceOptions {
