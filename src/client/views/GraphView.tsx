@@ -33,7 +33,7 @@ function hashDomainColor(domain: string | null): string {
 }
 
 function radiusFor(node: GraphNode): number {
-  return 4 + Math.sqrt(node.connectionCount) * 3;
+  return Math.min(16, 3 + Math.sqrt(node.connectionCount) * 1.5);
 }
 
 export function GraphView() {
@@ -45,6 +45,7 @@ export function GraphView() {
     subdomain: true,
     domain: false,
     tag: true,
+    similarity: true,
   });
 
   useEffect(() => {
@@ -237,7 +238,13 @@ export function GraphView() {
       .scaleExtent([0.2, 4])
       .on("zoom", (event) => {
         root.attr("transform", event.transform.toString());
-        labelSelection.attr("display", event.transform.k >= 1.2 ? "inline" : "none");
+        const k = event.transform.k;
+        nodeSelection.attr("r", (d) => d.radius / k);
+        labelSelection
+          .attr("display", k >= 1.2 ? "inline" : "none")
+          .attr("font-size", `${11 / k}px`)
+          .attr("y", (d) => (d.y ?? 0) - (d.radius / k + 4 / k));
+        edgeSelection.attr("stroke-width", (d: any) => edgeWidth(d.type) / k);
       });
     svg.call(zoom as any);
 
@@ -270,7 +277,7 @@ export function GraphView() {
       <svg ref={svgRef} className="h-full w-full" />
       <div className="absolute top-3 right-3 bg-[var(--bg-secondary)] border border-[var(--border)] rounded p-3 text-xs text-[var(--text-primary)] space-y-1">
         <div className="uppercase text-[var(--text-muted)] mb-1">Edges</div>
-        {(["wikilink", "subdomain", "domain", "tag"] as const).map((k) => (
+        {(["wikilink", "subdomain", "domain", "tag", "similarity"] as const).map((k) => (
           <label key={k} className="flex items-center gap-2 cursor-pointer">
             <input
               type="checkbox"
@@ -298,6 +305,8 @@ function edgeStroke(type: GraphEdgeType): string {
       return "rgba(140,140,140,0.5)";
     case "tag":
       return "rgba(120,200,140,0.6)";
+    case "similarity":
+      return "rgba(200,120,255,0.5)";
   }
 }
 
@@ -311,5 +320,7 @@ function edgeWidth(type: GraphEdgeType): number {
       return 1;
     case "tag":
       return 1;
+    case "similarity":
+      return 0.75;
   }
 }

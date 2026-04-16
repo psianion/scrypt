@@ -29,8 +29,13 @@ import { SectionsRepo } from "./indexer/sections-repo";
 import { MetadataRepo } from "./indexer/metadata-repo";
 import { ChunkEmbeddingsRepo } from "./embeddings/chunks-repo";
 import { EmbeddingEngine } from "./embeddings/engine";
-import { EmbeddingService } from "./embeddings/service";
+import { EmbedClient, type WorkerLike } from "./embeddings/client";
+import { recoverPendingEmbeds } from "./embeddings/recovery";
+import { embedHealthRoutes } from "./api/health";
 import { ProgressBus } from "./embeddings/progress";
+import { Worker } from "node:worker_threads";
+import { fileURLToPath } from "node:url";
+import { dirname } from "node:path";
 import { Idempotency } from "./mcp/idempotency";
 import { wireWebSocketSink } from "./embeddings/ws-sink";
 import type { ToolContext } from "./mcp/types";
@@ -84,20 +89,43 @@ export function createApp(config: AppConfig) {
   const wave8Metadata = new MetadataRepo(db);
   const wave8Embeddings = new ChunkEmbeddingsRepo(db);
   const wave8Bus = new ProgressBus();
+  // Parent-side engine is kept only for query-time operations (e.g.
+  // semantic search encoding). All create-time embedding is delegated
+  // to the worker thread via EmbedClient so the main JS thread stays
+  // responsive during bulk ingest. The parent engine is lazy — it
+  // never prewarms here, so the model is only loaded once (inside the
+  // worker) on a healthy path.
   const wave8Engine = new EmbeddingEngine({
     model: process.env.SCRYPT_EMBED_MODEL ?? "Xenova/bge-small-en-v1.5",
     batchSize: Number(process.env.SCRYPT_EMBED_BATCH ?? 8),
     cacheDir:
       process.env.SCRYPT_EMBED_CACHE_DIR ?? join(scryptPath, "embed-cache"),
   });
-  const wave8EmbedService = new EmbeddingService({
-    engine: wave8Engine,
-    repo: wave8Embeddings,
+  const workerPath = join(
+    dirname(fileURLToPath(import.meta.url)),
+    "embeddings",
+    "worker.ts",
+  );
+  // Pass dbPath + embed config via workerData so the worker opens the
+  // SAME SQLite file as the main thread. Without this the worker
+  // defaults to "./scrypt.db" in CWD, creating a phantom DB the main
+  // thread never reads.
+  const wave8WorkerData = {
+    dbPath,
+    model: wave8Engine.model,
+    batchSize: Number(process.env.SCRYPT_EMBED_BATCH ?? 8),
+    cacheDir:
+      process.env.SCRYPT_EMBED_CACHE_DIR ?? join(scryptPath, "embed-cache"),
+    maxTokens: Number(process.env.SCRYPT_EMBED_MAX_TOKENS ?? 450),
+    overlapTokens: Number(process.env.SCRYPT_EMBED_OVERLAP ?? 50),
+  };
+  const wave8EmbedClient = new EmbedClient({
+    spawn: () =>
+      new Worker(workerPath, {
+        workerData: wave8WorkerData,
+      }) as unknown as WorkerLike,
     bus: wave8Bus,
-    chunkOpts: {
-      maxTokens: Number(process.env.SCRYPT_EMBED_MAX_TOKENS ?? 450),
-      overlapTokens: Number(process.env.SCRYPT_EMBED_OVERLAP ?? 50),
-    },
+    requestTimeoutMs: Number(process.env.SCRYPT_EMBED_TIMEOUT_MS ?? 300_000),
   });
 
   const indexer = new Indexer(
@@ -105,7 +133,7 @@ export function createApp(config: AppConfig) {
     fm,
     process.env.SCRYPT_EMBED_DISABLE === "1"
       ? undefined
-      : { sections: wave8Sections, embedService: wave8EmbedService },
+      : { sections: wave8Sections, embedService: wave8EmbedClient },
   );
   const ws = new WebSocketManager();
   const router = new Router();
@@ -136,6 +164,7 @@ export function createApp(config: AppConfig) {
   dailyContextRoutes(router, fm, indexer, config.vaultPath);
   activityRoutes(router, activity);
   graphRoutes(router, db);
+  embedHealthRoutes(router, wave8EmbedClient);
 
   // Wave 8: MCP streamable-http transport mounted at POST /mcp. Reuses
   // the same embedding pipeline as the file-watch indexer so a single
@@ -147,7 +176,7 @@ export function createApp(config: AppConfig) {
     sections: wave8Sections,
     metadata: wave8Metadata,
     embeddings: wave8Embeddings,
-    embedService: wave8EmbedService,
+    embedService: wave8EmbedClient,
     engine: wave8Engine,
     bus: wave8Bus,
     idempotency: new Idempotency(db),
@@ -256,6 +285,7 @@ export function createApp(config: AppConfig) {
     db,
     activity,
     ingestRouter,
+    embedClient: wave8EmbedClient,
     stop: () => {
       autocommit?.stop();
     },
@@ -281,4 +311,23 @@ if (import.meta.main) {
     websocket: app.websocket,
   });
   console.log(`Scrypt running on http://localhost:${server.port}`);
+
+  // Boot self-heal: wait for the initial fullReindex to finish so the
+  // DB isn't locked by concurrent writes, then walk the vault and embed
+  // every .md. The worker's hasFreshChunk fast-path makes already-
+  // embedded notes effectively free, so this only does real work for
+  // notes added / mutated while scrypt was down.
+  if (process.env.SCRYPT_EMBED_DISABLE !== "1") {
+    app.ready
+      .then(() =>
+        recoverPendingEmbeds({
+          vaultDir: config.vaultPath,
+          client: app.embedClient,
+          log: (line) => console.log(line),
+        }),
+      )
+      .catch((err) => {
+        console.error("[embed-recover] crashed:", err);
+      });
+  }
 }

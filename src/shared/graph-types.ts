@@ -7,7 +7,7 @@
 // tables).
 import type { Tag } from "./types";
 
-export type GraphEdgeType = "wikilink" | "subdomain" | "domain" | "tag";
+export type GraphEdgeType = "wikilink" | "subdomain" | "domain" | "tag" | "similarity";
 
 export interface GraphNode {
   id: string;

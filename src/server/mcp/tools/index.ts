@@ -12,6 +12,7 @@ import { findSimilarTool } from "./find-similar";
 import { walkGraphTool } from "./walk-graph";
 import { clusterGraphTool } from "./cluster-graph";
 import { getReportTool } from "./get-report";
+import { batchIngestTool } from "./batch-ingest";
 
 export function registerAllTools(registry: ToolRegistry): void {
   registry.register(createNoteTool);
@@ -26,4 +27,5 @@ export function registerAllTools(registry: ToolRegistry): void {
   registry.register(walkGraphTool);
   registry.register(clusterGraphTool);
   registry.register(getReportTool);
+  registry.register(batchIngestTool);
 }

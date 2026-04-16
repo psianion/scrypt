@@ -43,6 +43,7 @@ export function createTestEnv() {
     async cleanup() {
       app.fm.stopWatching();
       app.stop?.();
+      app.embedClient.shutdown();
       // Wait for the startup reindex so no queries run after db.close().
       try {
         await app.ready;

@@ -104,6 +104,66 @@ export function graphRoutes(router: Router, db: Database): void {
       }
     }
 
+    // 5. similarity edges from embeddings
+    const model = process.env.SCRYPT_EMBED_MODEL ?? "Xenova/bge-small-en-v1.5";
+    const chunkRows = db
+      .query<
+        { note_path: string; dims: number; vector: Uint8Array },
+        [string]
+      >(
+        `SELECT note_path, dims, vector FROM note_chunk_embeddings WHERE model = ?`,
+      )
+      .all(model);
+
+    if (chunkRows.length > 0) {
+      // Average chunk vectors per note
+      const noteVecs = new Map<string, { sum: Float32Array; count: number }>();
+      for (const r of chunkRows) {
+        if (!visibleIds.has(r.note_path)) continue;
+        const vec = new Float32Array(
+          new Uint8Array(r.vector).buffer.slice(0, r.dims * 4),
+        );
+        let entry = noteVecs.get(r.note_path);
+        if (!entry) {
+          entry = { sum: new Float32Array(r.dims), count: 0 };
+          noteVecs.set(r.note_path, entry);
+        }
+        for (let k = 0; k < r.dims; k++) entry.sum[k] += vec[k];
+        entry.count += 1;
+      }
+
+      // Normalize averaged vectors
+      const averaged: Array<{ path: string; vec: Float32Array }> = [];
+      for (const [path, entry] of noteVecs) {
+        const vec = entry.sum;
+        for (let k = 0; k < vec.length; k++) vec[k] /= entry.count;
+        let norm = 0;
+        for (let k = 0; k < vec.length; k++) norm += vec[k] * vec[k];
+        norm = Math.sqrt(norm);
+        if (norm > 0) for (let k = 0; k < vec.length; k++) vec[k] /= norm;
+        averaged.push({ path, vec });
+      }
+
+      // Pairwise cosine similarity — add edges above threshold
+      const SIM_THRESHOLD = 0.8;
+      for (let i = 0; i < averaged.length; i++) {
+        for (let j = i + 1; j < averaged.length; j++) {
+          const a = averaged[i];
+          const b = averaged[j];
+          let score = 0;
+          for (let k = 0; k < a.vec.length; k++) score += a.vec[k] * b.vec[k];
+          if (score >= SIM_THRESHOLD) {
+            edges.push({
+              source: a.path,
+              target: b.path,
+              type: "similarity",
+              weight: score,
+            });
+          }
+        }
+      }
+    }
+
     // connectionCount
     const countMap = new Map<string, number>();
     for (const e of edges) {
