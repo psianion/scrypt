@@ -204,7 +204,9 @@ test("EmbedClient: forwards embed-progress events to ProgressBus.emit", async ()
     requestTimeoutMs: 1000,
   });
 
-  void client.embedNote({} as any, "c");
+  const promise = client.embedNote({} as any, "c");
+  const requestId =
+    fake.sent[0].type === "embed-note" ? fake.sent[0].requestId : "";
 
   fake.reply({
     type: "embed-progress",
@@ -220,4 +222,15 @@ test("EmbedClient: forwards embed-progress events to ProgressBus.emit", async ()
 
   expect(emitted.length).toBe(1);
   expect(emitted[0].chunk_id).toBe("chunk-1");
+
+  // Resolve the pending request to prevent timer leak
+  fake.reply({
+    type: "embed-done",
+    requestId,
+    chunksTotal: 0,
+    chunksEmbedded: 0,
+    chunksSkipped: 0,
+    embedMs: 0,
+  });
+  await promise;
 });

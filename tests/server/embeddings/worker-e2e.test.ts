@@ -17,9 +17,6 @@ test.skipIf(SKIP)(
   async () => {
     const cacheDir = mkdtempSync(join(tmpdir(), "scrypt-e2e-cache-"));
     const dbDir = mkdtempSync(join(tmpdir(), "scrypt-e2e-db-"));
-    process.env.SCRYPT_EMBED_CACHE_DIR = cacheDir;
-    process.env.SCRYPT_DB_PATH = join(dbDir, "scrypt.db");
-    process.env.SCRYPT_EMBED_BATCH = "4";
 
     const here = dirname(fileURLToPath(import.meta.url));
     const workerPath = join(
@@ -37,8 +34,19 @@ test.skipIf(SKIP)(
     const events: any[] = [];
     bus.subscribe((e) => events.push(e));
 
+    const dbPath = join(dbDir, "scrypt.db");
     const client = new EmbedClient({
-      spawn: () => new Worker(workerPath) as any,
+      spawn: () =>
+        new Worker(workerPath, {
+          workerData: {
+            dbPath,
+            cacheDir,
+            model: "Xenova/bge-small-en-v1.5",
+            batchSize: 4,
+            maxTokens: 450,
+            overlapTokens: 50,
+          },
+        }) as any,
       bus,
       requestTimeoutMs: 60_000,
     });

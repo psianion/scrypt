@@ -46,6 +46,47 @@ test("recoverPendingEmbeds: enqueues every .md in the vault", async () => {
   expect(summary.total).toBe(3);
 });
 
+test("recoverPendingEmbeds: sequential — never more than 1 call in flight at a time", async () => {
+  // Regression for the bulk-load bug: recovery used to fire-and-forget
+  // every note at once, which blew past EmbedClient's per-request 60 s
+  // timer because queue wait counts against each timer. Here we use a
+  // fake client that takes a visible tick to resolve, and assert that
+  // recovery never overlaps calls.
+  const vault = tmpVault({
+    "a.md": "# a\n",
+    "b.md": "# b\n",
+    "c.md": "# c\n",
+    "d.md": "# d\n",
+    "e.md": "# e\n",
+  });
+  let inFlight = 0;
+  let maxInFlight = 0;
+  const order: string[] = [];
+  const fakeClient: EmbedderLike = {
+    async embedNote(parsed) {
+      inFlight += 1;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      order.push(parsed.notePath);
+      // Yield twice so any parallel call would be observable.
+      await new Promise((r) => setImmediate(r));
+      await new Promise((r) => setImmediate(r));
+      inFlight -= 1;
+      return { chunks_total: 0, chunks_embedded: 0, embed_ms: 0 };
+    },
+  };
+
+  const summary = await recoverPendingEmbeds({
+    vaultDir: vault,
+    client: fakeClient,
+    log: () => {},
+  });
+
+  expect(maxInFlight).toBe(1);
+  expect(summary.total).toBe(5);
+  expect(summary.failed).toBe(0);
+  expect(order.length).toBe(5);
+});
+
 test("recoverPendingEmbeds: client failure does not abort the walk", async () => {
   const vault = tmpVault({
     "a.md": "# a\n",

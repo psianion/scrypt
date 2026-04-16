@@ -1,5 +1,8 @@
 import { test, expect } from "bun:test";
-import { handleWorkerMessage } from "../../../src/server/embeddings/worker";
+import {
+  handleWorkerMessage,
+  resolveBootstrapConfig,
+} from "../../../src/server/embeddings/worker";
 import type {
   WorkerInbound,
   WorkerOutbound,
@@ -101,4 +104,40 @@ test("worker: prewarm → worker-ready", async () => {
 
   expect(sent.length).toBe(1);
   expect(sent[0]).toEqual({ type: "worker-ready", model: "fake-model" });
+});
+
+test("resolveBootstrapConfig: honors workerData.dbPath (regression: split-brain DB)", () => {
+  // Regression for the phantom-DB bug: the worker previously fell back
+  // to "./scrypt.db" in its own CWD when no env var was set, writing
+  // embeddings to a file the main thread never reads. The parent must
+  // be able to force the dbPath via workerData, and resolveBootstrapConfig
+  // must prefer workerData over env over any hardcoded default.
+  const cfg = resolveBootstrapConfig(
+    { dbPath: "/vault/.scrypt/scrypt.db", model: "m", batchSize: 4, cacheDir: "/c", maxTokens: 100, overlapTokens: 10 },
+    {} as NodeJS.ProcessEnv,
+  );
+  expect(cfg.dbPath).toBe("/vault/.scrypt/scrypt.db");
+  expect(cfg.model).toBe("m");
+  expect(cfg.batchSize).toBe(4);
+  expect(cfg.cacheDir).toBe("/c");
+  expect(cfg.maxTokens).toBe(100);
+  expect(cfg.overlapTokens).toBe(10);
+});
+
+test("resolveBootstrapConfig: workerData takes precedence over env", () => {
+  const cfg = resolveBootstrapConfig(
+    { dbPath: "/wd.db" },
+    { SCRYPT_DB_PATH: "/env.db", SCRYPT_EMBED_MODEL: "env-model" } as unknown as NodeJS.ProcessEnv,
+  );
+  expect(cfg.dbPath).toBe("/wd.db");
+  expect(cfg.model).toBe("env-model");
+});
+
+test("resolveBootstrapConfig: throws when dbPath is missing (hard fail, no silent default)", () => {
+  expect(() =>
+    resolveBootstrapConfig(null, {} as NodeJS.ProcessEnv),
+  ).toThrow(/dbPath/);
+  expect(() =>
+    resolveBootstrapConfig({}, {} as NodeJS.ProcessEnv),
+  ).toThrow(/dbPath/);
 });

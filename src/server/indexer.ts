@@ -68,19 +68,20 @@ export class Indexer {
       }
     }
 
-    // Pass 1: index all notes to ensure all records exist in DB
+    // Pass 1: index all notes to ensure all records exist in DB.
+    // Skip embedding — recovery handles bulk embed on startup.
     for (const note of notes) {
-      await this.reindexNote(note.path);
+      await this.reindexNote(note.path, { skipEmbed: true });
     }
 
-    // Pass 2: re-resolve cross-references now that all notes are indexed
+    // Pass 2: re-resolve cross-references now that all notes are indexed.
     this.db.query("UPDATE notes SET content_hash = ''").run();
     for (const note of notes) {
-      await this.reindexNote(note.path);
+      await this.reindexNote(note.path, { skipEmbed: true });
     }
   }
 
-  async reindexNote(path: string): Promise<void> {
+  async reindexNote(path: string, opts?: { skipEmbed?: boolean }): Promise<void> {
     const note = await this.fm.readNote(path);
     if (!note) return;
 
@@ -228,7 +229,7 @@ export class Indexer {
             endLine: s.endLine,
           })),
         );
-        if (process.env.SCRYPT_EMBED_DISABLE !== "1") {
+        if (!opts?.skipEmbed && process.env.SCRYPT_EMBED_DISABLE !== "1") {
           try {
             await this.wave8.embedService.embedNote(parsed, randomUUID());
           } catch (err) {

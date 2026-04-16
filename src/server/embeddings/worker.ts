@@ -66,8 +66,41 @@ async function runEmbedJob(
 
 // ---- bootstrap (only runs inside a real worker thread) ----
 
+export interface WorkerBootstrapConfig {
+  dbPath: string;
+  model: string;
+  batchSize: number;
+  cacheDir: string;
+  maxTokens: number;
+  overlapTokens: number;
+}
+
+export function resolveBootstrapConfig(
+  workerData: Partial<WorkerBootstrapConfig> | null | undefined,
+  env: NodeJS.ProcessEnv,
+): WorkerBootstrapConfig {
+  // The parent MUST pass dbPath via workerData so the worker and the
+  // main thread read/write the same SQLite file. Falling back to env or
+  // a relative default leads to a split-brain where worker embeddings
+  // land in a phantom DB the main thread never reads.
+  const dbPath = workerData?.dbPath ?? env.SCRYPT_DB_PATH;
+  if (!dbPath) {
+    throw new Error(
+      "[embed-worker] missing dbPath: parent must pass workerData.dbPath or set SCRYPT_DB_PATH",
+    );
+  }
+  return {
+    dbPath,
+    model: workerData?.model ?? env.SCRYPT_EMBED_MODEL ?? "Xenova/bge-small-en-v1.5",
+    batchSize: workerData?.batchSize ?? Number(env.SCRYPT_EMBED_BATCH ?? 8),
+    cacheDir: workerData?.cacheDir ?? env.SCRYPT_EMBED_CACHE_DIR ?? "./.embed-cache",
+    maxTokens: workerData?.maxTokens ?? Number(env.SCRYPT_EMBED_MAX_TOKENS ?? 450),
+    overlapTokens: workerData?.overlapTokens ?? Number(env.SCRYPT_EMBED_OVERLAP ?? 50),
+  };
+}
+
 async function bootstrap() {
-  const { parentPort } = await import("node:worker_threads");
+  const { parentPort, workerData } = await import("node:worker_threads");
   if (!parentPort) return;
 
   const { Database } = await import("bun:sqlite");
@@ -77,15 +110,15 @@ async function bootstrap() {
   const { ProgressBus } = await import("./progress");
   const { EmbeddingService } = await import("./service");
 
-  const dbPath = process.env.SCRYPT_DB_PATH ?? "./scrypt.db";
-  const db = new Database(dbPath, { create: true });
+  const cfg = resolveBootstrapConfig(workerData as Partial<WorkerBootstrapConfig>, process.env);
+  const db = new Database(cfg.dbPath, { create: true });
   initSchema(db);
   db.run("PRAGMA journal_mode = WAL");
 
   const engine = new EmbeddingEngine({
-    model: process.env.SCRYPT_EMBED_MODEL ?? "Xenova/bge-small-en-v1.5",
-    batchSize: Number(process.env.SCRYPT_EMBED_BATCH ?? 8),
-    cacheDir: process.env.SCRYPT_EMBED_CACHE_DIR ?? "./.embed-cache",
+    model: cfg.model,
+    batchSize: cfg.batchSize,
+    cacheDir: cfg.cacheDir,
   });
   await engine.prewarm?.();
 
@@ -96,8 +129,8 @@ async function bootstrap() {
     repo,
     bus,
     chunkOpts: {
-      maxTokens: Number(process.env.SCRYPT_EMBED_MAX_TOKENS ?? 450),
-      overlapTokens: Number(process.env.SCRYPT_EMBED_OVERLAP ?? 50),
+      maxTokens: cfg.maxTokens,
+      overlapTokens: cfg.overlapTokens,
     },
   });
 

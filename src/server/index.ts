@@ -106,9 +106,26 @@ export function createApp(config: AppConfig) {
     "embeddings",
     "worker.ts",
   );
+  // Pass dbPath + embed config via workerData so the worker opens the
+  // SAME SQLite file as the main thread. Without this the worker
+  // defaults to "./scrypt.db" in CWD, creating a phantom DB the main
+  // thread never reads.
+  const wave8WorkerData = {
+    dbPath,
+    model: wave8Engine.model,
+    batchSize: Number(process.env.SCRYPT_EMBED_BATCH ?? 8),
+    cacheDir:
+      process.env.SCRYPT_EMBED_CACHE_DIR ?? join(scryptPath, "embed-cache"),
+    maxTokens: Number(process.env.SCRYPT_EMBED_MAX_TOKENS ?? 450),
+    overlapTokens: Number(process.env.SCRYPT_EMBED_OVERLAP ?? 50),
+  };
   const wave8EmbedClient = new EmbedClient({
-    spawn: () => new Worker(workerPath) as unknown as WorkerLike,
+    spawn: () =>
+      new Worker(workerPath, {
+        workerData: wave8WorkerData,
+      }) as unknown as WorkerLike,
     bus: wave8Bus,
+    requestTimeoutMs: Number(process.env.SCRYPT_EMBED_TIMEOUT_MS ?? 300_000),
   });
 
   const indexer = new Indexer(
@@ -295,18 +312,22 @@ if (import.meta.main) {
   });
   console.log(`Scrypt running on http://localhost:${server.port}`);
 
-  // Boot self-heal: re-walk the vault and fire-and-forget an embed
-  // request per markdown file. The worker's hasFreshChunk fast-path
-  // makes already-embedded notes effectively free, so this only does
-  // real work for notes added / mutated while scrypt was down. Runs
-  // after the HTTP listener is up so the API is responsive during it.
+  // Boot self-heal: wait for the initial fullReindex to finish so the
+  // DB isn't locked by concurrent writes, then walk the vault and embed
+  // every .md. The worker's hasFreshChunk fast-path makes already-
+  // embedded notes effectively free, so this only does real work for
+  // notes added / mutated while scrypt was down.
   if (process.env.SCRYPT_EMBED_DISABLE !== "1") {
-    recoverPendingEmbeds({
-      vaultDir: config.vaultPath,
-      client: app.embedClient,
-      log: (line) => console.log(line),
-    }).catch((err) => {
-      console.error("[embed-recover] crashed:", err);
-    });
+    app.ready
+      .then(() =>
+        recoverPendingEmbeds({
+          vaultDir: config.vaultPath,
+          client: app.embedClient,
+          log: (line) => console.log(line),
+        }),
+      )
+      .catch((err) => {
+        console.error("[embed-recover] crashed:", err);
+      });
   }
 }

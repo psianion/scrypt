@@ -38,7 +38,7 @@ export interface EmbedClientOptions {
 interface PendingRequest {
   resolve: (r: EmbedResult) => void;
   reject: (e: Error) => void;
-  timer: ReturnType<typeof setTimeout>;
+  timer: ReturnType<typeof setTimeout> | null;
 }
 
 interface ClientStats {
@@ -75,35 +75,28 @@ export class EmbedClient implements EmbedderLike {
     }
     const worker = this.ensureWorker();
     const requestId = randomUUID();
-    const timeoutMs = this.opts.requestTimeoutMs ?? 60_000;
+    const timeoutMs = this.opts.requestTimeoutMs ?? 300_000;
 
     return new Promise<EmbedResult>((resolve, reject) => {
-      const timer = setTimeout(() => {
-        const pending = this.inflight.get(requestId);
-        if (!pending) return;
-        this.inflight.delete(requestId);
-        this.stats.queueDepth = this.inflight.size;
-        this.stats.timeoutsTotal += 1;
-        pending.reject(new Error(`embed timeout for request ${requestId}`));
-      }, timeoutMs);
-
-      this.inflight.set(requestId, { resolve, reject, timer });
-      this.stats.queueDepth = this.inflight.size;
-
       const msg: EmbedJobMessage = {
         type: "embed-note",
         requestId,
         parsed,
         correlationId,
       };
+
       if (this.workerReady) {
+        const timer = this.startRequestTimer(requestId, timeoutMs);
+        this.inflight.set(requestId, { resolve, reject, timer });
         worker.postMessage(msg);
       } else {
-        // Worker is still bootstrapping (loading the model). node:worker_threads
-        // drops messages sent before the worker attaches its parentPort listener,
-        // so we buffer here and flush when the worker-ready handshake arrives.
+        // Worker is still bootstrapping (loading the model). Defer the
+        // per-request timer until the worker-ready handshake so model
+        // load time doesn't eat the timeout budget.
+        this.inflight.set(requestId, { resolve, reject, timer: null });
         this.pendingOutbound.push(msg);
       }
+      this.stats.queueDepth = this.inflight.size;
     });
   }
 
@@ -112,6 +105,16 @@ export class EmbedClient implements EmbedderLike {
   }
 
   shutdown(): void {
+    // Drain in-flight requests so their timers don't fire after shutdown.
+    for (const [, pending] of this.inflight) {
+      if (pending.timer) clearTimeout(pending.timer);
+      pending.reject(new Error("embed client shut down"));
+    }
+    this.inflight.clear();
+    this.stats.queueDepth = 0;
+    this.workerReady = false;
+    this.pendingOutbound = [];
+
     if (this.worker) {
       try {
         this.worker.postMessage({ type: "shutdown" });
@@ -119,6 +122,20 @@ export class EmbedClient implements EmbedderLike {
       } catch {}
       this.worker = null;
     }
+  }
+
+  private startRequestTimer(
+    requestId: string,
+    timeoutMs: number,
+  ): ReturnType<typeof setTimeout> {
+    return setTimeout(() => {
+      const pending = this.inflight.get(requestId);
+      if (!pending) return;
+      this.inflight.delete(requestId);
+      this.stats.queueDepth = this.inflight.size;
+      this.stats.timeoutsTotal += 1;
+      pending.reject(new Error(`embed timeout for request ${requestId}`));
+    }, timeoutMs);
   }
 
   // ---- lifecycle ----
@@ -144,7 +161,7 @@ export class EmbedClient implements EmbedderLike {
       case "embed-done": {
         const pending = this.inflight.get(msg.requestId);
         if (!pending) return;
-        clearTimeout(pending.timer);
+        if (pending.timer) clearTimeout(pending.timer);
         this.inflight.delete(msg.requestId);
         this.stats.queueDepth = this.inflight.size;
         this.stats.skippedTotal += msg.chunksSkipped;
@@ -159,7 +176,7 @@ export class EmbedClient implements EmbedderLike {
         if (msg.requestId) {
           const pending = this.inflight.get(msg.requestId);
           if (pending) {
-            clearTimeout(pending.timer);
+            if (pending.timer) clearTimeout(pending.timer);
             this.inflight.delete(msg.requestId);
             this.stats.queueDepth = this.inflight.size;
             pending.reject(new Error(msg.message));
@@ -179,7 +196,15 @@ export class EmbedClient implements EmbedderLike {
           const worker = this.worker;
           const queued = this.pendingOutbound;
           this.pendingOutbound = [];
-          for (const m of queued) worker.postMessage(m);
+          const timeoutMs = this.opts.requestTimeoutMs ?? 300_000;
+          for (const m of queued) {
+            // Start the per-request timer now that the worker is ready.
+            const pending = this.inflight.get(m.requestId);
+            if (pending && !pending.timer) {
+              pending.timer = this.startRequestTimer(m.requestId, timeoutMs);
+            }
+            worker.postMessage(m);
+          }
         }
         return;
       }
@@ -188,7 +213,7 @@ export class EmbedClient implements EmbedderLike {
 
   private onWorkerError(err: Error): void {
     for (const [, pending] of this.inflight) {
-      clearTimeout(pending.timer);
+      if (pending.timer) clearTimeout(pending.timer);
       pending.reject(err);
     }
     this.inflight.clear();

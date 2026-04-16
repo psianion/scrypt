@@ -1,13 +1,13 @@
 // src/server/embeddings/recovery.ts
 //
-// Boot self-heal: walk the vault, parse each .md, fire-and-forget the
-// existing EmbedderLike.embedNote() for every file. EmbeddingService's
-// hasFreshChunk fast-path inside the worker makes already-embedded
-// notes effectively free; only newly-added or hash-changed notes
-// actually do real work.
-//
-// Yields to the event loop between IPC bursts so that recovery doesn't
-// starve incoming HTTP traffic during boot.
+// Boot self-heal: walk the vault, parse each .md, and sequentially
+// call EmbedderLike.embedNote() for every file. Sequential awaits are
+// deliberate — the embed worker processes one job at a time, and
+// per-request timers in EmbedClient start at enqueue, so firing N
+// requests in parallel lets queue wait eat the 60 s budget and
+// spuriously time out every later request. Going one at a time keeps
+// queue depth ≤ 1 and lets the hasFreshChunk fast-path (inside the
+// worker) dispose of already-embedded notes in milliseconds.
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { randomUUID } from "node:crypto";
@@ -64,10 +64,12 @@ export async function recoverPendingEmbeds(
     try {
       const content = readFileSync(join(opts.vaultDir, relPath), "utf8");
       const parsed = parseStructural(relPath, content);
-      opts.client.embedNote(parsed, randomUUID()).catch((err) => {
+      try {
+        await opts.client.embedNote(parsed, randomUUID());
+      } catch (err) {
         failed += 1;
         opts.log(`embed-recover-fail ${relPath}: ${(err as Error).message}`);
-      });
+      }
     } catch (err) {
       failed += 1;
       opts.log(
@@ -80,9 +82,6 @@ export async function recoverPendingEmbeds(
     }
   }
 
-  // Wait one tick so any synchronous catches above have a chance to run
-  // before we return the summary (the test asserts against it).
-  await new Promise((r) => setImmediate(r));
-  opts.log(`embed-recover: enqueued ${total} notes (${failed} failed)`);
+  opts.log(`embed-recover: processed ${total} notes (${failed} failed)`);
   return { total, failed };
 }
