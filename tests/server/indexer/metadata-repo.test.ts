@@ -2,6 +2,7 @@
 import { test, expect, beforeEach, describe } from "bun:test";
 import { Database } from "bun:sqlite";
 import { applyWave8Migration } from "../../../src/server/migrations/wave8";
+import { applyWave9Migration } from "../../../src/server/migrations/wave9";
 import { MetadataRepo } from "../../../src/server/indexer/metadata-repo";
 
 describe("MetadataRepo", () => {
@@ -10,6 +11,7 @@ describe("MetadataRepo", () => {
   beforeEach(() => {
     db = new Database(":memory:");
     applyWave8Migration(db);
+    applyWave9Migration(db);
     repo = new MetadataRepo(db);
   });
 
@@ -39,5 +41,39 @@ describe("MetadataRepo", () => {
     const m = repo.get("a.md");
     expect(m?.entities).toEqual([{ name: "Tesla", kind: "org" }]);
     expect(m?.themes).toEqual(["ml", "rl"]);
+  });
+
+  test("upsert persists doc_type and summary", () => {
+    repo.upsert("a.md", { doc_type: "plan", summary: "paragraph summary" });
+    const m = repo.get("a.md");
+    expect(m?.doc_type).toBe("plan");
+    expect(m?.summary).toBe("paragraph summary");
+  });
+
+  test("partial update of doc_type preserves summary and vice versa", () => {
+    repo.upsert("a.md", { doc_type: "research", summary: "initial" });
+    repo.upsert("a.md", { doc_type: "spec" });
+    let m = repo.get("a.md");
+    expect(m?.doc_type).toBe("spec");
+    expect(m?.summary).toBe("initial");
+
+    repo.upsert("a.md", { summary: "updated" });
+    m = repo.get("a.md");
+    expect(m?.doc_type).toBe("spec");
+    expect(m?.summary).toBe("updated");
+  });
+
+  test("partial update of doc_type does not clobber auto_tags/entities/themes", () => {
+    repo.upsert("a.md", {
+      auto_tags: ["a"],
+      entities: [{ name: "E", kind: "person" }],
+      themes: ["t"],
+    });
+    repo.upsert("a.md", { doc_type: "journal" });
+    const m = repo.get("a.md");
+    expect(m?.auto_tags).toEqual(["a"]);
+    expect(m?.entities).toEqual([{ name: "E", kind: "person" }]);
+    expect(m?.themes).toEqual(["t"]);
+    expect(m?.doc_type).toBe("journal");
   });
 });

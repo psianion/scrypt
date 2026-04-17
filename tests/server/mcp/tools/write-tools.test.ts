@@ -83,6 +83,83 @@ describe("Wave 8 write tools", () => {
     expect(m?.auto_tags).toEqual(["x", "y"]);
   });
 
+  test("update_note_metadata persists doc_type and summary round-trip", async () => {
+    const r = await updateNoteMetadataTool.handler(
+      ctx,
+      {
+        path: "a.md",
+        doc_type: "plan",
+        summary: "short paragraph",
+        client_tag: "m-docsum",
+      },
+      "c",
+    );
+    expect(r.updated_fields.sort()).toEqual(["doc_type", "summary"]);
+    const m = ctx.metadata.get("a.md");
+    expect(m?.doc_type).toBe("plan");
+    expect(m?.summary).toBe("short paragraph");
+  });
+
+  test("update_note_metadata rejects invalid doc_type enum", async () => {
+    let caught: unknown = null;
+    try {
+      await updateNoteMetadataTool.handler(
+        ctx,
+        {
+          path: "a.md",
+          // @ts-expect-error — intentionally invalid
+          doc_type: "bogus",
+          client_tag: "m-bad-type",
+        },
+        "c",
+      );
+    } catch (e) {
+      caught = e;
+    }
+    expect(caught).toMatchObject({ code: MCP_ERROR.INVALID_PARAMS });
+  });
+
+  test("update_note_metadata rejects summary longer than 1000 chars", async () => {
+    const long = "x".repeat(1001);
+    let caught: unknown = null;
+    try {
+      await updateNoteMetadataTool.handler(
+        ctx,
+        { path: "a.md", summary: long, client_tag: "m-long" },
+        "c",
+      );
+    } catch (e) {
+      caught = e;
+    }
+    expect(caught).toMatchObject({ code: MCP_ERROR.INVALID_PARAMS });
+  });
+
+  test("update_note_metadata partial doc_type leaves other fields intact", async () => {
+    await updateNoteMetadataTool.handler(
+      ctx,
+      {
+        path: "a.md",
+        description: "about A",
+        auto_tags: ["x"],
+        themes: ["t"],
+        summary: "initial",
+        client_tag: "m-seed",
+      },
+      "c",
+    );
+    await updateNoteMetadataTool.handler(
+      ctx,
+      { path: "a.md", doc_type: "architecture", client_tag: "m-type-only" },
+      "c",
+    );
+    const m = ctx.metadata.get("a.md");
+    expect(m?.doc_type).toBe("architecture");
+    expect(m?.summary).toBe("initial");
+    expect(m?.description).toBe("about A");
+    expect(m?.auto_tags).toEqual(["x"]);
+    expect(m?.themes).toEqual(["t"]);
+  });
+
   test("update_note_metadata errors on missing note", async () => {
     let caught: unknown = null;
     try {
