@@ -6,7 +6,6 @@ import {
   parseFrontmatter,
   extractWikiLinks,
   extractTags,
-  extractTasks,
 } from "./parsers";
 import { resolveSlug } from "./slug-resolver";
 import { parseStructural } from "./indexer/structural-parse";
@@ -203,14 +202,10 @@ export class Indexer {
         .run(path, targetPath, Date.now());
     }
 
-    // Tasks
-    const tasks = extractTasks(note.content);
-    const taskStmt = this.db.query(
-      "INSERT INTO tasks (note_id, text, done, line) VALUES (?, ?, ?, ?)"
-    );
-    for (const task of tasks) {
-      taskStmt.run(noteId, task.text, task.done ? 1 : 0, task.line);
-    }
+    // Wave 9: legacy checkbox-based task extraction is dead. Tasks now come
+    // from MCP create_task (LLM-decided during ingest, or ad-hoc) against the
+    // new tasks schema (id/note_path/title/type/status/...). The old shape
+    // (note_id/text/done/line) was dropped in wave9 migration.
 
     this.writeLinkIndexRows(note.path, note.title ?? "");
 
@@ -389,50 +384,11 @@ export class Indexer {
       .all() as { tag: string; count: number }[];
   }
 
-  getTasks(filters?: {
-    board?: string;
-    done?: boolean;
-    tag?: string;
-  }): Task[] {
-    let sql = `
-      SELECT t.id, t.note_id as noteId, n.path as notePath, t.text, t.done,
-             t.due_date as dueDate, t.priority, t.board, t.line
-      FROM tasks t
-      JOIN notes n ON n.id = t.note_id
-      WHERE 1=1
-    `;
-    const params: (string | number)[] = [];
-
-    if (filters?.board) {
-      sql += " AND t.board = ?";
-      params.push(filters.board);
-    }
-    if (filters?.done !== undefined) {
-      sql += " AND t.done = ?";
-      params.push(filters.done ? 1 : 0);
-    }
-    if (filters?.tag) {
-      sql += " AND t.note_id IN (SELECT note_id FROM tags WHERE tag = ?)";
-      params.push(filters.tag);
-    }
-
-    return this.db.query(sql).all(...params) as Task[];
-  }
-
-  updateTask(
-    id: number,
-    updates: Partial<Pick<Task, "done" | "board" | "priority">>
-  ): void {
-    if (updates.done !== undefined) {
-      this.db.query("UPDATE tasks SET done = ? WHERE id = ?").run(updates.done ? 1 : 0, id);
-    }
-    if (updates.board !== undefined) {
-      this.db.query("UPDATE tasks SET board = ? WHERE id = ?").run(updates.board, id);
-    }
-    if (updates.priority !== undefined) {
-      this.db.query("UPDATE tasks SET priority = ? WHERE id = ?").run(updates.priority, id);
-    }
-  }
+  // Wave 9: legacy getTasks/updateTask removed. Tasks now live in the new
+  // tasks schema (id/note_path/title/type/status/...) and are accessed via
+  // the MCP create_task / get_task / list_tasks / update_task / delete_task
+  // tools (src/server/mcp/tools/*-task.ts) and the TasksRepo
+  // (src/server/indexer/tasks-repo.ts).
 
   private clearNoteRelations(noteId: number, notePath: string): void {
     this.db.query("DELETE FROM backlinks WHERE source_id = ?").run(noteId);
@@ -445,7 +401,8 @@ export class Indexer {
         "DELETE FROM graph_edges WHERE source = ? AND client_tag IS NULL",
       )
       .run(notePath);
-    this.db.query("DELETE FROM tasks WHERE note_id = ?").run(noteId);
+    // Wave 9: tasks are no longer joined to notes via note_id. They live
+    // standalone in the new tasks schema and are managed via MCP tools.
     this.db.query("DELETE FROM aliases WHERE note_id = ?").run(noteId);
   }
 

@@ -4,6 +4,7 @@ import { Database } from "bun:sqlite";
 import { initSchema } from "../../../../src/server/db";
 import { SectionsRepo } from "../../../../src/server/indexer/sections-repo";
 import { MetadataRepo } from "../../../../src/server/indexer/metadata-repo";
+import { TasksRepo } from "../../../../src/server/indexer/tasks-repo";
 import { ChunkEmbeddingsRepo } from "../../../../src/server/embeddings/chunks-repo";
 import { ProgressBus } from "../../../../src/server/embeddings/progress";
 import { Idempotency } from "../../../../src/server/mcp/idempotency";
@@ -33,6 +34,7 @@ describe("Wave 8 write tools", () => {
       db,
       sections: new SectionsRepo(db),
       metadata: new MetadataRepo(db),
+      tasks: new TasksRepo(db),
       embeddings: new ChunkEmbeddingsRepo(db),
       embedService: {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any

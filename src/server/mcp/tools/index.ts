@@ -13,6 +13,11 @@ import { walkGraphTool } from "./walk-graph";
 import { clusterGraphTool } from "./cluster-graph";
 import { getReportTool } from "./get-report";
 import { batchIngestTool } from "./batch-ingest";
+import { createTaskTool } from "./create-task";
+import { getTaskTool } from "./get-task";
+import { listTasksTool } from "./list-tasks";
+import { updateTaskTool } from "./update-task";
+import { deleteTaskTool } from "./delete-task";
 
 export function registerAllTools(registry: ToolRegistry): void {
   registry.register(createNoteTool);
@@ -28,4 +33,9 @@ export function registerAllTools(registry: ToolRegistry): void {
   registry.register(clusterGraphTool);
   registry.register(getReportTool);
   registry.register(batchIngestTool);
+  registry.register(createTaskTool);
+  registry.register(getTaskTool);
+  registry.register(listTasksTool);
+  registry.register(updateTaskTool);
+  registry.register(deleteTaskTool);
 }

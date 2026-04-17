@@ -6,6 +6,7 @@ import { walkGraphTool } from "../../../../src/server/mcp/tools/walk-graph";
 import type { ToolContext } from "../../../../src/server/mcp/types";
 import { SectionsRepo } from "../../../../src/server/indexer/sections-repo";
 import { MetadataRepo } from "../../../../src/server/indexer/metadata-repo";
+import { TasksRepo } from "../../../../src/server/indexer/tasks-repo";
 import { ChunkEmbeddingsRepo } from "../../../../src/server/embeddings/chunks-repo";
 import { ProgressBus } from "../../../../src/server/embeddings/progress";
 import { Idempotency } from "../../../../src/server/mcp/idempotency";
@@ -32,6 +33,7 @@ describe("walk_graph", () => {
       db,
       sections: new SectionsRepo(db),
       metadata: new MetadataRepo(db),
+      tasks: new TasksRepo(db),
       embeddings: new ChunkEmbeddingsRepo(db),
       embedService: {} as unknown as ToolContext["embedService"],
       engine: { model: "x", batchSize: 1, async embedBatch() { return []; } },

@@ -156,19 +156,18 @@ describe("wave9 migration", () => {
   });
 
   test("DOC_TYPES enum contains the spec values (no reference, with review+guide)", () => {
-    expect([...DOC_TYPES].sort()).toEqual(
-      [
-        "architecture",
-        "changelog",
-        "guide",
-        "journal",
-        "other",
-        "plan",
-        "research",
-        "review",
-        "spec",
-      ].sort(),
-    );
+    const expected: typeof DOC_TYPES[number][] = [
+      "architecture",
+      "changelog",
+      "guide",
+      "journal",
+      "other",
+      "plan",
+      "research",
+      "review",
+      "spec",
+    ];
+    expect([...DOC_TYPES].sort()).toEqual(expected.sort());
     expect((DOC_TYPES as readonly string[]).includes("reference")).toBe(false);
   });
 

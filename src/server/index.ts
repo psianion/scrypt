@@ -10,7 +10,6 @@ import { notesRoutes } from "./api/notes";
 import { searchRoutes } from "./api/search";
 import { journalRoutes } from "./api/journal";
 import { templateRoutes } from "./api/templates";
-import { taskRoutes } from "./api/tasks";
 import { dataRoutes } from "./api/data";
 import { pluginRoutes } from "./api/plugins";
 import { skillRoutes } from "./api/skills";
@@ -27,6 +26,7 @@ import { ToolRegistry } from "./mcp/registry";
 import { registerAllTools } from "./mcp/tools";
 import { SectionsRepo } from "./indexer/sections-repo";
 import { MetadataRepo } from "./indexer/metadata-repo";
+import { TasksRepo } from "./indexer/tasks-repo";
 import { ChunkEmbeddingsRepo } from "./embeddings/chunks-repo";
 import { EmbeddingEngine } from "./embeddings/engine";
 import { EmbedClient, type WorkerLike } from "./embeddings/client";
@@ -87,6 +87,7 @@ export function createApp(config: AppConfig) {
   // the MCP streamable-http transport will later share.
   const wave8Sections = new SectionsRepo(db);
   const wave8Metadata = new MetadataRepo(db);
+  const wave9Tasks = new TasksRepo(db);
   const wave8Embeddings = new ChunkEmbeddingsRepo(db);
   const wave8Bus = new ProgressBus();
   // Parent-side engine is kept only for query-time operations (e.g.
@@ -143,7 +144,8 @@ export function createApp(config: AppConfig) {
   searchRoutes(router, indexer);
   journalRoutes(router, fm, indexer, config.vaultPath);
   templateRoutes(router, fm, config.vaultPath);
-  taskRoutes(router, indexer, fm, config.vaultPath);
+  // Wave 9: legacy /api/tasks REST endpoint removed. Tasks are managed via
+  // MCP create_task/get_task/list_tasks/update_task/delete_task tools.
   dataRoutes(router, config.vaultPath);
   pluginRoutes(router, config.vaultPath);
   skillRoutes(router, config.vaultPath);
@@ -175,6 +177,7 @@ export function createApp(config: AppConfig) {
     db,
     sections: wave8Sections,
     metadata: wave8Metadata,
+    tasks: wave9Tasks,
     embeddings: wave8Embeddings,
     embedService: wave8EmbedClient,
     engine: wave8Engine,

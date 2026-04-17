@@ -5,6 +5,7 @@ import { Database } from "bun:sqlite";
 import { initSchema } from "../db";
 import { SectionsRepo } from "../indexer/sections-repo";
 import { MetadataRepo } from "../indexer/metadata-repo";
+import { TasksRepo } from "../indexer/tasks-repo";
 import { ChunkEmbeddingsRepo } from "../embeddings/chunks-repo";
 import { EmbeddingEngine } from "../embeddings/engine";
 import { EmbeddingService } from "../embeddings/service";
@@ -31,6 +32,7 @@ function buildContext(
 
   const sections = new SectionsRepo(db);
   const metadata = new MetadataRepo(db);
+  const tasks = new TasksRepo(db);
   const embeddings = new ChunkEmbeddingsRepo(db);
   const bus = new ProgressBus();
   const engine = new EmbeddingEngine({
@@ -53,6 +55,7 @@ function buildContext(
     db,
     sections,
     metadata,
+    tasks,
     embeddings,
     embedService,
     engine,

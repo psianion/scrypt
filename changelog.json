@@ -1,0 +1,77 @@
+[
+  {
+    "date": "2026-04-16",
+    "started_at": "2026-04-16T15:00:00+05:30",
+    "ended_at": "2026-04-16T21:17:30+05:30",
+    "duration_minutes": 377,
+    "summary": "Hardened embed worker lifecycle, added similarity graph edges from embeddings, built batch_ingest MCP tool, fixed Docker ARM64",
+    "session_type": "mixed",
+    "complexity": "high",
+    "model": {
+      "orchestrator": "claude-opus-4-6",
+      "agents": "claude-opus-4-6"
+    },
+    "tokens": {
+      "context_mode": {
+        "total_data_processed_mb": 1.8,
+        "tool_calls": 45
+      },
+      "estimated_session_total": {
+        "input_tokens": 1200000,
+        "output_tokens": 500000,
+        "total_tokens": 1700000
+      }
+    },
+    "usage_snapshot": {
+      "session": { "remaining": "unknown" },
+      "weekly": { "remaining": "unknown" }
+    },
+    "agents": {
+      "count": 4,
+      "total_tokens": 180000,
+      "spawned": [
+        { "type": "Explore", "tokens": 40000, "tools_used": 25 },
+        { "type": "Explore", "tokens": 35000, "tools_used": 20 },
+        { "type": "Explore", "tokens": 55000, "tools_used": 30 },
+        { "type": "general-purpose", "tokens": 50000, "tools_used": 15 }
+      ]
+    },
+    "deliverables": [
+      {
+        "type": "bugfix",
+        "scope": ["embed worker shutdown", "timer deferral", "timeout increase", "double-submission fix", "DB locking fix"],
+        "lines": 652
+      },
+      {
+        "type": "feature",
+        "scope": ["similarity graph edges", "batch_ingest MCP tool", "GraphView similarity filter"],
+        "lines": 400
+      },
+      {
+        "type": "infra",
+        "scope": ["Docker ARM64 platform", "docker-compose ingest mount", "credential helper fix"],
+        "lines": 10
+      },
+      {
+        "type": "test",
+        "scope": ["client.test.ts timer leak fix", "helpers cleanup fix"],
+        "lines": 30
+      }
+    ],
+    "skills_used": ["cleanup", "commit-commands:commit-push-pr", "scrypt-ingest", "log-session"],
+    "tools_used_summary": {
+      "Read": 35,
+      "Edit": 28,
+      "Write": 3,
+      "Bash": 65,
+      "Grep": 15,
+      "Glob": 5,
+      "Agent": 4,
+      "ctx_execute": 18,
+      "Playwright": 12
+    },
+    "satisfaction": null,
+    "tags": ["embed-worker", "debugging", "docker", "graph-visualization", "mcp-tools", "batch-ingest"],
+    "cost_usd": 45.00
+  }
+]
