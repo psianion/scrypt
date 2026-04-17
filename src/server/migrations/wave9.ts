@@ -2,34 +2,43 @@
 //
 // Wave 9 — Intelligence Layer schema changes:
 //   - drop legacy checkbox-based `tasks` table and recreate with full CRUD schema
-//     (type, status, due_date, priority, metadata, client_tag)
+//     (type CHECK, status CHECK, nullable note_path, default unixepoch timestamps)
 //   - add `doc_type` and `summary` columns to `note_metadata`
+//   - wipe edges using retired confidence values (extracted/inferred/ambiguous)
 //
 // No back-compat: pre-beta, we drop+recreate the `tasks` table and discard old
 // rows. The migration is idempotent — safe to run multiple times.
 import type { Database } from "bun:sqlite";
 
-const LEGACY_TASKS_COLS = new Set([
-  "text",
-  "done",
-  "board",
-  "line",
-  "note_id",
-]);
-
-const WAVE9_TASKS_COLS = [
-  "id",
-  "note_path",
-  "title",
-  "type",
-  "status",
-  "due_date",
-  "priority",
-  "metadata",
-  "client_tag",
-  "created_at",
-  "updated_at",
+export const TASK_TYPES_SQL = [
+  "BRAINSTORM",
+  "PLAN",
+  "BUILD",
+  "RESEARCH",
+  "REVIEW",
+  "CUSTOM",
 ] as const;
+
+export const TASK_STATUSES_SQL = ["open", "in_progress", "closed"] as const;
+
+const TASK_TYPE_CHECK = `type IN (${TASK_TYPES_SQL.map((v) => `'${v}'`).join(",")})`;
+const TASK_STATUS_CHECK = `status IN (${TASK_STATUSES_SQL.map((v) => `'${v}'`).join(",")})`;
+
+const CREATE_TASKS_SQL = `
+  CREATE TABLE tasks (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    note_path   TEXT,
+    title       TEXT NOT NULL,
+    type        TEXT NOT NULL CHECK (${TASK_TYPE_CHECK}),
+    status      TEXT NOT NULL DEFAULT 'open' CHECK (${TASK_STATUS_CHECK}),
+    due_date    TEXT,
+    priority    INTEGER DEFAULT 0,
+    metadata    TEXT,
+    client_tag  TEXT UNIQUE,
+    created_at  INTEGER NOT NULL DEFAULT (unixepoch()),
+    updated_at  INTEGER NOT NULL DEFAULT (unixepoch())
+  )
+`;
 
 function tableCols(db: Database, table: string): string[] {
   return (db.query(`PRAGMA table_info(${table})`).all() as { name: string }[]).map(
@@ -37,42 +46,30 @@ function tableCols(db: Database, table: string): string[] {
   );
 }
 
-function isWave9TasksShape(cols: string[]): boolean {
-  if (cols.length === 0) return false;
-  return WAVE9_TASKS_COLS.every((c) => cols.includes(c));
-}
-
-function isLegacyTasksShape(cols: string[]): boolean {
-  if (cols.length === 0) return false;
-  return cols.some((c) => LEGACY_TASKS_COLS.has(c));
+function getTableSql(db: Database, table: string): string | null {
+  const row = db
+    .query<{ sql: string | null }, [string]>(
+      `SELECT sql FROM sqlite_master WHERE type='table' AND name = ?`,
+    )
+    .get(table);
+  return row?.sql ?? null;
 }
 
 export function applyWave9Migration(db: Database): void {
-  const tasksCols = tableCols(db, "tasks");
-
-  if (tasksCols.length > 0 && !isWave9TasksShape(tasksCols)) {
-    // Pre-beta: drop legacy checkbox-based tasks table and anything else that
-    // doesn't match the Wave 9 shape. Old rows are discarded by design.
-    if (isLegacyTasksShape(tasksCols) || !isWave9TasksShape(tasksCols)) {
-      db.run(`DROP TABLE tasks`);
-    }
+  // Drop + recreate `tasks` whenever the stored CREATE SQL doesn't include the
+  // Wave 9 CHECK constraints. This catches both the legacy (checkbox) shape
+  // and the in-flight first-cut Wave 9 shape that lacked CHECKs.
+  const existingSql = getTableSql(db, "tasks");
+  const needsRecreate =
+    existingSql === null ||
+    !existingSql.includes("CHECK (type IN") ||
+    !existingSql.includes("CHECK (status IN");
+  if (existingSql !== null && needsRecreate) {
+    db.run(`DROP TABLE tasks`);
   }
-
-  db.run(`
-    CREATE TABLE IF NOT EXISTS tasks (
-      id          INTEGER PRIMARY KEY AUTOINCREMENT,
-      note_path   TEXT NOT NULL,
-      title       TEXT NOT NULL,
-      type        TEXT NOT NULL,
-      status      TEXT NOT NULL DEFAULT 'open',
-      due_date    TEXT,
-      priority    INTEGER DEFAULT 0,
-      metadata    TEXT,
-      client_tag  TEXT UNIQUE,
-      created_at  INTEGER NOT NULL,
-      updated_at  INTEGER NOT NULL
-    )
-  `);
+  if (needsRecreate) {
+    db.run(CREATE_TASKS_SQL);
+  }
   db.run(`CREATE INDEX IF NOT EXISTS idx_tasks_note_path ON tasks(note_path)`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status)`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_tasks_type ON tasks(type)`);

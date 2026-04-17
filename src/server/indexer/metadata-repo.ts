@@ -9,9 +9,10 @@ export const DOC_TYPES = [
   "spec",
   "plan",
   "architecture",
+  "review",
+  "guide",
   "journal",
   "changelog",
-  "reference",
   "other",
 ] as const;
 export type DocType = (typeof DOC_TYPES)[number];
