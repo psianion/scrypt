@@ -2,6 +2,11 @@
 import { McpError, MCP_ERROR } from "../errors";
 import type { ToolDef } from "../types";
 import type { Database } from "bun:sqlite";
+import {
+  CONFIDENCE_VALUES,
+  isConfidence,
+  type Confidence,
+} from "../confidence";
 
 const RESERVED = new Set(["wikilink", "subdomain", "domain", "tag"]);
 
@@ -9,7 +14,7 @@ interface Input {
   source: string;
   target: string;
   relation: string;
-  confidence: "extracted" | "inferred" | "ambiguous";
+  confidence: Confidence;
   reason?: string;
   client_tag: string;
 }
@@ -47,7 +52,7 @@ export const addEdgeTool: ToolDef<Input, Output> = {
       relation: { type: "string" },
       confidence: {
         type: "string",
-        enum: ["extracted", "inferred", "ambiguous"],
+        enum: [...CONFIDENCE_VALUES],
       },
       reason: { type: "string" },
       client_tag: { type: "string" },
@@ -56,6 +61,14 @@ export const addEdgeTool: ToolDef<Input, Output> = {
   },
   async handler(ctx, input) {
     return ctx.idempotency.runCached("add_edge", input.client_tag, async () => {
+      if (!isConfidence(input.confidence)) {
+        throw new McpError(
+          MCP_ERROR.INVALID_PARAMS,
+          `invalid confidence: ${String(input.confidence)}. Allowed: ${CONFIDENCE_VALUES.join(
+            ", ",
+          )}`,
+        );
+      }
       if (RESERVED.has(input.relation)) {
         throw new McpError(
           MCP_ERROR.CONFLICT,

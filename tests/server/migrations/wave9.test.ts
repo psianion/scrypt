@@ -115,6 +115,39 @@ describe("wave9 migration", () => {
     expect(count.c).toBe(0);
   });
 
+  test("wipes legacy-confidence edges (extracted/inferred/ambiguous)", () => {
+    applyWave8Migration(db);
+    // pre-seed graph_edges before wave9 runs
+    db.run(`
+      CREATE TABLE IF NOT EXISTS graph_edges (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        source TEXT, target TEXT, relation TEXT,
+        weight REAL, confidence TEXT, reason TEXT,
+        client_tag TEXT, created_at INTEGER,
+        UNIQUE(source, target, relation)
+      )
+    `);
+    const now = Date.now();
+    db.run(
+      `INSERT INTO graph_edges (source,target,relation,confidence,created_at)
+       VALUES
+         ('a','b','r1','extracted',?),
+         ('a','c','r2','inferred',?),
+         ('a','d','r3','ambiguous',?),
+         ('a','e','r4','connected',?),
+         ('a','f','r5',NULL,?)`,
+      [now, now, now, now, now],
+    );
+    applyWave9Migration(db);
+    const rows = db
+      .query<{ confidence: string | null }, []>(
+        `SELECT confidence FROM graph_edges ORDER BY target`,
+      )
+      .all();
+    const confs = rows.map((r) => r.confidence);
+    expect(confs).toEqual(["connected", null]);
+  });
+
   test("migration is idempotent", () => {
     applyWave8Migration(db);
     applyWave9Migration(db);

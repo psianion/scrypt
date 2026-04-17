@@ -171,7 +171,7 @@ function computeSimilarityEdges(
   const insert = db.prepare(
     `INSERT OR IGNORE INTO graph_edges
        (source, target, relation, weight, confidence, reason, created_at)
-     VALUES (?, ?, 'similarity', ?, 'inferred', 'embedding cosine', ?)`,
+     VALUES (?, ?, 'similarity', ?, 'semantically_related', 'embedding cosine', ?)`,
   );
   let created = 0;
   const now = Date.now();

@@ -24,9 +24,9 @@ describe("walk_graph", () => {
     }
     db.query(
       `INSERT INTO graph_edges (source, target, relation, confidence) VALUES
-        ('a.md', 'b.md', 'elaborates', 'extracted'),
-        ('b.md', 'c.md', 'elaborates', 'inferred'),
-        ('c.md', 'd.md', 'elaborates', 'ambiguous')`,
+        ('a.md', 'b.md', 'elaborates', 'connected'),
+        ('b.md', 'c.md', 'elaborates', 'mentions'),
+        ('c.md', 'd.md', 'elaborates', 'semantically_related')`,
     ).run();
     ctx = {
       db,
@@ -56,7 +56,7 @@ describe("walk_graph", () => {
   test("confidence_min filters low-confidence edges", async () => {
     const r = await walkGraphTool.handler(
       ctx,
-      { from: "a.md", depth: 3, confidence_min: "inferred" },
+      { from: "a.md", depth: 3, confidence_min: "mentions" },
       "c",
     );
     const ids = r.nodes.map((n) => n.id).sort();

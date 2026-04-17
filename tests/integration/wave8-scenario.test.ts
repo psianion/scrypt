@@ -230,7 +230,7 @@ Outperforms baselines on Atari.
         source: "rl/new-paper.md",
         target: "rl/actor-critic.md",
         relation: "elaborates",
-        confidence: "inferred",
+        confidence: "mentions",
         reason: "new-paper extends actor-critic",
         client_tag: "scenario-edge",
       },

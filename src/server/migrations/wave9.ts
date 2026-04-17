@@ -89,4 +89,16 @@ export function applyWave9Migration(db: Database): void {
       db.run(`ALTER TABLE note_metadata ADD COLUMN summary TEXT`);
     }
   }
+
+  // Wave 9 swaps the add_edge confidence enum: extracted/inferred/ambiguous
+  // → connected/mentions/semantically_related. Pre-beta: wipe any rows using
+  // the retired values rather than remapping (old values had different
+  // semantics so translation would be wrong).
+  const graphEdgesCols = tableCols(db, "graph_edges");
+  if (graphEdgesCols.includes("confidence")) {
+    db.run(
+      `DELETE FROM graph_edges
+       WHERE confidence IN ('extracted','inferred','ambiguous')`,
+    );
+  }
 }

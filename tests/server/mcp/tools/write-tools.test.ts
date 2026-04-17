@@ -217,7 +217,7 @@ describe("Wave 8 write tools", () => {
         source: "a.md",
         target: "b.md",
         relation: "elaborates",
-        confidence: "inferred",
+        confidence: "mentions",
         reason: "because tests",
         client_tag: "e1",
       },
@@ -232,9 +232,81 @@ describe("Wave 8 write tools", () => {
       .all();
     expect(rows[0]).toEqual({
       relation: "elaborates",
-      confidence: "inferred",
+      confidence: "mentions",
       reason: "because tests",
     });
+  });
+
+  test("add_edge accepts all three new-tier confidence values", async () => {
+    for (const [i, conf] of [
+      "connected",
+      "mentions",
+      "semantically_related",
+    ].entries()) {
+      await addEdgeTool.handler(
+        ctx,
+        {
+          source: "a.md",
+          target: "b.md",
+          relation: `rel_${i}`,
+          // @ts-expect-error — test enum literal widening
+          confidence: conf,
+          client_tag: `tier-${conf}`,
+        },
+        "c",
+      );
+    }
+    const confs = ctx.db
+      .query<{ confidence: string }, []>(
+        `SELECT confidence FROM graph_edges ORDER BY id`,
+      )
+      .all()
+      .map((r) => r.confidence);
+    expect(confs).toEqual(["connected", "mentions", "semantically_related"]);
+  });
+
+  test("add_edge rejects legacy confidence values (extracted/inferred/ambiguous)", async () => {
+    for (const legacy of ["extracted", "inferred", "ambiguous"]) {
+      let caught: unknown = null;
+      try {
+        await addEdgeTool.handler(
+          ctx,
+          {
+            source: "a.md",
+            target: "b.md",
+            relation: "elaborates",
+            // @ts-expect-error — intentional legacy value
+            confidence: legacy,
+            client_tag: `legacy-${legacy}`,
+          },
+          "c",
+        );
+      } catch (e) {
+        caught = e;
+      }
+      expect(caught).toMatchObject({ code: MCP_ERROR.INVALID_PARAMS });
+    }
+  });
+
+  test("add_edge rejects unknown confidence strings with INVALID_PARAMS", async () => {
+    let caught: unknown = null;
+    try {
+      await addEdgeTool.handler(
+        ctx,
+        {
+          source: "a.md",
+          target: "b.md",
+          relation: "elaborates",
+          // @ts-expect-error — intentional invalid value
+          confidence: "speculative",
+          client_tag: "e-bogus",
+        },
+        "c",
+      );
+    } catch (e) {
+      caught = e;
+    }
+    expect(caught).toMatchObject({ code: MCP_ERROR.INVALID_PARAMS });
   });
 
   test("add_edge rejects reserved structural relations", async () => {
@@ -246,7 +318,7 @@ describe("Wave 8 write tools", () => {
           source: "a.md",
           target: "b.md",
           relation: "wikilink",
-          confidence: "extracted",
+          confidence: "connected",
           client_tag: "e2",
         },
         "c",
@@ -266,7 +338,7 @@ describe("Wave 8 write tools", () => {
           source: "a.md",
           target: "nope.md",
           relation: "elaborates",
-          confidence: "inferred",
+          confidence: "mentions",
           client_tag: "e3",
         },
         "c",
@@ -284,7 +356,7 @@ describe("Wave 8 write tools", () => {
         source: "a.md",
         target: "b.md",
         relation: "elaborates",
-        confidence: "inferred",
+        confidence: "mentions",
         client_tag: "r-setup",
       },
       "c",
