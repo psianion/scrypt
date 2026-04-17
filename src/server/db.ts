@@ -1,6 +1,7 @@
 // src/server/db.ts
 import { Database } from "bun:sqlite";
 import { applyWave8Migration } from "./migrations/wave8";
+import { applyWave9Migration } from "./migrations/wave9";
 
 export function createDatabase(dbPath: string): Database {
   const db = new Database(dbPath, { create: true });
@@ -194,4 +195,8 @@ export function initSchema(db: Database): void {
 
   // Wave 8: note_metadata, note_sections, note_chunk_embeddings, mcp_dedup.
   applyWave8Migration(db);
+
+  // Wave 9: drop legacy tasks, recreate with full CRUD schema;
+  // add doc_type + summary to note_metadata.
+  applyWave9Migration(db);
 }
