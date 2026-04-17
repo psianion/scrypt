@@ -13,6 +13,7 @@ import { walkGraphTool } from "./walk-graph";
 import { clusterGraphTool } from "./cluster-graph";
 import { getReportTool } from "./get-report";
 import { batchIngestTool } from "./batch-ingest";
+import { rescanSimilarityTool } from "./rescan-similarity";
 import { createTaskTool } from "./create-task";
 import { getTaskTool } from "./get-task";
 import { listTasksTool } from "./list-tasks";
@@ -33,6 +34,7 @@ export function registerAllTools(registry: ToolRegistry): void {
   registry.register(clusterGraphTool);
   registry.register(getReportTool);
   registry.register(batchIngestTool);
+  registry.register(rescanSimilarityTool);
   registry.register(createTaskTool);
   registry.register(getTaskTool);
   registry.register(listTasksTool);

@@ -97,5 +97,17 @@ export function applyWave9Migration(db: Database): void {
       `DELETE FROM graph_edges
        WHERE confidence IN ('extracted','inferred','ambiguous')`,
     );
+    // Old batch_ingest emitted relation='similarity'. Wave 9 unifies that
+    // under the new vocabulary as relation='semantically_related'. Use
+    // UPDATE OR IGNORE so rows that would collide with an already-correct
+    // edge (UNIQUE source,target,relation) are silently dropped instead.
+    db.run(
+      `UPDATE OR IGNORE graph_edges
+         SET relation = 'semantically_related'
+       WHERE relation = 'similarity'`,
+    );
+    // Drop any leftover 'similarity' rows that the UPDATE OR IGNORE skipped
+    // due to UNIQUE collisions.
+    db.run(`DELETE FROM graph_edges WHERE relation = 'similarity'`);
   }
 }

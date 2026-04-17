@@ -256,6 +256,69 @@ describe("wave9 migration", () => {
     expect(confs).toEqual(["connected", null]);
   });
 
+  test("relabels relation='similarity' to 'semantically_related'", () => {
+    applyWave8Migration(db);
+    db.run(`
+      CREATE TABLE IF NOT EXISTS graph_edges (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        source TEXT, target TEXT, relation TEXT,
+        weight REAL, confidence TEXT, reason TEXT,
+        client_tag TEXT, created_at INTEGER,
+        UNIQUE(source, target, relation)
+      )
+    `);
+    const now = Date.now();
+    db.run(
+      `INSERT INTO graph_edges (source,target,relation,confidence,created_at)
+       VALUES
+         ('a','b','similarity','semantically_related',?),
+         ('a','c','similarity','semantically_related',?)`,
+      [now, now],
+    );
+    applyWave9Migration(db);
+    const relations = db
+      .query<{ relation: string }, []>(
+        `SELECT relation FROM graph_edges ORDER BY target`,
+      )
+      .all()
+      .map((r) => r.relation);
+    expect(relations).toEqual(["semantically_related", "semantically_related"]);
+    // No 'similarity' rows left
+    const leftover = db
+      .query<{ c: number }, []>(
+        `SELECT COUNT(*) AS c FROM graph_edges WHERE relation='similarity'`,
+      )
+      .get()!;
+    expect(leftover.c).toBe(0);
+  });
+
+  test("relabel skips rows that would collide on UNIQUE(source,target,relation)", () => {
+    applyWave8Migration(db);
+    db.run(`
+      CREATE TABLE IF NOT EXISTS graph_edges (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        source TEXT, target TEXT, relation TEXT,
+        weight REAL, confidence TEXT, reason TEXT,
+        client_tag TEXT, created_at INTEGER,
+        UNIQUE(source, target, relation)
+      )
+    `);
+    const now = Date.now();
+    db.run(
+      `INSERT INTO graph_edges (source,target,relation,confidence,created_at)
+       VALUES
+         ('a','b','similarity','semantically_related',?),
+         ('a','b','semantically_related','semantically_related',?)`,
+      [now, now],
+    );
+    applyWave9Migration(db);
+    const rows = db
+      .query<{ relation: string }, []>(`SELECT relation FROM graph_edges`)
+      .all()
+      .map((r) => r.relation);
+    expect(rows).toEqual(["semantically_related"]);
+  });
+
   test("migration is idempotent", () => {
     applyWave8Migration(db);
     applyWave9Migration(db);
