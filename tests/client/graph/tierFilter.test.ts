@@ -1,0 +1,51 @@
+import { test, expect, describe, beforeEach } from "bun:test";
+import {
+  DEFAULT_TIER_FILTER,
+  loadTierFilter,
+  saveTierFilter,
+  filterEdgesByTier,
+} from "../../../src/client/graph/tierFilter";
+
+function fakeStorage(): Storage {
+  const store = new Map<string, string>();
+  return {
+    getItem: (k) => store.get(k) ?? null,
+    setItem: (k, v) => store.set(k, v),
+    removeItem: (k) => void store.delete(k),
+    clear: () => store.clear(),
+    key: () => null,
+    length: 0,
+  } as Storage;
+}
+
+describe("tierFilter", () => {
+  let ls: Storage;
+  beforeEach(() => {
+    ls = fakeStorage();
+  });
+
+  test("default has only 'connected' enabled", () => {
+    expect(DEFAULT_TIER_FILTER).toEqual({ connected: true, mentions: false, semantically_related: false });
+  });
+
+  test("loadTierFilter returns default when storage is empty", () => {
+    expect(loadTierFilter(ls)).toEqual(DEFAULT_TIER_FILTER);
+  });
+
+  test("save + load round-trip", () => {
+    const v = { connected: false, mentions: true, semantically_related: true };
+    saveTierFilter(ls, v);
+    expect(loadTierFilter(ls)).toEqual(v);
+  });
+
+  test("filterEdgesByTier keeps only enabled tiers", () => {
+    const edges = [
+      { source: "a", target: "b", relation: "x", confidence: "connected", reason: null },
+      { source: "a", target: "c", relation: "x", confidence: "mentions", reason: null },
+      { source: "a", target: "d", relation: "x", confidence: "semantically_related", reason: null },
+    ];
+    const out = filterEdgesByTier(edges, { connected: true, mentions: false, semantically_related: false });
+    expect(out).toHaveLength(1);
+    expect(out[0]!.target).toBe("b");
+  });
+});
