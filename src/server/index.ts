@@ -168,7 +168,7 @@ export function createApp(config: AppConfig) {
   memoryRoutes(router, fm);
   dailyContextRoutes(router, fm, indexer, config.vaultPath);
   activityRoutes(router, activity);
-  graphRoutes(router, db);
+  graphRoutes(router, db, config.vaultPath, snapshotScheduler);
   taskListRoutes(router, wave9Tasks);
   embedHealthRoutes(router, wave8EmbedClient);
 

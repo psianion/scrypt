@@ -1,4 +1,7 @@
 // src/server/api/graph.ts
+import { createHash } from "node:crypto";
+import { existsSync, readFileSync, statSync } from "node:fs";
+import { join } from "node:path";
 import type { Router } from "../router";
 import type { Database } from "bun:sqlite";
 import type {
@@ -8,6 +11,10 @@ import type {
 } from "../../shared/graph-types";
 import { RESERVED_NAMESPACES, type Tag } from "../../shared/types";
 import { parseTag } from "../parsers";
+import type { SnapshotScheduler } from "../graph/snapshot-scheduler";
+import { writeGraphSnapshot } from "../graph/snapshot";
+
+const SNAPSHOT_STALE_MS = 10_000;
 
 interface NoteRow {
   path: string;
@@ -25,7 +32,40 @@ const RESERVED_PREFIXES = [
   "dist/",
 ];
 
-export function graphRoutes(router: Router, db: Database): void {
+export function graphRoutes(
+  router: Router,
+  db: Database,
+  vaultDir: string,
+  scheduler: SnapshotScheduler,
+): void {
+  router.get("/api/graph/snapshot", (req) => {
+    const filePath = join(vaultDir, ".scrypt", "graph.json");
+
+    if (!existsSync(filePath)) {
+      writeGraphSnapshot(db, vaultDir);
+    } else {
+      const age = Date.now() - statSync(filePath).mtimeMs;
+      if (age > SNAPSHOT_STALE_MS) {
+        // stale-while-revalidate: serve file, schedule a rebuild in bg
+        scheduler.schedule();
+      }
+    }
+
+    const body = readFileSync(filePath);
+    const etag = `"${createHash("sha1").update(body).digest("hex")}"`;
+    if (req.headers.get("If-None-Match") === etag) {
+      return new Response(null, { status: 304, headers: { ETag: etag } });
+    }
+    return new Response(body, {
+      status: 200,
+      headers: {
+        "Content-Type": "application/json",
+        "ETag": etag,
+        "Cache-Control": "no-cache",
+      },
+    });
+  });
+
   router.get("/api/graph", async () => {
     const noteRows = db
       .query(

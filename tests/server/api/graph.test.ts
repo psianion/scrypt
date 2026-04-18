@@ -1,6 +1,14 @@
 // tests/server/api/graph.test.ts
-import { describe, test, expect, beforeAll, afterAll } from "bun:test";
+import { describe, test, expect, beforeAll, afterAll, beforeEach } from "bun:test";
+import { Database } from "bun:sqlite";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { createTestEnv } from "../../helpers";
+import { initSchema } from "../../../src/server/db";
+import { graphRoutes } from "../../../src/server/api/graph";
+import { SnapshotScheduler } from "../../../src/server/graph/snapshot-scheduler";
+import { Router } from "../../../src/server/router";
 
 let env: ReturnType<typeof createTestEnv>;
 
@@ -146,5 +154,50 @@ describe("GET /api/graph response shape (dev bypass)", () => {
     const data = (await res.json()) as { nodes: unknown[]; edges: unknown[] };
     expect(Array.isArray(data.nodes)).toBe(true);
     expect(Array.isArray(data.edges)).toBe(true);
+  });
+});
+
+describe("GET /api/graph/snapshot", () => {
+  let db: Database;
+  let vaultDir: string;
+  let router: Router;
+  beforeEach(() => {
+    db = new Database(":memory:");
+    initSchema(db);
+    db.run(
+      `INSERT INTO graph_nodes (id, kind, label, note_path) VALUES ('a.md','note','A','a.md')`,
+    );
+    vaultDir = mkdtempSync(join(tmpdir(), "scrypt-graph-api-"));
+    router = new Router();
+    const sched = new SnapshotScheduler(db, vaultDir, { debounceMs: 10 });
+    graphRoutes(router, db, vaultDir, sched);
+  });
+
+  test("returns JSON snapshot, 200, Content-Type and ETag set", async () => {
+    const res = await router.handle(
+      new Request("http://x/api/graph/snapshot"),
+    );
+    if (!res) throw new Error("no response");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Type")).toContain("application/json");
+    expect(res.headers.get("ETag")).toBeTruthy();
+    const body = await res.json();
+    expect(body.nodes).toHaveLength(1);
+    expect(body.nodes[0].id).toBe("a.md");
+  });
+
+  test("304 when If-None-Match matches", async () => {
+    const first = await router.handle(
+      new Request("http://x/api/graph/snapshot"),
+    );
+    if (!first) throw new Error("no response");
+    const etag = first.headers.get("ETag")!;
+    const second = await router.handle(
+      new Request("http://x/api/graph/snapshot", {
+        headers: { "If-None-Match": etag },
+      }),
+    );
+    if (!second) throw new Error("no response");
+    expect(second.status).toBe(304);
   });
 });
