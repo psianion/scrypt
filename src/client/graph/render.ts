@@ -90,14 +90,14 @@ function hexToNumber(hex: string): number {
 
 function tierStyle(tier: Tier, srcColor: number): { color: number; width: number; alpha: number } {
   if (tier === "connected") {
-    return { color: hexToNumber(darken(numberToHex(srcColor), 0.3)), width: 1.4, alpha: 0.85 };
+    return { color: hexToNumber(darken(numberToHex(srcColor), 0.2)), width: 1.2, alpha: 0.9 };
   }
   if (tier === "mentions") {
-    return { color: 0x8a8a8a, width: 0.9, alpha: 0.4 };
+    return { color: 0x9aa0aa, width: 1.0, alpha: 0.55 };
   }
-  // semantically_related — can be tens of thousands in a well-embedded vault.
-  // Keep very faint so it reads as ambient haze, not foreground structure.
-  return { color: 0x6a6a6a, width: 0.5, alpha: 0.12 };
+  // semantically_related — can be thousands. Visible baseline but muted so
+  // explicit links still read as foreground.
+  return { color: 0x7a7f88, width: 0.8, alpha: 0.28 };
 }
 
 function numberToHex(n: number): string {
@@ -203,74 +203,74 @@ export function createGraph(parent: HTMLElement, opts: RenderOpts): RenderHandle
   const linkRender: LinkRender[] = [];
   let currentTransform: ZoomTransform = zoomIdentity;
 
-  // Node sizing function — used by render + collide force so they stay in sync.
-  const nodeRadius = (d: NodeDatum) => 3 + Math.min(6, Math.sqrt(d.degree));
+  // Quartz's formula is `2 + sqrt(degree)`, which works when typical degree is
+  // 5–20 (wikilinks only). Scrypt adds semantic similarity edges, pushing hub
+  // degree into the 100–200 range — raw `sqrt(degree)` would produce 14px hubs
+  // that eat the canvas. Clamp at 8px max so layout stays readable regardless
+  // of vault density.
+  const nodeRadius = (d: NodeDatum) => 2 + Math.min(6, Math.sqrt(d.degree / 3));
 
-  // Simulation — tuned closer to Quartz v4: stronger repulsion, link distance
-  // scaled, collide derived from node radius so hubs don't overlap.
+  // Simulation — Quartz defaults: strength(-100 * repelForce), centerForce,
+  // linkDistance. We set them directly since we don't read from a D3Config.
   const simulation: Simulation<NodeDatum, LinkDatum> = forceSimulation<NodeDatum>(nodes)
+    .force("charge", forceManyBody().strength(-120))
+    .force("center", forceCenter(width / 2, height / 2).strength(0.5))
     .force(
       "link",
-      forceLink<NodeDatum, LinkDatum>(links)
-        .id((n) => n.id)
-        .distance(40)
-        .strength(0.1),
+      forceLink<NodeDatum, LinkDatum>(links).id((n) => n.id).distance(30),
     )
-    .force("charge", forceManyBody().strength(-120).distanceMax(400))
-    .force("center", forceCenter(width / 2, height / 2).strength(0.04))
-    .force("collide", forceCollide<NodeDatum>().radius((d) => nodeRadius(d) + 2).strength(0.9))
-    .alphaDecay(0.015)
-    .velocityDecay(0.35);
+    .force("collide", forceCollide<NodeDatum>((d) => nodeRadius(d)).iterations(3))
+    .alphaDecay(0.0228)
+    .velocityDecay(0.4);
 
   if (opts.enableRadial) {
     const radius = (Math.min(width, height) / 2) * 0.8;
-    simulation.force("radial", forceRadial(radius, width / 2, height / 2).strength(0.03));
+    simulation.force("radial", forceRadial(radius, width / 2, height / 2).strength(0.2));
   }
 
   // Query filter state (applied over tween)
   let queryVisible: Set<string> | null = null;
   let queryMatches: Set<string> = new Set();
 
+  // Quartz-style "active" set: a node is active if it's the hovered node or a
+  // 1-hop neighbour of the hovered node. Used to dim everything else.
+  function isActive(id: string, hovered: string | null): boolean {
+    if (!hovered) return false;
+    if (hovered === id) return true;
+    return neighbours.get(hovered)?.has(id) ?? false;
+  }
+
   function computeNodeAlpha(id: string, hovered: string | null): number {
-    let alpha = opts.visited.has(id) ? 0.5 : 1.0;
+    if (hovered) return isActive(id, hovered) ? 1 : 0.2;
     if (queryVisible) {
-      if (queryMatches.has(id)) alpha = 1.0;
-      else if (queryVisible.has(id)) alpha = 0.6;
-      else alpha = 0.1;
+      if (queryMatches.has(id)) return 1;
+      if (queryVisible.has(id)) return 0.7;
+      return 0.15;
     }
-    if (hovered) {
-      if (hovered === id || neighbours.get(hovered)?.has(id)) alpha = 1.0;
-      else alpha = Math.min(alpha, 0.2);
-    }
-    return alpha;
+    return opts.visited.has(id) ? 0.5 : 1;
   }
 
   function computeLinkAlpha(l: LinkDatum, hovered: string | null): number {
-    const tierOn = tierFilter[l.tier] ?? false;
-    if (!tierOn) return 0;
-    let alpha = l.baseAlpha;
+    if (!(tierFilter[l.tier] ?? false)) return 0;
     const s = (l.source as NodeDatum).id;
     const t = (l.target as NodeDatum).id;
-    if (queryVisible) {
-      alpha = queryVisible.has(s) && queryVisible.has(t) ? 0.4 : 0.1;
-    }
     if (hovered) {
-      if (s === hovered || t === hovered) alpha = l.baseAlpha;
-      else alpha = Math.min(alpha, 0.1);
+      return s === hovered || t === hovered ? 1 : 0.08;
     }
-    return alpha;
+    if (queryVisible) {
+      return queryVisible.has(s) && queryVisible.has(t) ? l.baseAlpha : 0.06;
+    }
+    return l.baseAlpha;
   }
 
   let hoveredNodeId: string | null = null;
 
   function computeLabelAlpha(id: string, hovered: string | null): number {
-    // Labels always visible at low alpha so the graph reads like Quartz.
-    // Hovered node (or neighbour) → bright. Faded nodes → faint.
-    if (hovered === id) return 1;
-    if (hovered && neighbours.get(hovered)?.has(id)) return 0.85;
-    if (queryVisible && !queryVisible.has(id)) return 0.05;
-    if (hovered) return 0.2;
-    return 0.55;
+    // Labels off by default (Quartz behaviour). Visible only on hover (self +
+    // 1-hop neighbours) or for exact search matches.
+    if (hovered) return isActive(id, hovered) ? 1 : 0;
+    if (queryVisible && queryMatches.has(id)) return 1;
+    return 0;
   }
 
   function applyStyles(animated: boolean) {
@@ -339,16 +339,17 @@ export function createGraph(parent: HTMLElement, opts: RenderOpts): RenderHandle
 
         // Trim label text — long vault-path titles crush the view.
         const shortTitle =
-          n.title.length > 32 ? `${n.title.slice(0, 30)}…` : n.title;
+          n.title.length > 40 ? `${n.title.slice(0, 38)}…` : n.title;
         const label = new Text({
           text: shortTitle,
-          alpha: 0.55,
+          alpha: 0,
           style: {
-            fontSize: 10,
-            fill: 0xcccccc,
-            fontFamily: "system-ui, sans-serif",
+            fontSize: 12,
+            fill: 0xe0e0e0,
+            fontFamily: "system-ui, -apple-system, sans-serif",
+            fontWeight: "500",
           },
-          anchor: { x: 0.5, y: 1.3 },
+          anchor: { x: 0.5, y: 1.4 },
           resolution: window.devicePixelRatio * 2,
         });
         label.eventMode = "none";
