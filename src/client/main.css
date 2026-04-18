@@ -41,3 +41,52 @@ body {
   background: #444;
   color: #fff;
 }
+
+/* GraphView (Pixi renderer) */
+.graph-view {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+}
+.graph-view__top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 60px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-secondary);
+  flex-shrink: 0;
+}
+.graph-view__search {
+  flex: 1;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  padding: 6px 10px;
+  font: inherit;
+  border-radius: 3px;
+  outline: none;
+}
+.graph-view__search:focus {
+  border-color: var(--text-secondary);
+}
+.graph-view__tiers {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.graph-view__tiers label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+.graph-view__canvas {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
