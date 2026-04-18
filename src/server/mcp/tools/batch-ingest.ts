@@ -10,6 +10,11 @@ import { createHash } from "node:crypto";
 import { parseStructural } from "../../indexer/structural-parse";
 import type { ToolDef, ToolContext } from "../types";
 import type { Database } from "bun:sqlite";
+import {
+  findSimilarPairs,
+  upsertSemanticEdges,
+  getSimilarityThreshold,
+} from "../../graph/semantic-similarity";
 
 interface Input {
   source_dir: string;
@@ -125,70 +130,14 @@ function upsertWikilinkEdges(
   return count;
 }
 
-function computeSimilarityEdges(
-  db: Database,
-  newPaths: Set<string>,
-  model: string,
-  threshold: number,
-): number {
-  const rows = db
-    .query<
-      { note_path: string; dims: number; vector: Uint8Array },
-      [string]
-    >("SELECT note_path, dims, vector FROM note_chunk_embeddings WHERE model = ?")
-    .all(model);
-
-  if (rows.length === 0) return 0;
-
-  // Average chunk vectors per note
-  const noteVecs = new Map<string, { sum: Float32Array; count: number }>();
-  for (const r of rows) {
-    const vec = new Float32Array(
-      new Uint8Array(r.vector).buffer.slice(0, r.dims * 4),
-    );
-    let entry = noteVecs.get(r.note_path);
-    if (!entry) {
-      entry = { sum: new Float32Array(r.dims), count: 0 };
-      noteVecs.set(r.note_path, entry);
-    }
-    for (let k = 0; k < r.dims; k++) entry.sum[k] += vec[k];
-    entry.count += 1;
-  }
-
-  // Normalize
-  const averaged: Array<{ path: string; vec: Float32Array }> = [];
-  for (const [path, entry] of noteVecs) {
-    const vec = entry.sum;
-    for (let k = 0; k < vec.length; k++) vec[k] /= entry.count;
-    let norm = 0;
-    for (let k = 0; k < vec.length; k++) norm += vec[k] * vec[k];
-    norm = Math.sqrt(norm);
-    if (norm > 0) for (let k = 0; k < vec.length; k++) vec[k] /= norm;
-    averaged.push({ path, vec });
-  }
-
-  // Only create edges where at least one side is a new note
-  const insert = db.prepare(
-    `INSERT OR IGNORE INTO graph_edges
-       (source, target, relation, weight, confidence, reason, created_at)
-     VALUES (?, ?, 'similarity', ?, 'inferred', 'embedding cosine', ?)`,
-  );
-  let created = 0;
-  const now = Date.now();
-  for (let i = 0; i < averaged.length; i++) {
-    for (let j = i + 1; j < averaged.length; j++) {
-      if (!newPaths.has(averaged[i].path) && !newPaths.has(averaged[j].path))
-        continue;
-      let score = 0;
-      for (let k = 0; k < averaged[i].vec.length; k++)
-        score += averaged[i].vec[k] * averaged[j].vec[k];
-      if (score >= threshold) {
-        const res = insert.run(averaged[i].path, averaged[j].path, score, now);
-        if (res.changes > 0) created += 1;
-      }
-    }
-  }
-  return created;
+function allEmbeddedPaths(db: Database, model: string): string[] {
+  return (
+    db
+      .query<{ note_path: string }, [string]>(
+        `SELECT DISTINCT note_path FROM note_chunk_embeddings WHERE model = ?`,
+      )
+      .all(model)
+  ).map((r) => r.note_path);
 }
 
 export const batchIngestTool: ToolDef<Input, Output> = {
@@ -202,7 +151,7 @@ export const batchIngestTool: ToolDef<Input, Output> = {
       domain: { type: "string", description: "Domain label for organizing ingested notes (default: dirname)" },
       target_prefix: { type: "string", description: "Vault path prefix (default: research/)" },
       batch_size: { type: "number", description: "Files per yield (default: 25)" },
-      min_similarity: { type: "number", description: "Cosine threshold for similarity edges (default: 0.8)" },
+      min_similarity: { type: "number", description: "Cosine threshold for semantically_related edges. Default: SCRYPT_SIMILARITY_THRESHOLD env (0.75 if unset)." },
     },
     required: ["source_dir"],
   },
@@ -216,7 +165,7 @@ export const batchIngestTool: ToolDef<Input, Output> = {
     const domain = input.domain ?? basename(sourceDir);
     const prefix = input.target_prefix ?? "research";
     const batchSize = input.batch_size ?? 25;
-    const minSim = input.min_similarity ?? 0.8;
+    const minSim = input.min_similarity ?? getSimilarityThreshold();
     const model = process.env.SCRYPT_EMBED_MODEL ?? "Xenova/bge-small-en-v1.5";
 
     const mdFiles = walkMarkdown(sourceDir);
@@ -303,10 +252,17 @@ export const batchIngestTool: ToolDef<Input, Output> = {
       }
     }
 
-    // Compute similarity edges for new notes
+    // Compute semantically_related edges scoped to the newly-ingested notes
+    // (so we don't re-score the entire vault every batch). At least one side
+    // of every emitted pair will be a freshly-ingested note.
     let simEdges = 0;
     if (newPaths.size > 0) {
-      simEdges = computeSimilarityEdges(ctx.db, newPaths, model, minSim);
+      const allPaths = allEmbeddedPaths(ctx.db, model);
+      const pairs = findSimilarPairs(ctx.db, allPaths, model, {
+        minSimilarity: minSim,
+        scopedTo: newPaths,
+      });
+      simEdges = upsertSemanticEdges(ctx.db, pairs);
     }
 
     return {

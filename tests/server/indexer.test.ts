@@ -114,17 +114,8 @@ describe("reindexNote", () => {
     expect(edges[0].target).toBe("notes/g2.md");
   });
 
-  test("extracts tasks with text, done state, line number", async () => {
-    await writeTestNote("notes/tasks.md", "---\ntitle: Tasks\n---\n\n- [ ] Buy milk\n- [x] Done thing");
-    await indexer.reindexNote("notes/tasks.md");
-
-    const tasks = db.query("SELECT * FROM tasks ORDER BY line").all() as any[];
-    expect(tasks).toHaveLength(2);
-    expect(tasks[0].text).toBe("Buy milk");
-    expect(tasks[0].done).toBe(0);
-    expect(tasks[1].text).toBe("Done thing");
-    expect(tasks[1].done).toBe(1);
-  });
+  // Wave 9: legacy checkbox-task extraction is dead. Task creation now goes
+  // through MCP create_task; covered in tests/server/mcp/tools/tasks-crud.test.ts.
 });
 
 describe("removeNote", () => {
@@ -137,7 +128,8 @@ describe("removeNote", () => {
 
     expect(db.query("SELECT * FROM notes WHERE id = ?").get(noteId)).toBeNull();
     expect(db.query("SELECT * FROM tags WHERE note_id = ?").all(noteId)).toHaveLength(0);
-    expect(db.query("SELECT * FROM tasks WHERE note_id = ?").all(noteId)).toHaveLength(0);
+    // Wave 9: tasks no longer foreign-key to notes via note_id; cleanup is
+    // not coupled to note removal. New tasks schema is decoupled from notes.
   });
 });
 
@@ -237,16 +229,8 @@ describe("getTags", () => {
   });
 });
 
-describe("getTasks", () => {
-  test("returns tasks with source note path", async () => {
-    await writeTestNote("notes/taskn.md", "---\ntitle: Task Note\n---\n\n- [ ] Do this\n- [x] Did that");
-    await indexer.fullReindex();
-
-    const tasks = indexer.getTasks();
-    expect(tasks).toHaveLength(2);
-    expect(tasks[0].notePath).toBe("notes/taskn.md");
-  });
-});
+// Wave 9: legacy Indexer.getTasks() removed. Task listing now goes through
+// MCP list_tasks; covered in tests/server/mcp/tools/tasks-crud.test.ts.
 
 describe("link_index population", () => {
   test("each note produces three rows: basename, full path, title slug", async () => {

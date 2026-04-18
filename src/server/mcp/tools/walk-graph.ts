@@ -1,19 +1,22 @@
 // src/server/mcp/tools/walk-graph.ts
 import type { ToolDef } from "../types";
-
-const CONFIDENCE_RANK: Record<string, number> = {
-  ambiguous: 0,
-  inferred: 1,
-  extracted: 2,
-};
+import {
+  CONFIDENCE_RANK,
+  CONFIDENCE_VALUES,
+  type Confidence,
+} from "../confidence";
 
 const MAX_NODES = 500;
+
+// Default fallback for edges with NULL confidence (structural edges created
+// by the indexer). Treated as strongest so they always pass confidence_min.
+const DEFAULT_EDGE_CONFIDENCE: Confidence = "connected";
 
 interface Input {
   from: string;
   depth?: number;
   relation_filter?: string[];
-  confidence_min?: "ambiguous" | "inferred" | "extracted";
+  confidence_min?: Confidence;
 }
 
 interface EdgeRow {
@@ -47,14 +50,15 @@ export const walkGraphTool: ToolDef<Input, Output> = {
       relation_filter: { type: "array" },
       confidence_min: {
         type: "string",
-        enum: ["ambiguous", "inferred", "extracted"],
+        enum: [...CONFIDENCE_VALUES],
       },
     },
     required: ["from"],
   },
   async handler(ctx, input) {
     const depth = input.depth ?? 1;
-    const minRank = CONFIDENCE_RANK[input.confidence_min ?? "ambiguous"];
+    const minRank =
+      CONFIDENCE_RANK[input.confidence_min ?? "semantically_related"];
     const relFilter =
       input.relation_filter && input.relation_filter.length > 0
         ? new Set(input.relation_filter)
@@ -80,7 +84,8 @@ export const walkGraphTool: ToolDef<Input, Output> = {
         const neighbors = neighborStmt.all(node, node) as EdgeRow[];
         for (const e of neighbors) {
           if (relFilter && !relFilter.has(e.relation)) continue;
-          const rank = CONFIDENCE_RANK[e.confidence ?? "extracted"] ?? 2;
+          const confKey = (e.confidence as Confidence | null) ?? DEFAULT_EDGE_CONFIDENCE;
+          const rank = CONFIDENCE_RANK[confKey] ?? CONFIDENCE_RANK[DEFAULT_EDGE_CONFIDENCE];
           if (rank < minRank) continue;
           const key = `${e.source}\u0000${e.target}\u0000${e.relation}`;
           if (seenEdges.has(key)) continue;

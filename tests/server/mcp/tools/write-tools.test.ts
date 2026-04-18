@@ -4,6 +4,7 @@ import { Database } from "bun:sqlite";
 import { initSchema } from "../../../../src/server/db";
 import { SectionsRepo } from "../../../../src/server/indexer/sections-repo";
 import { MetadataRepo } from "../../../../src/server/indexer/metadata-repo";
+import { TasksRepo } from "../../../../src/server/indexer/tasks-repo";
 import { ChunkEmbeddingsRepo } from "../../../../src/server/embeddings/chunks-repo";
 import { ProgressBus } from "../../../../src/server/embeddings/progress";
 import { Idempotency } from "../../../../src/server/mcp/idempotency";
@@ -33,6 +34,7 @@ describe("Wave 8 write tools", () => {
       db,
       sections: new SectionsRepo(db),
       metadata: new MetadataRepo(db),
+      tasks: new TasksRepo(db),
       embeddings: new ChunkEmbeddingsRepo(db),
       embedService: {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -81,6 +83,83 @@ describe("Wave 8 write tools", () => {
     const m = ctx.metadata.get("a.md");
     expect(m?.description).toBe("about A");
     expect(m?.auto_tags).toEqual(["x", "y"]);
+  });
+
+  test("update_note_metadata persists doc_type and summary round-trip", async () => {
+    const r = await updateNoteMetadataTool.handler(
+      ctx,
+      {
+        path: "a.md",
+        doc_type: "plan",
+        summary: "short paragraph",
+        client_tag: "m-docsum",
+      },
+      "c",
+    );
+    expect(r.updated_fields.sort()).toEqual(["doc_type", "summary"]);
+    const m = ctx.metadata.get("a.md");
+    expect(m?.doc_type).toBe("plan");
+    expect(m?.summary).toBe("short paragraph");
+  });
+
+  test("update_note_metadata rejects invalid doc_type enum", async () => {
+    let caught: unknown = null;
+    try {
+      await updateNoteMetadataTool.handler(
+        ctx,
+        {
+          path: "a.md",
+          // @ts-expect-error — intentionally invalid
+          doc_type: "bogus",
+          client_tag: "m-bad-type",
+        },
+        "c",
+      );
+    } catch (e) {
+      caught = e;
+    }
+    expect(caught).toMatchObject({ code: MCP_ERROR.INVALID_PARAMS });
+  });
+
+  test("update_note_metadata rejects summary longer than 1000 chars", async () => {
+    const long = "x".repeat(1001);
+    let caught: unknown = null;
+    try {
+      await updateNoteMetadataTool.handler(
+        ctx,
+        { path: "a.md", summary: long, client_tag: "m-long" },
+        "c",
+      );
+    } catch (e) {
+      caught = e;
+    }
+    expect(caught).toMatchObject({ code: MCP_ERROR.INVALID_PARAMS });
+  });
+
+  test("update_note_metadata partial doc_type leaves other fields intact", async () => {
+    await updateNoteMetadataTool.handler(
+      ctx,
+      {
+        path: "a.md",
+        description: "about A",
+        auto_tags: ["x"],
+        themes: ["t"],
+        summary: "initial",
+        client_tag: "m-seed",
+      },
+      "c",
+    );
+    await updateNoteMetadataTool.handler(
+      ctx,
+      { path: "a.md", doc_type: "architecture", client_tag: "m-type-only" },
+      "c",
+    );
+    const m = ctx.metadata.get("a.md");
+    expect(m?.doc_type).toBe("architecture");
+    expect(m?.summary).toBe("initial");
+    expect(m?.description).toBe("about A");
+    expect(m?.auto_tags).toEqual(["x"]);
+    expect(m?.themes).toEqual(["t"]);
   });
 
   test("update_note_metadata errors on missing note", async () => {
@@ -140,7 +219,7 @@ describe("Wave 8 write tools", () => {
         source: "a.md",
         target: "b.md",
         relation: "elaborates",
-        confidence: "inferred",
+        confidence: "mentions",
         reason: "because tests",
         client_tag: "e1",
       },
@@ -155,9 +234,81 @@ describe("Wave 8 write tools", () => {
       .all();
     expect(rows[0]).toEqual({
       relation: "elaborates",
-      confidence: "inferred",
+      confidence: "mentions",
       reason: "because tests",
     });
+  });
+
+  test("add_edge accepts all three new-tier confidence values", async () => {
+    for (const [i, conf] of [
+      "connected",
+      "mentions",
+      "semantically_related",
+    ].entries()) {
+      await addEdgeTool.handler(
+        ctx,
+        {
+          source: "a.md",
+          target: "b.md",
+          relation: `rel_${i}`,
+          // @ts-expect-error — test enum literal widening
+          confidence: conf,
+          client_tag: `tier-${conf}`,
+        },
+        "c",
+      );
+    }
+    const confs = ctx.db
+      .query<{ confidence: string }, []>(
+        `SELECT confidence FROM graph_edges ORDER BY id`,
+      )
+      .all()
+      .map((r) => r.confidence);
+    expect(confs).toEqual(["connected", "mentions", "semantically_related"]);
+  });
+
+  test("add_edge rejects legacy confidence values (extracted/inferred/ambiguous)", async () => {
+    for (const legacy of ["extracted", "inferred", "ambiguous"]) {
+      let caught: unknown = null;
+      try {
+        await addEdgeTool.handler(
+          ctx,
+          {
+            source: "a.md",
+            target: "b.md",
+            relation: "elaborates",
+            // @ts-expect-error — intentional legacy value
+            confidence: legacy,
+            client_tag: `legacy-${legacy}`,
+          },
+          "c",
+        );
+      } catch (e) {
+        caught = e;
+      }
+      expect(caught).toMatchObject({ code: MCP_ERROR.INVALID_PARAMS });
+    }
+  });
+
+  test("add_edge rejects unknown confidence strings with INVALID_PARAMS", async () => {
+    let caught: unknown = null;
+    try {
+      await addEdgeTool.handler(
+        ctx,
+        {
+          source: "a.md",
+          target: "b.md",
+          relation: "elaborates",
+          // @ts-expect-error — intentional invalid value
+          confidence: "speculative",
+          client_tag: "e-bogus",
+        },
+        "c",
+      );
+    } catch (e) {
+      caught = e;
+    }
+    expect(caught).toMatchObject({ code: MCP_ERROR.INVALID_PARAMS });
   });
 
   test("add_edge rejects reserved structural relations", async () => {
@@ -169,7 +320,7 @@ describe("Wave 8 write tools", () => {
           source: "a.md",
           target: "b.md",
           relation: "wikilink",
-          confidence: "extracted",
+          confidence: "connected",
           client_tag: "e2",
         },
         "c",
@@ -189,7 +340,7 @@ describe("Wave 8 write tools", () => {
           source: "a.md",
           target: "nope.md",
           relation: "elaborates",
-          confidence: "inferred",
+          confidence: "mentions",
           client_tag: "e3",
         },
         "c",
@@ -207,7 +358,7 @@ describe("Wave 8 write tools", () => {
         source: "a.md",
         target: "b.md",
         relation: "elaborates",
-        confidence: "inferred",
+        confidence: "mentions",
         client_tag: "r-setup",
       },
       "c",

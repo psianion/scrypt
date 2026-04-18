@@ -8,6 +8,7 @@ import type { Database } from "bun:sqlite";
 import type { ChunkEmbeddingsRepo } from "../embeddings/chunks-repo";
 import type { SectionsRepo } from "../indexer/sections-repo";
 import type { MetadataRepo } from "../indexer/metadata-repo";
+import type { TasksRepo } from "../indexer/tasks-repo";
 import type {
   EmbedderLike,
   EngineLike,
@@ -23,6 +24,7 @@ export interface ToolContext {
   db: Database;
   sections: SectionsRepo;
   metadata: MetadataRepo;
+  tasks: TasksRepo;
   embeddings: ChunkEmbeddingsRepo;
   embedService: EmbedderLike;
   engine: EngineLike;
