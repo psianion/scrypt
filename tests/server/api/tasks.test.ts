@@ -34,4 +34,11 @@ describe("GET /api/tasks/list", () => {
     const body = await res!.json();
     expect(body.total).toBe(2);
   });
+
+  test("invalid status returns 400", async () => {
+    const { router } = buildRouter();
+    const res = await router.handle(new Request("http://x/api/tasks/list?status=bogus"));
+    expect(res).not.toBeNull();
+    expect(res!.status).toBe(400);
+  });
 });
