@@ -6,8 +6,8 @@ import {
   saveTierFilter,
   type TierFilter,
 } from "../graph/tierFilter";
-import { buildSearchIndex, filterGraph } from "../graph/search";
 import { createGraph, type RenderHandle } from "../graph/render";
+import { api } from "../api";
 
 const VISITED_KEY = "graph-visited";
 
@@ -73,16 +73,49 @@ export function GraphView() {
   useEffect(() => {
     if (!snap || !handleRef.current) return;
     handleRef.current.updateFilter(tier);
-    const idx = buildSearchIndex(snap);
-    const { nodes } = filterGraph(snap, idx, query);
-    if (query.trim() === "") {
-      handleRef.current.updateQueryFilter(null, new Set());
-    } else {
-      const ids = new Set(nodes.map((n) => n.id));
-      const matches = new Set(nodes.filter((n) => n.isMatch).map((n) => n.id));
-      handleRef.current.updateQueryFilter(ids, matches);
+  }, [tier, snap]);
+
+  // Server-backed search. Hits FTS5 over note title + content so queries
+  // surface notes that *mention* the term in their body — not just the title.
+  // Debounced to avoid firing on every keystroke.
+  useEffect(() => {
+    if (!snap || !handleRef.current) return;
+    const handle = handleRef.current;
+    const q = query.trim();
+    if (q === "") {
+      handle.updateQueryFilter(null, new Set());
+      return;
     }
-  }, [query, tier, snap]);
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        const { paths } = await api.searchGraph(q);
+        if (cancelled) return;
+        const snapIds = new Set(snap.nodes.map((n) => n.id));
+        const matches = new Set(paths.filter((p) => snapIds.has(p)));
+        const adjacency = new Map<string, Set<string>>();
+        for (const e of snap.edges) {
+          if (!adjacency.has(e.source)) adjacency.set(e.source, new Set());
+          if (!adjacency.has(e.target)) adjacency.set(e.target, new Set());
+          adjacency.get(e.source)!.add(e.target);
+          adjacency.get(e.target)!.add(e.source);
+        }
+        const visible = new Set<string>(matches);
+        for (const m of matches) {
+          for (const nb of adjacency.get(m) ?? []) visible.add(nb);
+        }
+        if (!cancelled && handle) {
+          handle.updateQueryFilter(visible, matches);
+        }
+      } catch {
+        // fail silently; empty result keeps previous filter state
+      }
+    }, 220);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [query, snap]);
 
   const setTierPersist = (next: TierFilter) => {
     setTier(next);

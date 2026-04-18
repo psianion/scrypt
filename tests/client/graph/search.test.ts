@@ -5,9 +5,9 @@ import type { GraphSnapshot } from "../../../src/server/graph/snapshot";
 const snap: GraphSnapshot = {
   generated_at: 0,
   nodes: [
-    { id: "vtt.md", title: "VTT analysis", doc_type: "research", degree: 2, community: 1 },
-    { id: "spec.md", title: "VTT spec", doc_type: "spec", degree: 2, community: 1 },
-    { id: "other.md", title: "Something else", doc_type: "other", degree: 0, community: 2 },
+    { id: "vtt.md", title: "VTT analysis", doc_type: "research", project: "x", degree: 2, community: 1 },
+    { id: "spec.md", title: "VTT spec", doc_type: "spec", project: "x", degree: 2, community: 1 },
+    { id: "other.md", title: "Something else", doc_type: "other", project: "x", degree: 0, community: 2 },
   ],
   edges: [{ source: "vtt.md", target: "spec.md", relation: "x", confidence: "connected", reason: null }],
 };

@@ -17,6 +17,8 @@ import {
   forceLink,
   forceCollide,
   forceRadial,
+  forceX,
+  forceY,
   zoomIdentity,
   select,
   drag,
@@ -30,7 +32,7 @@ import {
 import { Group as TweenGroup, Tween } from "@tweenjs/tween.js";
 import type { GraphSnapshot, SnapshotEdge } from "../../server/graph/snapshot";
 import type { Tier, TierFilter } from "./tierFilter";
-import { colorFor, darken } from "./colors";
+import { colorForProject, darken } from "./colors";
 
 export interface RenderOpts {
   snap: GraphSnapshot;
@@ -57,6 +59,7 @@ type NodeDatum = SimulationNodeDatum & {
   id: string;
   title: string;
   doc_type: string | null;
+  project: string;
   degree: number;
 };
 
@@ -155,6 +158,7 @@ export function createGraph(parent: HTMLElement, opts: RenderOpts): RenderHandle
       id: n.id,
       title: n.title,
       doc_type: n.doc_type,
+      project: n.project,
       degree: n.degree,
     };
     nodes.push(datum);
@@ -168,7 +172,7 @@ export function createGraph(parent: HTMLElement, opts: RenderOpts): RenderHandle
     if (!nodeDataById.has(e.source) || !nodeDataById.has(e.target)) continue;
     const tier = (e.confidence ?? "connected") as Tier;
     const src = nodeDataById.get(e.source)!;
-    const srcColor = hexToNumber(colorFor(src.doc_type));
+    const srcColor = hexToNumber(colorForProject(src.project));
     const style = tierStyle(tier, srcColor);
     links.push({
       source: src,
@@ -210,22 +214,43 @@ export function createGraph(parent: HTMLElement, opts: RenderOpts): RenderHandle
   // of vault density.
   const nodeRadius = (d: NodeDatum) => 2 + Math.min(6, Math.sqrt(d.degree / 3));
 
-  // Simulation — Quartz defaults: strength(-100 * repelForce), centerForce,
-  // linkDistance. We set them directly since we don't read from a D3Config.
+  // Per-project anchor positions. Distributed evenly around a circle so each
+  // project gets its own sub-cluster zone, while still sitting inside the
+  // overall sphere pulled by forceCenter.
+  const projectAnchors = new Map<string, { x: number; y: number }>();
+  {
+    const projects = [...new Set(nodes.map((n) => n.project))].sort();
+    const cx = width / 2;
+    const cy = height / 2;
+    const anchorRadius = (Math.min(width, height) / 2) * 0.55;
+    projects.forEach((p, i) => {
+      const angle = (i / Math.max(1, projects.length)) * Math.PI * 2;
+      projectAnchors.set(p, {
+        x: cx + Math.cos(angle) * anchorRadius,
+        y: cy + Math.sin(angle) * anchorRadius,
+      });
+    });
+  }
+
+  // Simulation — Quartz defaults + project-aware clustering. Cross-project
+  // edges are already filtered server-side so projects become disconnected
+  // subgraphs; forceX/forceY pull each subgraph toward its own anchor.
   const simulation: Simulation<NodeDatum, LinkDatum> = forceSimulation<NodeDatum>(nodes)
     .force("charge", forceManyBody().strength(-120))
-    .force("center", forceCenter(width / 2, height / 2).strength(0.5))
+    .force("center", forceCenter(width / 2, height / 2).strength(0.15))
     .force(
       "link",
       forceLink<NodeDatum, LinkDatum>(links).id((n) => n.id).distance(30),
     )
     .force("collide", forceCollide<NodeDatum>((d) => nodeRadius(d)).iterations(3))
+    .force("x", forceX<NodeDatum>((d) => projectAnchors.get(d.project)?.x ?? width / 2).strength(0.18))
+    .force("y", forceY<NodeDatum>((d) => projectAnchors.get(d.project)?.y ?? height / 2).strength(0.18))
     .alphaDecay(0.0228)
     .velocityDecay(0.4);
 
   if (opts.enableRadial) {
     const radius = (Math.min(width, height) / 2) * 0.8;
-    simulation.force("radial", forceRadial(radius, width / 2, height / 2).strength(0.2));
+    simulation.force("radial", forceRadial(radius, width / 2, height / 2).strength(0.05));
   }
 
   // Query filter state (applied over tween)
@@ -333,7 +358,7 @@ export function createGraph(parent: HTMLElement, opts: RenderOpts): RenderHandle
 
       // Nodes
       for (const n of nodes) {
-        const baseColor = hexToNumber(colorFor(n.doc_type));
+        const baseColor = hexToNumber(colorForProject(n.project));
         const r = nodeRadius(n);
         const gfx = new Graphics();
         gfx.circle(0, 0, r).fill({ color: baseColor });

@@ -6,8 +6,22 @@ export interface SnapshotNode {
   id: string;
   title: string;
   doc_type: string | null;
+  /** First meaningful path segment — used to group nodes into project clusters. */
+  project: string;
   degree: number;
   community: number | null;
+}
+
+/**
+ * Pick a project name from a vault-relative path. `research/<name>/...` is the
+ * main pattern in this vault, so the 2nd segment wins there; otherwise the
+ * first segment (`journal`, `docs`, `assets`, etc.) is the project.
+ */
+export function projectOf(path: string): string {
+  const parts = path.split("/");
+  if (parts.length <= 1) return "root";
+  if (parts[0] === "research" && parts.length > 2 && parts[1]) return parts[1]!;
+  return parts[0]!;
 }
 
 export interface SnapshotEdge {
@@ -55,16 +69,25 @@ export function buildGraphSnapshot(db: Database): GraphSnapshot {
 
   const noteIds = new Set(nodeRows.map((r) => r.id));
 
+  // Pre-compute each node's project from its path. Used to filter edges and
+  // color clusters.
+  const projectById = new Map<string, string>();
+  for (const r of nodeRows) projectById.set(r.id, projectOf(r.note_path));
+
   const edgeRows = db
     .query<EdgeRow, []>(
       `SELECT source, target, relation, confidence, reason FROM graph_edges`,
     )
     .all();
 
+  // Keep only within-project edges. Cross-project similarity (e.g. a dnd note
+  // that happens to be cosine-close to a goveva note) creates noisy hairballs
+  // that obscure actual project structure.
   const edges: SnapshotEdge[] = [];
   const degree = new Map<string, number>();
   for (const e of edgeRows) {
     if (!noteIds.has(e.source) || !noteIds.has(e.target)) continue;
+    if (projectById.get(e.source) !== projectById.get(e.target)) continue;
     edges.push(e);
     degree.set(e.source, (degree.get(e.source) ?? 0) + 1);
     degree.set(e.target, (degree.get(e.target) ?? 0) + 1);
@@ -76,13 +99,25 @@ export function buildGraphSnapshot(db: Database): GraphSnapshot {
   const docType = new Map<string, string | null>();
   for (const m of metaRows) docType.set(m.note_path, m.doc_type);
 
-  const nodes: SnapshotNode[] = nodeRows.map((r) => ({
-    id: r.id,
-    title: r.label,
-    doc_type: docType.get(r.note_path) ?? null,
-    degree: degree.get(r.id) ?? 0,
-    community: r.community_id,
-  }));
+  // Map distinct projects to small stable integer community ids so the client
+  // can color clusters consistently even when `graph_nodes.community_id` hasn't
+  // been populated yet by cluster_graph.
+  const projectIndex = new Map<string, number>();
+  for (const p of projectById.values()) {
+    if (!projectIndex.has(p)) projectIndex.set(p, projectIndex.size);
+  }
+
+  const nodes: SnapshotNode[] = nodeRows.map((r) => {
+    const project = projectById.get(r.id) ?? projectOf(r.note_path);
+    return {
+      id: r.id,
+      title: r.label,
+      doc_type: docType.get(r.note_path) ?? null,
+      project,
+      degree: degree.get(r.id) ?? 0,
+      community: r.community_id ?? projectIndex.get(project) ?? null,
+    };
+  });
 
   return {
     generated_at: Date.now(),

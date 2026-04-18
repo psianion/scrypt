@@ -40,6 +40,8 @@ export const api = {
 
   search: (q: string) => json<SearchResult[]>(`/api/search?q=${encodeURIComponent(q)}`),
   searchTags: (q: string) => json<{ tag: string; count: number }[]>(`/api/search/tags?q=${encodeURIComponent(q)}`),
+  searchGraph: (q: string) =>
+    json<{ paths: string[] }>(`/api/search/graph?q=${encodeURIComponent(q)}`),
 
   graph: {
     full: () => json<GraphResponse>("/api/graph"),
