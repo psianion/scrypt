@@ -144,6 +144,9 @@ export function createApp(config: AppConfig) {
 
   // Register API routes
   notesRoutes(router, fm, indexer);
+  // graphRoutes must come before searchRoutes — searchRoutes registers a
+  // catch-all /api/graph/*path that would otherwise swallow /api/graph/snapshot.
+  graphRoutes(router, db, config.vaultPath, snapshotScheduler);
   searchRoutes(router, indexer);
   journalRoutes(router, fm, indexer, config.vaultPath);
   templateRoutes(router, fm, config.vaultPath);
@@ -168,7 +171,6 @@ export function createApp(config: AppConfig) {
   memoryRoutes(router, fm);
   dailyContextRoutes(router, fm, indexer, config.vaultPath);
   activityRoutes(router, activity);
-  graphRoutes(router, db, config.vaultPath, snapshotScheduler);
   taskListRoutes(router, wave9Tasks);
   embedHealthRoutes(router, wave8EmbedClient);
 
