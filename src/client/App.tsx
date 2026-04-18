@@ -11,7 +11,7 @@ import { JournalView } from "./views/JournalView";
 import { NotesList } from "./views/NotesList";
 import { SearchView } from "./views/SearchView";
 import { BacklinksPanel } from "./views/BacklinksPanel";
-import { KanbanView } from "./views/KanbanView";
+import { TasksList } from "./views/TasksList";
 import { DataExplorer } from "./views/DataExplorer";
 import { TagBrowser } from "./views/TagBrowser";
 import { Settings } from "./views/Settings";
@@ -68,7 +68,7 @@ export function AppContent() {
                 <Route path="/journal" element={<JournalView />} />
                 <Route path="/notes" element={<NotesList />} />
                 <Route path="/search" element={<SearchView />} />
-                <Route path="/tasks" element={<KanbanView />} />
+                <Route path="/tasks" element={<TasksList />} />
                 <Route path="/data" element={<DataExplorer />} />
                 <Route path="/tags" element={<TagBrowser />} />
                 <Route path="/settings" element={<Settings />} />

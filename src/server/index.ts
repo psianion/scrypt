@@ -21,6 +21,7 @@ import { memoryRoutes } from "./api/memories";
 import { dailyContextRoutes } from "./api/daily-context";
 import { activityRoutes } from "./api/activity";
 import { graphRoutes } from "./api/graph";
+import { taskListRoutes } from "./api/tasks";
 import { mcpRoutes } from "./mcp/routes";
 import { ToolRegistry } from "./mcp/registry";
 import { registerAllTools } from "./mcp/tools";
@@ -166,6 +167,7 @@ export function createApp(config: AppConfig) {
   dailyContextRoutes(router, fm, indexer, config.vaultPath);
   activityRoutes(router, activity);
   graphRoutes(router, db);
+  taskListRoutes(router, wave9Tasks);
   embedHealthRoutes(router, wave8EmbedClient);
 
   // Wave 8: MCP streamable-http transport mounted at POST /mcp. Reuses

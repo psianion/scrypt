@@ -62,16 +62,21 @@ export const api = {
   },
 
   tasks: {
-    list: (params?: { board?: string; done?: string; tag?: string }) => {
-      const qs = new URLSearchParams(params as Record<string, string>).toString();
-      return json<Task[]>(`/api/tasks${qs ? `?${qs}` : ""}`);
+    list(params?: {
+      status?: "open" | "in_progress" | "closed" | "all";
+      type?: string;
+      note_path?: string;
+      limit?: number;
+      offset?: number;
+    }) {
+      const qs = new URLSearchParams();
+      for (const [k, v] of Object.entries(params ?? {})) {
+        if (v !== undefined) qs.set(k, String(v));
+      }
+      return json<{ tasks: Task[]; total: number }>(
+        `/api/tasks/list${qs.toString() ? `?${qs}` : ""}`,
+      );
     },
-    update: (id: number, data: Partial<Pick<Task, "done" | "board" | "priority">>) =>
-      json<void>(`/api/tasks/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      }),
   },
 
   data: {
