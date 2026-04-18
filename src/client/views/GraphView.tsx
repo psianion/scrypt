@@ -4,7 +4,6 @@ import { useGraphSnapshot } from "../graph/useGraphSnapshot";
 import {
   loadTierFilter,
   saveTierFilter,
-  filterEdgesByTier,
   type TierFilter,
 } from "../graph/tierFilter";
 import { buildSearchIndex, filterGraph } from "../graph/search";
@@ -39,7 +38,7 @@ export function GraphView() {
     const visited = loadVisited();
     const rect = hostRef.current.getBoundingClientRect();
     handleRef.current = createGraph(hostRef.current, {
-      snap: { ...snap, edges: filterEdgesByTier(snap.edges, tier) },
+      snap,
       tierFilter: tier,
       visited,
       onNodeClick: (id) => {

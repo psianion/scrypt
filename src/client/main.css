@@ -211,3 +211,93 @@ body {
   color: var(--text-muted);
   margin-top: 1px;
 }
+
+/* Wave B: read-only TasksList */
+.tasks-list {
+  padding: 20px 28px;
+  color: var(--text-primary);
+  overflow: auto;
+  height: 100%;
+}
+.tasks-list__header {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 16px;
+}
+.tasks-list__header h1 {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0;
+  flex-shrink: 0;
+}
+.tasks-list__header label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+.tasks-list__count {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--text-muted);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 2px 10px;
+}
+.tasks-list__empty {
+  color: var(--text-muted);
+  font-style: italic;
+  padding: 24px 0;
+}
+.tasks-list__table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13px;
+}
+.tasks-list__table thead th {
+  text-align: left;
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-secondary);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.tasks-list__table tbody td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.tasks-list__table tbody tr:hover {
+  background: var(--bg-secondary);
+}
+.tasks-list__table a {
+  color: var(--link);
+  text-decoration: none;
+}
+.tasks-list__table a:hover {
+  color: var(--text-primary);
+  text-decoration: underline;
+}
+.pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}

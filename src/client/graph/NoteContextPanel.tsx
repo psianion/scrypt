@@ -30,18 +30,23 @@ export function NoteContextPanel({ path }: Props) {
   useEffect(() => {
     if (!snap || !hostRef.current || !path) return;
     const host = hostRef.current;
-    handleRef.current = createGraph(host, {
-      snap,
-      tierFilter: { connected: true, mentions: true, semantically_related: true },
-      visited: new Set(),
-      onNodeClick: (id) => navigate(`/note/${id}`),
-      onNodeVisited: () => {},
-      enableRadial: false,
-      depthLimit: 1,
-      centerId: path,
-      width: 260,
-      height: 260,
-    });
+    try {
+      handleRef.current = createGraph(host, {
+        snap,
+        tierFilter: { connected: true, mentions: true, semantically_related: true },
+        visited: new Set(),
+        onNodeClick: (id) => navigate(`/note/${id}`),
+        onNodeVisited: () => {},
+        enableRadial: false,
+        depthLimit: 1,
+        centerId: path,
+        width: 260,
+        height: 260,
+      });
+    } catch {
+      // Pixi cannot init (e.g. jsdom/happy-dom without WebGL/Canvas) — leave
+      // the host empty. The rest of the panel (tags, related) still renders.
+    }
     return () => {
       handleRef.current?.destroy();
       handleRef.current = null;
@@ -49,9 +54,8 @@ export function NoteContextPanel({ path }: Props) {
   }, [snap, path, navigate]);
 
   if (!path) return null;
-  if (!snap || !note) return <aside className="note-context">Loading…</aside>;
 
-  const incoming = note.incoming_edges ?? [];
+  const incoming = note?.incoming_edges ?? [];
   const byTier = {
     connected: incoming.filter((e) => e.confidence === "connected"),
     mentions: incoming.filter((e) => e.confidence === "mentions"),
@@ -60,7 +64,8 @@ export function NoteContextPanel({ path }: Props) {
     ),
   };
 
-  const tags = note.tags ?? [];
+  const tags = note?.tags ?? [];
+  const loading = !snap || !note;
 
   return (
     <aside className="note-context">
@@ -97,7 +102,9 @@ export function NoteContextPanel({ path }: Props) {
 
       <section className="note-context__related">
         <h4>Related</h4>
-        {byTier.connected.length +
+        {loading ? (
+          <div className="note-context__empty">Loading…</div>
+        ) : byTier.connected.length +
           byTier.mentions.length +
           byTier.semantically_related.length ===
         0 ? (
