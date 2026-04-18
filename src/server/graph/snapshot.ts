@@ -1,4 +1,6 @@
 import type { Database } from "bun:sqlite";
+import { mkdirSync, writeFileSync, renameSync } from "node:fs";
+import { join } from "node:path";
 
 export interface SnapshotNode {
   id: string;
@@ -87,4 +89,15 @@ export function buildGraphSnapshot(db: Database): GraphSnapshot {
     nodes,
     edges,
   };
+}
+
+export function writeGraphSnapshot(db: Database, vaultDir: string): string {
+  const snap = buildGraphSnapshot(db);
+  const dir = join(vaultDir, ".scrypt");
+  mkdirSync(dir, { recursive: true });
+  const finalPath = join(dir, "graph.json");
+  const tmpPath = `${finalPath}.${process.pid}.${Date.now()}.tmp`;
+  writeFileSync(tmpPath, JSON.stringify(snap), "utf8");
+  renameSync(tmpPath, finalPath);
+  return finalPath;
 }
