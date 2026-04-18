@@ -90,12 +90,14 @@ function hexToNumber(hex: string): number {
 
 function tierStyle(tier: Tier, srcColor: number): { color: number; width: number; alpha: number } {
   if (tier === "connected") {
-    return { color: hexToNumber(darken(numberToHex(srcColor), 0.3)), width: 1.5, alpha: 1.0 };
+    return { color: hexToNumber(darken(numberToHex(srcColor), 0.3)), width: 1.4, alpha: 0.85 };
   }
   if (tier === "mentions") {
-    return { color: 0x999999, width: 1.0, alpha: 0.6 };
+    return { color: 0x8a8a8a, width: 0.9, alpha: 0.4 };
   }
-  return { color: 0xbbbbbb, width: 0.75, alpha: 0.4 };
+  // semantically_related — can be tens of thousands in a well-embedded vault.
+  // Keep very faint so it reads as ambient haze, not foreground structure.
+  return { color: 0x6a6a6a, width: 0.5, alpha: 0.12 };
 }
 
 function numberToHex(n: number): string {
@@ -201,21 +203,28 @@ export function createGraph(parent: HTMLElement, opts: RenderOpts): RenderHandle
   const linkRender: LinkRender[] = [];
   let currentTransform: ZoomTransform = zoomIdentity;
 
-  // Simulation
+  // Node sizing function — used by render + collide force so they stay in sync.
+  const nodeRadius = (d: NodeDatum) => 3 + Math.min(6, Math.sqrt(d.degree));
+
+  // Simulation — tuned closer to Quartz v4: stronger repulsion, link distance
+  // scaled, collide derived from node radius so hubs don't overlap.
   const simulation: Simulation<NodeDatum, LinkDatum> = forceSimulation<NodeDatum>(nodes)
     .force(
       "link",
       forceLink<NodeDatum, LinkDatum>(links)
         .id((n) => n.id)
-        .distance(30),
+        .distance(40)
+        .strength(0.1),
     )
-    .force("charge", forceManyBody().strength(-30))
-    .force("center", forceCenter(width / 2, height / 2))
-    .force("collide", forceCollide(8));
+    .force("charge", forceManyBody().strength(-120).distanceMax(400))
+    .force("center", forceCenter(width / 2, height / 2).strength(0.04))
+    .force("collide", forceCollide<NodeDatum>().radius((d) => nodeRadius(d) + 2).strength(0.9))
+    .alphaDecay(0.015)
+    .velocityDecay(0.35);
 
   if (opts.enableRadial) {
     const radius = (Math.min(width, height) / 2) * 0.8;
-    simulation.force("radial", forceRadial(radius, width / 2, height / 2).strength(0.05));
+    simulation.force("radial", forceRadial(radius, width / 2, height / 2).strength(0.03));
   }
 
   // Query filter state (applied over tween)
@@ -254,10 +263,20 @@ export function createGraph(parent: HTMLElement, opts: RenderOpts): RenderHandle
 
   let hoveredNodeId: string | null = null;
 
+  function computeLabelAlpha(id: string, hovered: string | null): number {
+    // Labels always visible at low alpha so the graph reads like Quartz.
+    // Hovered node (or neighbour) → bright. Faded nodes → faint.
+    if (hovered === id) return 1;
+    if (hovered && neighbours.get(hovered)?.has(id)) return 0.85;
+    if (queryVisible && !queryVisible.has(id)) return 0.05;
+    if (hovered) return 0.2;
+    return 0.55;
+  }
+
   function applyStyles(animated: boolean) {
     for (const n of nodeRender) {
       const target = computeNodeAlpha(n.data.id, hoveredNodeId);
-      const targetLabel = hoveredNodeId === n.data.id ? 1 : 0;
+      const targetLabel = computeLabelAlpha(n.data.id, hoveredNodeId);
       if (animated) {
         tweenGroup.add(new Tween(n, tweenGroup).to({ alpha: target }, 200).start());
         tweenGroup.add(new Tween({ v: n.label.alpha }, tweenGroup)
@@ -310,20 +329,23 @@ export function createGraph(parent: HTMLElement, opts: RenderOpts): RenderHandle
       // Nodes
       for (const n of nodes) {
         const baseColor = hexToNumber(colorFor(n.doc_type));
-        const r = 2 + Math.sqrt(n.degree);
+        const r = nodeRadius(n);
         const gfx = new Graphics();
         gfx.circle(0, 0, r).fill({ color: baseColor });
         gfx.eventMode = "static";
         gfx.cursor = "pointer";
-        gfx.hitArea = new Circle(0, 0, Math.max(r, 6));
+        gfx.hitArea = new Circle(0, 0, Math.max(r + 3, 8));
         nodesContainer.addChild(gfx);
 
+        // Trim label text — long vault-path titles crush the view.
+        const shortTitle =
+          n.title.length > 32 ? `${n.title.slice(0, 30)}…` : n.title;
         const label = new Text({
-          text: n.title,
-          alpha: 0,
+          text: shortTitle,
+          alpha: 0.55,
           style: {
-            fontSize: 11,
-            fill: 0x222222,
+            fontSize: 10,
+            fill: 0xcccccc,
             fontFamily: "system-ui, sans-serif",
           },
           anchor: { x: 0.5, y: 1.3 },
