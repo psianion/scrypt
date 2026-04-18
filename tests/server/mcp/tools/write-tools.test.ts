@@ -45,6 +45,7 @@ describe("Wave 8 write tools", () => {
       idempotency: new Idempotency(db),
       userId: "u1",
       vaultDir: "/tmp/vault",
+      scheduleGraphRebuild: () => {},
     };
     ctx.sections.replaceNoteSections("a.md", [
       {

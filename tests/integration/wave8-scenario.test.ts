@@ -145,6 +145,7 @@ describe("Wave 8 end-to-end scenario", () => {
       idempotency: new Idempotency(db),
       userId: null,
       vaultDir,
+      scheduleGraphRebuild: () => {},
     };
 
     registry = new ToolRegistry();

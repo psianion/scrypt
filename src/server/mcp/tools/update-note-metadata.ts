@@ -104,6 +104,7 @@ export const updateNoteMetadataTool: ToolDef<Input, Output> = {
           updated.push("summary");
         }
         ctx.metadata.upsert(input.path, patch);
+        ctx.scheduleGraphRebuild();
         return { note_path: input.path, updated_fields: updated };
       },
     );

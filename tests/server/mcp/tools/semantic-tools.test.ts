@@ -95,6 +95,7 @@ describe("semantic_search + find_similar", () => {
       idempotency: new Idempotency(db),
       userId: null,
       vaultDir: "/tmp",
+      scheduleGraphRebuild: () => {},
     };
   });
 

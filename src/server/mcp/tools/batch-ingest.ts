@@ -265,6 +265,8 @@ export const batchIngestTool: ToolDef<Input, Output> = {
       simEdges = upsertSemanticEdges(ctx.db, pairs);
     }
 
+    ctx.scheduleGraphRebuild();
+
     return {
       scanned: mdFiles.length,
       ingested,

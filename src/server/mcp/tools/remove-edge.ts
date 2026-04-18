@@ -48,6 +48,7 @@ export const removeEdgeTool: ToolDef<Input, Output> = {
                WHERE source = ? AND target = ? AND ${nonReserved} AND relation = ?`,
             )
             .run(input.source, input.target, input.relation);
+          ctx.scheduleGraphRebuild();
           return { removed: res.changes };
         }
         const res = ctx.db
@@ -56,6 +57,7 @@ export const removeEdgeTool: ToolDef<Input, Output> = {
              WHERE source = ? AND target = ? AND ${nonReserved}`,
           )
           .run(input.source, input.target);
+        ctx.scheduleGraphRebuild();
         return { removed: res.changes };
       },
     );

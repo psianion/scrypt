@@ -49,6 +49,7 @@ describe("cluster_graph + get_report", () => {
       idempotency: new Idempotency(db),
       userId: null,
       vaultDir: "/tmp",
+      scheduleGraphRebuild: () => {},
     };
   });
 

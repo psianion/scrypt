@@ -38,6 +38,7 @@ import { Worker } from "node:worker_threads";
 import { fileURLToPath } from "node:url";
 import { dirname } from "node:path";
 import { Idempotency } from "./mcp/idempotency";
+import { SnapshotScheduler } from "./graph/snapshot-scheduler";
 import { wireWebSocketSink } from "./embeddings/ws-sink";
 import type { ToolContext } from "./mcp/types";
 import { IngestRouter } from "./ingest/router";
@@ -89,6 +90,7 @@ export function createApp(config: AppConfig) {
   const wave8Sections = new SectionsRepo(db);
   const wave8Metadata = new MetadataRepo(db);
   const wave9Tasks = new TasksRepo(db);
+  const snapshotScheduler = new SnapshotScheduler(db, config.vaultPath);
   const wave8Embeddings = new ChunkEmbeddingsRepo(db);
   const wave8Bus = new ProgressBus();
   // Parent-side engine is kept only for query-time operations (e.g.
@@ -187,6 +189,7 @@ export function createApp(config: AppConfig) {
     idempotency: new Idempotency(db),
     userId: null,
     vaultDir: config.vaultPath,
+    scheduleGraphRebuild: () => snapshotScheduler.schedule(),
     // Wire the legacy indexer so MCP write tools repopulate notes /
     // notes_fts / backlinks / tags / tasks / link_index without having
     // to wait for the fs watcher (unreliable under Docker on macOS).

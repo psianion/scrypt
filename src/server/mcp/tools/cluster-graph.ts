@@ -15,6 +15,8 @@ export const clusterGraphTool: ToolDef<Input, LouvainResult> = {
     properties: { algorithm: { type: "string", enum: ["louvain"] } },
   },
   async handler(ctx) {
-    return runLouvain(ctx.db);
+    const result = runLouvain(ctx.db);
+    ctx.scheduleGraphRebuild();
+    return result;
   },
 };

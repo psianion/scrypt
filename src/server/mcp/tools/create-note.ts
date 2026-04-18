@@ -174,6 +174,7 @@ export const createNoteTool: ToolDef<Input, Output> = {
           embed_ms: embed.embed_ms,
           embedded: embed.chunks_embedded === embed.chunks_total,
         };
+        ctx.scheduleGraphRebuild();
         return result;
       },
     );

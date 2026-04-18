@@ -77,6 +77,7 @@ export const rescanSimilarityTool: ToolDef<Input, Output> = {
       scopedTo: scoped,
     });
     const created = upsertSemanticEdges(ctx.db, pairs);
+    ctx.scheduleGraphRebuild();
     return {
       edges_created: created,
       pairs_considered: pairs.length,

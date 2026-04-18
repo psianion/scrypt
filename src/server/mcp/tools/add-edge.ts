@@ -102,6 +102,7 @@ export const addEdgeTool: ToolDef<Input, Output> = {
           input.client_tag,
           Date.now(),
         );
+      ctx.scheduleGraphRebuild();
       return { edge_id: Number(res.lastInsertRowid) };
     });
   },

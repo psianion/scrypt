@@ -41,6 +41,7 @@ function buildCtx(): ToolContext {
     idempotency: new Idempotency(db),
     userId: "u1",
     vaultDir: "/tmp/vault",
+    scheduleGraphRebuild: () => {},
   };
 }
 

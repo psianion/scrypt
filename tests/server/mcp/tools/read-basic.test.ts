@@ -48,6 +48,7 @@ describe("get_note + search_notes", () => {
       idempotency: new Idempotency(db),
       userId: null,
       vaultDir,
+      scheduleGraphRebuild: () => {},
     };
 
     const content = `---

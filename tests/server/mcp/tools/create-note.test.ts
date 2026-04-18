@@ -75,6 +75,7 @@ describe("create_note tool", () => {
       idempotency: new Idempotency(db),
       userId: "u1",
       vaultDir,
+      scheduleGraphRebuild: () => {},
     };
   });
 

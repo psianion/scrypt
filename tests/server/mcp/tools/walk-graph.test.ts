@@ -41,6 +41,7 @@ describe("walk_graph", () => {
       idempotency: new Idempotency(db),
       userId: null,
       vaultDir: "/tmp",
+      scheduleGraphRebuild: () => {},
     };
   });
 
