@@ -245,7 +245,7 @@ export function createGraph(parent: HTMLElement, opts: RenderOpts): RenderHandle
     if (queryVisible) {
       if (queryMatches.has(id)) return 1;
       if (queryVisible.has(id)) return 0.7;
-      return 0.15;
+      return 0; // hard filter — non-visible nodes disappear
     }
     return opts.visited.has(id) ? 0.5 : 1;
   }
@@ -258,7 +258,8 @@ export function createGraph(parent: HTMLElement, opts: RenderOpts): RenderHandle
       return s === hovered || t === hovered ? 1 : 0.08;
     }
     if (queryVisible) {
-      return queryVisible.has(s) && queryVisible.has(t) ? l.baseAlpha : 0.06;
+      // hard filter — only edges where both endpoints are visible
+      return queryVisible.has(s) && queryVisible.has(t) ? l.baseAlpha : 0;
     }
     return l.baseAlpha;
   }
@@ -266,10 +267,14 @@ export function createGraph(parent: HTMLElement, opts: RenderOpts): RenderHandle
   let hoveredNodeId: string | null = null;
 
   function computeLabelAlpha(id: string, hovered: string | null): number {
-    // Labels off by default (Quartz behaviour). Visible only on hover (self +
-    // 1-hop neighbours) or for exact search matches.
+    // Hidden by default. Visible for: hovered node + its 1-hop neighbours,
+    // AND — when searching — every node that passes the filter.
     if (hovered) return isActive(id, hovered) ? 1 : 0;
-    if (queryVisible && queryMatches.has(id)) return 1;
+    if (queryVisible) {
+      if (queryMatches.has(id)) return 1;
+      if (queryVisible.has(id)) return 0.75;
+      return 0;
+    }
     return 0;
   }
 
