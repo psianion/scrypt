@@ -38,6 +38,14 @@ export interface Backlink {
   context: string;
 }
 
+export interface NoteIncomingEdge {
+  source: string;
+  target: string;
+  relation: string;
+  confidence: string | null;
+  reason: string | null;
+}
+
 // Legacy indexer-table shapes used by GET /api/graph/*path (the local
 // subgraph walk). The canonical full-graph types with 4 edge weights live
 // in `./graph-types.ts` and are used by GET /api/graph.

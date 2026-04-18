@@ -41,7 +41,8 @@ export function notesRoutes(router: Router, fm: FileManager, indexer: Indexer): 
     if (!note) return Response.json({ error: "Not found" }, { status: 404 });
 
     const backlinks = indexer.getBacklinks(params.path);
-    return Response.json({ ...note, backlinks });
+    const incoming_edges = indexer.getIncomingEdges(params.path);
+    return Response.json({ ...note, backlinks, incoming_edges });
   });
 
   router.post("/api/notes", async (req) => {

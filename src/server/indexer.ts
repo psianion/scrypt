@@ -284,6 +284,27 @@ export class Indexer {
       .all(path) as Backlink[];
   }
 
+  getIncomingEdges(path: string): Array<{
+    source: string;
+    target: string;
+    relation: string;
+    confidence: string | null;
+    reason: string | null;
+  }> {
+    return this.db
+      .query(
+        `SELECT source, target, relation, confidence, reason
+         FROM graph_edges WHERE target = ?`,
+      )
+      .all(path) as Array<{
+        source: string;
+        target: string;
+        relation: string;
+        confidence: string | null;
+        reason: string | null;
+      }>;
+  }
+
   getGraph(): { nodes: LocalGraphNode[]; edges: LocalGraphEdge[] } {
     const nodes = this.db
       .query(

@@ -10,7 +10,6 @@ import { GraphView } from "./views/GraphView";
 import { JournalView } from "./views/JournalView";
 import { NotesList } from "./views/NotesList";
 import { SearchView } from "./views/SearchView";
-import { BacklinksPanel } from "./views/BacklinksPanel";
 import { TasksList } from "./views/TasksList";
 import { DataExplorer } from "./views/DataExplorer";
 import { TagBrowser } from "./views/TagBrowser";
@@ -74,7 +73,6 @@ export function AppContent() {
                 <Route path="/settings" element={<Settings />} />
               </Routes>
             </div>
-            <BacklinksPanel />
           </main>
           <StatusBar />
         </div>

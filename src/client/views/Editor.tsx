@@ -9,6 +9,7 @@ import { api } from "../api";
 import type { Note } from "../../shared/types";
 import { embeddingOverlay } from "./editor/embeddingOverlay";
 import "./editor/embedding-overlay.css";
+import { NoteContextPanel } from "../graph/NoteContextPanel";
 
 export function Editor() {
   const location = useLocation();
@@ -90,8 +91,9 @@ export function Editor() {
   }, [saveNote]);
 
   return (
-    <div data-testid="editor" className="flex-1 h-full overflow-hidden">
-      <div ref={editorRef} className="h-full" />
+    <div data-testid="editor" className="flex flex-1 h-full overflow-hidden">
+      <div ref={editorRef} className="flex-1 h-full min-w-0" />
+      {notePath && <NoteContextPanel path={notePath} />}
     </div>
   );
 }

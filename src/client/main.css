@@ -90,3 +90,124 @@ body {
   overflow: hidden;
   position: relative;
 }
+
+/* NoteContextPanel (right rail on /note/* pages) */
+.note-context {
+  width: 280px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 12px;
+  border-left: 1px solid var(--border);
+  background: var(--bg-secondary);
+  overflow-y: auto;
+  color: var(--text-primary);
+  font-size: 13px;
+}
+.note-context h4 {
+  margin: 0 0 6px 0;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+}
+.note-context__graph {
+  position: relative;
+}
+.note-context__graph-host {
+  width: 260px;
+  height: 260px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  overflow: hidden;
+}
+.note-context__open-global {
+  position: absolute;
+  top: 22px;
+  right: 4px;
+  padding: 2px 6px;
+  color: var(--text-secondary);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  text-decoration: none;
+  font-size: 12px;
+  line-height: 1;
+}
+.note-context__open-global:hover {
+  color: var(--text-primary);
+  border-color: var(--text-secondary);
+}
+.note-context__tags,
+.note-context__related {
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.note-context__related {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+.note-context__tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.tag-chip {
+  display: inline-block;
+  padding: 2px 8px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  text-decoration: none;
+}
+.tag-chip:hover {
+  color: var(--text-primary);
+  border-color: var(--text-secondary);
+}
+.note-context__empty {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.tier-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+.tier-group h5 {
+  margin: 0 0 2px 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.tier-group__toggle {
+  cursor: pointer;
+  user-select: none;
+}
+.tier-group__toggle:hover {
+  color: var(--text-primary);
+}
+.tier-row {
+  display: block;
+  padding: 2px 0;
+}
+.tier-row a {
+  color: var(--link);
+  text-decoration: none;
+  font-size: 12px;
+}
+.tier-row a:hover {
+  color: var(--text-primary);
+}
+.tier-row__reason {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
