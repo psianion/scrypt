@@ -1,5 +1,14 @@
 import type { Database } from "bun:sqlite";
-import { mkdirSync, writeFileSync, renameSync } from "node:fs";
+import {
+  mkdirSync,
+  renameSync,
+  unlinkSync,
+  openSync,
+  writeSync,
+  fsyncSync,
+  closeSync,
+} from "node:fs";
+import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 
 export interface SnapshotNode {
@@ -80,14 +89,21 @@ export function buildGraphSnapshot(db: Database): GraphSnapshot {
     )
     .all();
 
-  // Keep only within-project edges. Cross-project similarity (e.g. a dnd note
-  // that happens to be cosine-close to a goveva note) creates noisy hairballs
-  // that obscure actual project structure.
+  // Drop cross-project *semantic* edges — cosine-close but unrelated pairs
+  // (e.g. a dnd note close to a goveva note) create hairballs that obscure
+  // actual structure. Explicit `connected`/`mentions` edges are kept across
+  // projects because they represent real authored links.
   const edges: SnapshotEdge[] = [];
   const degree = new Map<string, number>();
   for (const e of edgeRows) {
     if (!noteIds.has(e.source) || !noteIds.has(e.target)) continue;
-    if (projectById.get(e.source) !== projectById.get(e.target)) continue;
+    const tier = e.confidence ?? "connected";
+    if (
+      tier === "semantically_related" &&
+      projectById.get(e.source) !== projectById.get(e.target)
+    ) {
+      continue;
+    }
     edges.push(e);
     degree.set(e.source, (degree.get(e.source) ?? 0) + 1);
     degree.set(e.target, (degree.get(e.target) ?? 0) + 1);
@@ -131,8 +147,27 @@ export function writeGraphSnapshot(db: Database, vaultDir: string): string {
   const dir = join(vaultDir, ".scrypt");
   mkdirSync(dir, { recursive: true });
   const finalPath = join(dir, "graph.json");
-  const tmpPath = `${finalPath}.${process.pid}.${Date.now()}.tmp`;
-  writeFileSync(tmpPath, JSON.stringify(snap), "utf8");
-  renameSync(tmpPath, finalPath);
+  const tmpPath = `${finalPath}.${randomUUID()}.tmp`;
+  const payload = Buffer.from(JSON.stringify(snap), "utf8");
+  let fd: number | null = null;
+  try {
+    fd = openSync(tmpPath, "w");
+    writeSync(fd, payload, 0, payload.length, 0);
+    fsyncSync(fd);
+    closeSync(fd);
+    fd = null;
+    renameSync(tmpPath, finalPath);
+  } catch (err) {
+    if (fd !== null) {
+      try { closeSync(fd); } catch {}
+    }
+    try {
+      unlinkSync(tmpPath);
+    } catch (cleanupErr: unknown) {
+      const code = (cleanupErr as NodeJS.ErrnoException)?.code;
+      if (code !== "ENOENT") throw cleanupErr;
+    }
+    throw err;
+  }
   return finalPath;
 }

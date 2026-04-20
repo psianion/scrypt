@@ -1,7 +1,14 @@
 import { test, expect, describe, beforeEach } from "bun:test";
 import { Database } from "bun:sqlite";
 import { initSchema } from "../../../src/server/db";
-import { buildGraphSnapshot } from "../../../src/server/graph/snapshot";
+import {
+  buildGraphSnapshot,
+  writeGraphSnapshot,
+} from "../../../src/server/graph/snapshot";
+import * as fs from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, writeFileSync, mkdirSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 describe("buildGraphSnapshot", () => {
   let db: Database;
@@ -57,8 +64,70 @@ describe("buildGraphSnapshot", () => {
     expect(snap.edges).toHaveLength(0);
   });
 
+  test("keeps cross-project explicit edges but drops cross-project semantic edges", () => {
+    db.run(`INSERT INTO graph_nodes (id, kind, label, note_path) VALUES
+      ('research/dnd/a.md','note','A','research/dnd/a.md'),
+      ('research/dnd/b.md','note','B','research/dnd/b.md'),
+      ('research/goveva/c.md','note','C','research/goveva/c.md'),
+      ('research/goveva/d.md','note','D','research/goveva/d.md')`);
+    db.run(`INSERT INTO graph_edges (source,target,relation,confidence,created_at) VALUES
+      ('research/dnd/a.md','research/goveva/c.md','references','mentions',0),
+      ('research/dnd/a.md','research/goveva/d.md','similar','semantically_related',0),
+      ('research/dnd/a.md','research/dnd/b.md','similar','semantically_related',0)`);
+
+    const snap = buildGraphSnapshot(db);
+    const pairs = snap.edges.map((e) => `${e.source}->${e.target}:${e.confidence}`).sort();
+    expect(pairs).toEqual([
+      "research/dnd/a.md->research/dnd/b.md:semantically_related",
+      "research/dnd/a.md->research/goveva/c.md:mentions",
+    ]);
+  });
+
   test("sets generated_at to a number close to now", () => {
     const snap = buildGraphSnapshot(db);
     expect(Math.abs(Date.now() - snap.generated_at)).toBeLessThan(2000);
+  });
+});
+
+describe("writeGraphSnapshot atomicity", () => {
+  let db: Database;
+  let vaultDir: string;
+  beforeEach(() => {
+    db = new Database(":memory:");
+    initSchema(db);
+    db.run(
+      `INSERT INTO graph_nodes (id, kind, label, note_path) VALUES ('a.md','note','A','a.md')`,
+    );
+    vaultDir = mkdtempSync(join(tmpdir(), "scrypt-write-"));
+  });
+
+  test("writes a complete graph.json and leaves no .tmp behind on success", () => {
+    writeGraphSnapshot(db, vaultDir);
+    const dir = join(vaultDir, ".scrypt");
+    const files = readdirSync(dir);
+    expect(files).toContain("graph.json");
+    expect(files.filter((f) => f.endsWith(".tmp"))).toHaveLength(0);
+    const snap = JSON.parse(readFileSync(join(dir, "graph.json"), "utf8"));
+    expect(snap.nodes).toHaveLength(1);
+  });
+
+  test("on rename failure: removes orphan .tmp and leaves prior graph.json intact", () => {
+    // Make graph.json a directory so renameSync(tmpPath, finalPath) fails with
+    // EISDIR/ENOTEMPTY/EEXIST depending on platform — exercises the cleanup
+    // path without monkey-patching fs (snapshot.ts uses destructured imports).
+    const dir = join(vaultDir, ".scrypt");
+    mkdirSync(dir, { recursive: true });
+    const finalPath = join(dir, "graph.json");
+    mkdirSync(finalPath); // a directory at the final path
+    // Drop a sentinel inside so we can prove the directory wasn't replaced.
+    writeFileSync(join(finalPath, "sentinel"), "x", "utf8");
+
+    expect(() => writeGraphSnapshot(db, vaultDir)).toThrow();
+
+    const files = readdirSync(dir);
+    expect(files.filter((f) => f.endsWith(".tmp"))).toHaveLength(0);
+    // The directory at finalPath must still exist with its sentinel.
+    expect(fs.statSync(finalPath).isDirectory()).toBe(true);
+    expect(readFileSync(join(finalPath, "sentinel"), "utf8")).toBe("x");
   });
 });

@@ -1,8 +1,14 @@
 import type { Database } from "bun:sqlite";
 import { writeGraphSnapshot } from "./snapshot";
 
+export type SnapshotWriter = (db: Database, vaultDir: string) => unknown | Promise<unknown>;
+
 export interface SchedulerOpts {
   debounceMs?: number;
+  /** Injectable for tests; defaults to the real atomic writer. */
+  writer?: SnapshotWriter;
+  /** Auto-disable after this many consecutive failures. */
+  maxConsecutiveFailures?: number;
 }
 
 export class SnapshotScheduler {
@@ -10,6 +16,11 @@ export class SnapshotScheduler {
   private running = false;
   private pendingAfterCurrent = false;
   private readonly debounceMs: number;
+  private readonly writer: SnapshotWriter;
+  private readonly maxConsecutiveFailures: number;
+  private consecutiveFailures = 0;
+  private _lastError: Error | null = null;
+  private _disabled = false;
 
   /** Number of successful builds. Exposed for tests. */
   buildCount = 0;
@@ -20,10 +31,21 @@ export class SnapshotScheduler {
     opts: SchedulerOpts = {},
   ) {
     this.debounceMs = opts.debounceMs ?? 2000;
+    this.writer = opts.writer ?? writeGraphSnapshot;
+    this.maxConsecutiveFailures = opts.maxConsecutiveFailures ?? 5;
+  }
+
+  get lastError(): Error | null {
+    return this._lastError;
+  }
+
+  get disabled(): boolean {
+    return this._disabled;
   }
 
   /** Enqueue a rebuild. Coalesces repeated calls within the debounce window. */
   schedule(): void {
+    if (this._disabled) return;
     if (this.running) {
       this.pendingAfterCurrent = true;
       return;
@@ -35,12 +57,14 @@ export class SnapshotScheduler {
     }, this.debounceMs);
   }
 
-  /** Build synchronously, clearing any pending debounce. Awaits the write. */
+  /** Build synchronously, clearing any pending debounce. Awaits the write.
+   *  Re-enables a previously disabled scheduler so callers can recover. */
   async flushNow(): Promise<void> {
     if (this.timer) {
       clearTimeout(this.timer);
       this.timer = null;
     }
+    this._disabled = false;
     await this.flush();
   }
 
@@ -51,17 +75,28 @@ export class SnapshotScheduler {
     }
     this.running = true;
     try {
-      writeGraphSnapshot(this.db, this.vaultDir);
+      await this.writer(this.db, this.vaultDir);
       this.buildCount += 1;
+      this.consecutiveFailures = 0;
+      this._lastError = null;
     } catch (err) {
-      console.error("[scrypt] snapshot write failed:", err);
+      const e = err instanceof Error ? err : new Error(String(err));
+      this._lastError = e;
+      this.consecutiveFailures += 1;
+      console.error("[scrypt] snapshot write failed", {
+        vaultDir: this.vaultDir,
+        consecutiveFailures: this.consecutiveFailures,
+        errorMessage: e.message,
+        errorStack: e.stack,
+      });
+      if (this.consecutiveFailures >= this.maxConsecutiveFailures) {
+        this._disabled = true;
+      }
     } finally {
       this.running = false;
-      if (this.pendingAfterCurrent) {
-        this.pendingAfterCurrent = false;
-        // chain one more build, same debounce
-        this.schedule();
-      }
+      const shouldChain = this.pendingAfterCurrent && !this._disabled;
+      this.pendingAfterCurrent = false;
+      if (shouldChain) this.schedule();
     }
   }
 }
