@@ -1,14 +1,3 @@
-// Pixi.js + D3 force-directed graph renderer.
-// Ported from Quartz v4 (quartz/components/scripts/graph.inline.ts) and adapted
-// for Scrypt's snapshot shape and tier filter model.
-//
-// Notes on intentional simplifications vs Quartz:
-// - No tag nodes; snapshot is pre-resolved.
-// - Edge tier styling is encoded via alpha/width only (Pixi Graphics has no
-//   native dashed/dotted stroke). connected = 1.0 alpha, mentions = 0.6,
-//   semantically_related = 0.4.
-// - Visited nodes get a 50% alpha tint.
-
 import { Application, Container, Graphics, Text, Circle } from "pixi.js";
 import {
   forceSimulation,
@@ -101,8 +90,7 @@ function tierStyle(tier: Tier, srcColor: number): { color: number; width: number
   if (tier === "mentions") {
     return { color: 0x9aa0aa, width: 1.0, alpha: 0.55 };
   }
-  // semantically_related — can be thousands. Visible baseline but muted so
-  // explicit links still read as foreground.
+  // semantically_related can run to thousands; muted so explicit links read as foreground.
   return { color: 0x7a7f88, width: 0.8, alpha: 0.28 };
 }
 
@@ -143,10 +131,8 @@ function bfs(
 export function createGraph(parent: HTMLElement, opts: RenderOpts): RenderHandle {
   const { snap, width, height } = opts;
 
-  // Active tier filter (mutable)
   let tierFilter: TierFilter = { ...opts.tierFilter };
 
-  // Determine which nodes to render (BFS if local)
   const allNodeIds = snap.nodes.map((n) => n.id);
   const visibleIds: Set<string> =
     opts.mode.kind === "global"
@@ -187,7 +173,6 @@ export function createGraph(parent: HTMLElement, opts: RenderOpts): RenderHandle
     });
   }
 
-  // Build neighbour map for hover focus
   const neighbours = new Map<string, Set<string>>();
   for (const n of nodes) neighbours.set(n.id, new Set());
   for (const l of links) {
@@ -197,17 +182,11 @@ export function createGraph(parent: HTMLElement, opts: RenderOpts): RenderHandle
     neighbours.get(t)?.add(s);
   }
 
-  // Pixi app
   const app = new Application();
   const canvas = document.createElement("canvas");
   parent.appendChild(canvas);
 
-  // Block browser-level page-zoom from trackpad pinch / ctrl-wheel while the
-  // cursor is over the graph. Safari fires the `gesture*` family for pinches,
-  // which default to zooming the whole page (cropping top bar + sidebars).
-  // Chrome encodes pinch as wheel+ctrlKey; d3-zoom preventDefaults wheel but
-  // not until after its own handler runs, so we also block pinch-wheel here.
-  // `touch-action: none` keeps iOS/Android touch gestures from panning.
+  // Block trackpad pinch / ctrl-wheel page-zoom (Safari gesture* events, Chrome wheel+ctrlKey).
   canvas.style.touchAction = "none";
   const preventPageZoom = (e: Event) => e.preventDefault();
   canvas.addEventListener("gesturestart", preventPageZoom);
@@ -226,16 +205,10 @@ export function createGraph(parent: HTMLElement, opts: RenderOpts): RenderHandle
   const linkRender: LinkRender[] = [];
   let currentTransform: ZoomTransform = zoomIdentity;
 
-  // Quartz's formula is `2 + sqrt(degree)`, which works when typical degree is
-  // 5–20 (wikilinks only). Scrypt adds semantic similarity edges, pushing hub
-  // degree into the 100–200 range — raw `sqrt(degree)` would produce 14px hubs
-  // that eat the canvas. Clamp at 8px max so layout stays readable regardless
-  // of vault density.
+  // Clamp at 8px — semantic edges push hub degree to 100+.
   const nodeRadius = (d: NodeDatum) => 2 + Math.min(6, Math.sqrt(d.degree / 3));
 
-  // Per-project anchor positions. Distributed evenly around a circle so each
-  // project gets its own sub-cluster zone, while still sitting inside the
-  // overall sphere pulled by forceCenter.
+  // Per-project anchor positions distributed around a circle inside forceCenter's pull.
   const projectAnchors = new Map<string, { x: number; y: number }>();
   {
     const projects = [...new Set(nodes.map((n) => n.project))].sort();
@@ -251,9 +224,6 @@ export function createGraph(parent: HTMLElement, opts: RenderOpts): RenderHandle
     });
   }
 
-  // Simulation — Quartz defaults + project-aware clustering. Cross-project
-  // edges are already filtered server-side so projects become disconnected
-  // subgraphs; forceX/forceY pull each subgraph toward its own anchor.
   const simulation: Simulation<NodeDatum, LinkDatum> = forceSimulation<NodeDatum>(nodes)
     .force("charge", forceManyBody().strength(-120))
     .force("center", forceCenter(width / 2, height / 2).strength(0.15))
@@ -272,20 +242,13 @@ export function createGraph(parent: HTMLElement, opts: RenderOpts): RenderHandle
     simulation.force("radial", forceRadial(radius, width / 2, height / 2).strength(0.05));
   }
 
-  // Drive ticks from our RAF loop only. d3-force starts an internal timer on
-  // construction; leaving it running would double-tick (every RAF frame plus
-  // d3's own timer) which makes the initial settle too fast and leaves the
-  // sim at alpha ~= 0 by the time a user tries to drag — so nodes don't
-  // react. Stopping the internal timer puts us fully in control.
+  // d3-force runs an internal timer; stop it to avoid double-ticking with our RAF.
   simulation.stop();
   simulation.alpha(1);
 
-  // Query filter state (applied over tween)
   let queryVisible: Set<string> | null = null;
   let queryMatches: Set<string> = new Set();
 
-  // Quartz-style "active" set: a node is active if it's the hovered node or a
-  // 1-hop neighbour of the hovered node. Used to dim everything else.
   function isActive(id: string, hovered: string | null): boolean {
     if (!hovered) return false;
     if (hovered === id) return true;
@@ -319,8 +282,7 @@ export function createGraph(parent: HTMLElement, opts: RenderOpts): RenderHandle
   let hoveredNodeId: string | null = null;
 
   function computeLabelAlpha(id: string, hovered: string | null): number {
-    // Hidden by default. On hover, only the hovered node's label shows —
-    // connected nodes stay un-labelled so the focus is unambiguous.
+    // Only the hovered node's label shows — neighbours stay unlabelled to keep focus unambiguous.
     if (hovered) return id === hovered ? 1 : 0;
     if (queryVisible) {
       if (queryMatches.has(id)) return 1;
@@ -376,14 +338,12 @@ export function createGraph(parent: HTMLElement, opts: RenderOpts): RenderHandle
       stage.addChild(linkContainer, nodesContainer, labelsContainer);
       stage.sortableChildren = true;
 
-      // Links
       for (const l of links) {
         const gfx = new Graphics();
         linkContainer.addChild(gfx);
         linkRender.push({ data: l, gfx, alpha: l.baseAlpha });
       }
 
-      // Nodes
       for (const n of nodes) {
         const baseColor = hexToNumber(colorForProject(n.project));
         const r = nodeRadius(n);
@@ -394,7 +354,6 @@ export function createGraph(parent: HTMLElement, opts: RenderOpts): RenderHandle
         gfx.hitArea = new Circle(0, 0, Math.max(r + 3, 8));
         nodesContainer.addChild(gfx);
 
-        // Trim label text — long vault-path titles crush the view.
         const shortTitle =
           n.title.length > 40 ? `${n.title.slice(0, 38)}…` : n.title;
         const label = new Text({
@@ -439,7 +398,6 @@ export function createGraph(parent: HTMLElement, opts: RenderOpts): RenderHandle
 
       applyStyles(false);
 
-      // Pan/zoom
       const sel = select<HTMLCanvasElement, unknown>(canvas);
       const zoomBehavior = zoom<HTMLCanvasElement, unknown>()
         .scaleExtent([0.25, 4])
@@ -453,7 +411,6 @@ export function createGraph(parent: HTMLElement, opts: RenderOpts): RenderHandle
         sel.transition().duration(400).call(zoomBehavior.transform, zoomIdentity);
       });
 
-      // Drag
       let dragStart = 0;
       sel.call(
         drag<HTMLCanvasElement, unknown>()
@@ -462,7 +419,6 @@ export function createGraph(parent: HTMLElement, opts: RenderOpts): RenderHandle
             const t = zoomTransform(canvas);
             const x = (event.x - t.x) / t.k;
             const y = (event.y - t.y) / t.k;
-            // find nearest node under cursor
             let best: NodeDatum | undefined;
             let bestDist = 16 * 16;
             for (const n of nodes) {
@@ -480,9 +436,7 @@ export function createGraph(parent: HTMLElement, opts: RenderOpts): RenderHandle
           .on("start", (event) => {
             if (!event.subject) return;
             if (!event.active) {
-              // Reheat immediately — not just by setting alphaTarget, which
-              // only eases alpha up over many frames. Direct alpha bump means
-              // the graph reacts to the first drag frame, matching Quartz.
+              // Direct alpha bump (not alphaTarget) so first drag frame reacts.
               simulation.alphaTarget(0.3).alpha(0.3);
             }
             event.subject.fx = event.subject.x;
@@ -500,14 +454,12 @@ export function createGraph(parent: HTMLElement, opts: RenderOpts): RenderHandle
             event.subject.fx = null;
             event.subject.fy = null;
             if (Date.now() - dragStart < 200) {
-              // treat as click
               opts.onNodeVisited(event.subject.id);
               opts.onNodeClick(event.subject.id);
             }
           }),
       );
 
-      // Animation loop
       function animate(time: number) {
         if (destroyed) return;
         simulation.tick();
@@ -555,7 +507,7 @@ export function createGraph(parent: HTMLElement, opts: RenderOpts): RenderHandle
       try {
         app.destroy(true, { children: true });
       } catch {
-        // app may not have finished init; ignore
+        // app may not have finished init
       }
       if (canvas.parentElement === parent) parent.removeChild(canvas);
     },

@@ -1,4 +1,3 @@
-// src/server/api/graph.ts
 import { createHash, randomUUID } from "node:crypto";
 import { existsSync, statSync } from "node:fs";
 import { join } from "node:path";
@@ -14,6 +13,7 @@ import { parseTag } from "../parsers";
 import type { SnapshotScheduler } from "../graph/snapshot-scheduler";
 import { writeGraphSnapshot } from "../graph/snapshot";
 
+// Stale window > debounce so SWR converges before next request.
 const SNAPSHOT_STALE_MS = 10_000;
 
 interface NoteRow {
@@ -38,8 +38,7 @@ export function graphRoutes(
   vaultDir: string,
   scheduler: SnapshotScheduler,
 ): void {
-  // SHA1 is non-trivial on multi-MB snapshots; recompute only when scheduler
-  // has produced a new build, not per request.
+  // SHA1 is non-trivial on multi-MB snapshots; recompute only on new builds.
   const etagCache: { etag: string | null; buildCount: number } = {
     etag: null,
     buildCount: -1,
@@ -122,7 +121,6 @@ export function graphRoutes(
     const visibleIds = new Set(nodes.map((n) => n.id));
     const edges: GraphEdge[] = [];
 
-    // 1. wikilink edges — Wave 8 graph_edges uses relation='wikilink'.
     const linkRows = db
       .query(
         `SELECT source, target FROM graph_edges WHERE relation = 'wikilink'`,
@@ -139,9 +137,6 @@ export function graphRoutes(
       });
     }
 
-    // 2. subdomain: equal (domain, subdomain), both non-null
-    // 3. domain: equal domain, different (or one missing) subdomain
-    // 4. tag: shared namespaced tag from RESERVED_NAMESPACES, same ns AND value
     for (let i = 0; i < nodes.length; i++) {
       for (let j = i + 1; j < nodes.length; j++) {
         const a = nodes[i];
@@ -176,7 +171,6 @@ export function graphRoutes(
       }
     }
 
-    // 5. similarity edges from embeddings
     const model = process.env.SCRYPT_EMBED_MODEL ?? "Xenova/bge-small-en-v1.5";
     const chunkRows = db
       .query<
@@ -188,7 +182,6 @@ export function graphRoutes(
       .all(model);
 
     if (chunkRows.length > 0) {
-      // Average chunk vectors per note
       const noteVecs = new Map<string, { sum: Float32Array; count: number }>();
       for (const r of chunkRows) {
         if (!visibleIds.has(r.note_path)) continue;
@@ -204,7 +197,6 @@ export function graphRoutes(
         entry.count += 1;
       }
 
-      // Normalize averaged vectors
       const averaged: Array<{ path: string; vec: Float32Array }> = [];
       for (const [path, entry] of noteVecs) {
         const vec = entry.sum;
@@ -216,7 +208,7 @@ export function graphRoutes(
         averaged.push({ path, vec });
       }
 
-      // Pairwise cosine similarity — add edges above threshold
+      // Cosine threshold; lower fills the graph with noise.
       const SIM_THRESHOLD = 0.8;
       for (let i = 0; i < averaged.length; i++) {
         for (let j = i + 1; j < averaged.length; j++) {
@@ -236,7 +228,6 @@ export function graphRoutes(
       }
     }
 
-    // connectionCount
     const countMap = new Map<string, number>();
     for (const e of edges) {
       countMap.set(e.source, (countMap.get(e.source) ?? 0) + 1);

@@ -65,8 +65,7 @@ export function NoteContextPanel({ path }: Props) {
         height: 260,
       });
     } catch {
-      // Pixi cannot init (e.g. jsdom/happy-dom without WebGL/Canvas) — leave
-      // the host empty. The rest of the panel (tags, related) still renders.
+      // Pixi cannot init (e.g. jsdom without WebGL) — leave host empty; rest of panel still renders.
     }
     return () => {
       handleRef.current?.destroy();

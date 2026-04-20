@@ -16,17 +16,11 @@ export interface SnapshotNode {
   id: string;
   title: string;
   doc_type: string | null;
-  /** First meaningful path segment — used to group nodes into project clusters. */
   project: string;
   degree: number;
   community: number | null;
 }
 
-/**
- * Pick a project name from a vault-relative path. `research/<name>/...` is the
- * main pattern in this vault, so the 2nd segment wins there; otherwise the
- * first segment (`journal`, `docs`, `assets`, etc.) is the project.
- */
 export function projectOf(path: string): string {
   const parts = path.split("/");
   if (parts.length <= 1) return "root";
@@ -79,8 +73,6 @@ export function buildGraphSnapshot(db: Database): GraphSnapshot {
 
   const noteIds = new Set(nodeRows.map((r) => r.id));
 
-  // Pre-compute each node's project from its path. Used to filter edges and
-  // color clusters.
   const projectById = new Map<string, string>();
   for (const r of nodeRows) projectById.set(r.id, projectOf(r.note_path));
 
@@ -90,10 +82,7 @@ export function buildGraphSnapshot(db: Database): GraphSnapshot {
     )
     .all();
 
-  // Drop cross-project *semantic* edges — cosine-close but unrelated pairs
-  // (e.g. a dnd note close to a goveva note) create hairballs that obscure
-  // actual structure. Explicit `connected`/`mentions` edges are kept across
-  // projects because they represent real authored links.
+  // Drop cross-project semantic edges — cosine-close unrelated pairs create hairballs.
   const edges: SnapshotEdge[] = [];
   const degree = new Map<string, number>();
   for (const e of edgeRows) {
@@ -122,9 +111,7 @@ export function buildGraphSnapshot(db: Database): GraphSnapshot {
   const docType = new Map<string, string | null>();
   for (const m of metaRows) docType.set(m.note_path, m.doc_type);
 
-  // Map distinct projects to small stable integer community ids so the client
-  // can color clusters consistently even when `graph_nodes.community_id` hasn't
-  // been populated yet by cluster_graph.
+  // Fallback community ids so clusters colour consistently before cluster_graph runs.
   const projectIndex = new Map<string, number>();
   for (const p of projectById.values()) {
     if (!projectIndex.has(p)) projectIndex.set(p, projectIndex.size);

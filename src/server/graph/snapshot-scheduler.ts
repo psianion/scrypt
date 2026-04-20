@@ -5,9 +5,7 @@ export type SnapshotWriter = (db: Database, vaultDir: string) => unknown | Promi
 
 export interface SchedulerOpts {
   debounceMs?: number;
-  /** Injectable for tests; defaults to the real atomic writer. */
   writer?: SnapshotWriter;
-  /** Auto-disable after this many consecutive failures. */
   maxConsecutiveFailures?: number;
 }
 
@@ -22,7 +20,6 @@ export class SnapshotScheduler {
   private _lastError: Error | null = null;
   private _disabled = false;
 
-  /** Number of successful builds. Exposed for tests. */
   buildCount = 0;
 
   constructor(
@@ -43,7 +40,7 @@ export class SnapshotScheduler {
     return this._disabled;
   }
 
-  /** Enqueue a rebuild. Coalesces repeated calls within the debounce window. */
+  // Coalesces repeated calls within the debounce window.
   schedule(): void {
     if (this._disabled) return;
     if (this.running) {
@@ -57,8 +54,7 @@ export class SnapshotScheduler {
     }, this.debounceMs);
   }
 
-  /** Build synchronously, clearing any pending debounce. Awaits the write.
-   *  Re-enables a previously disabled scheduler so callers can recover. */
+  // Re-enables the scheduler so callers can recover from disabled state.
   async flushNow(): Promise<void> {
     if (this.timer) {
       clearTimeout(this.timer);
