@@ -3,6 +3,7 @@ import { join } from "node:path";
 import type { Router } from "../router";
 import type { FileManager } from "../file-manager";
 import type { Indexer } from "../indexer";
+import { parseTier, type NoteIncomingEdge } from "../../shared/types";
 
 export function notesRoutes(router: Router, fm: FileManager, indexer: Indexer): void {
   router.get("/api/notes", async (req) => {
@@ -41,7 +42,15 @@ export function notesRoutes(router: Router, fm: FileManager, indexer: Indexer): 
     if (!note) return Response.json({ error: "Not found" }, { status: 404 });
 
     const backlinks = indexer.getBacklinks(params.path);
-    const incoming_edges = indexer.getIncomingEdges(params.path);
+    const incoming_edges: NoteIncomingEdge[] = indexer
+      .getIncomingEdges(params.path)
+      .map((e) => ({
+        source: e.source,
+        target: e.target,
+        relation: e.relation,
+        confidence: parseTier(e.confidence),
+        reason: e.reason,
+      }));
     return Response.json({ ...note, backlinks, incoming_edges });
   });
 

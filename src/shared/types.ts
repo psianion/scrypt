@@ -38,11 +38,20 @@ export interface Backlink {
   context: string;
 }
 
+export type Tier = "connected" | "mentions" | "semantically_related";
+
+export function parseTier(s: string | null): Tier | null {
+  if (s === "connected" || s === "mentions" || s === "semantically_related") {
+    return s;
+  }
+  return null;
+}
+
 export interface NoteIncomingEdge {
   source: string;
   target: string;
   relation: string;
-  confidence: string | null;
+  confidence: Tier | null;
   reason: string | null;
 }
 

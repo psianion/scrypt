@@ -10,6 +10,7 @@ import {
 } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
+import { parseTier, type Tier } from "../../shared/types";
 
 export interface SnapshotNode {
   id: string;
@@ -37,7 +38,7 @@ export interface SnapshotEdge {
   source: string;
   target: string;
   relation: string;
-  confidence: string | null;
+  confidence: Tier | null;
   reason: string | null;
 }
 
@@ -97,14 +98,20 @@ export function buildGraphSnapshot(db: Database): GraphSnapshot {
   const degree = new Map<string, number>();
   for (const e of edgeRows) {
     if (!noteIds.has(e.source) || !noteIds.has(e.target)) continue;
-    const tier = e.confidence ?? "connected";
+    const tier = parseTier(e.confidence);
     if (
       tier === "semantically_related" &&
       projectById.get(e.source) !== projectById.get(e.target)
     ) {
       continue;
     }
-    edges.push(e);
+    edges.push({
+      source: e.source,
+      target: e.target,
+      relation: e.relation,
+      confidence: tier,
+      reason: e.reason,
+    });
     degree.set(e.source, (degree.get(e.source) ?? 0) + 1);
     degree.set(e.target, (degree.get(e.target) ?? 0) + 1);
   }

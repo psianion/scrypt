@@ -1,6 +1,7 @@
 import type { SnapshotEdge } from "../../server/graph/snapshot";
+import type { Tier } from "../../shared/types";
 
-export type Tier = "connected" | "mentions" | "semantically_related";
+export type { Tier };
 export type TierFilter = Record<Tier, boolean>;
 
 export const DEFAULT_TIER_FILTER: TierFilter = {
@@ -52,5 +53,5 @@ export function filterEdgesByTier(
   edges: SnapshotEdge[],
   filter: TierFilter,
 ): SnapshotEdge[] {
-  return edges.filter((e) => filter[(e.confidence ?? "connected") as Tier] ?? false);
+  return edges.filter((e) => filter[e.confidence ?? "connected"] ?? false);
 }

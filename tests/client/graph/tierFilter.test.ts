@@ -5,6 +5,7 @@ import {
   saveTierFilter,
   filterEdgesByTier,
 } from "../../../src/client/graph/tierFilter";
+import type { SnapshotEdge } from "../../../src/server/graph/snapshot";
 
 function fakeStorage(): Storage {
   const store = new Map<string, string>();
@@ -39,7 +40,7 @@ describe("tierFilter", () => {
   });
 
   test("filterEdgesByTier keeps only enabled tiers", () => {
-    const edges = [
+    const edges: SnapshotEdge[] = [
       { source: "a", target: "b", relation: "x", confidence: "connected", reason: null },
       { source: "a", target: "c", relation: "x", confidence: "mentions", reason: null },
       { source: "a", target: "d", relation: "x", confidence: "semantically_related", reason: null },

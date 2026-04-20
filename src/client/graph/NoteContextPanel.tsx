@@ -60,8 +60,7 @@ export function NoteContextPanel({ path }: Props) {
         onNodeClick: (id) => navigate(`/note/${id}`),
         onNodeVisited: () => {},
         enableRadial: false,
-        depthLimit: 1,
-        centerId: path,
+        mode: { kind: "local", centerId: path, depthLimit: 1 },
         width: 260,
         height: 260,
       });

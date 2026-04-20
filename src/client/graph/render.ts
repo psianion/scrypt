@@ -34,6 +34,10 @@ import type { GraphSnapshot, SnapshotEdge } from "../../server/graph/snapshot";
 import type { Tier, TierFilter } from "./tierFilter";
 import { colorForProject, darken } from "./colors";
 
+export type RenderMode =
+  | { kind: "global" }
+  | { kind: "local"; centerId: string; depthLimit: number };
+
 export interface RenderOpts {
   snap: GraphSnapshot;
   tierFilter: TierFilter;
@@ -41,8 +45,7 @@ export interface RenderOpts {
   onNodeClick: (id: string) => void;
   onNodeVisited: (id: string) => void;
   enableRadial: boolean;
-  depthLimit: number;
-  centerId?: string;
+  mode: RenderMode;
   width: number;
   height: number;
 }
@@ -146,9 +149,9 @@ export function createGraph(parent: HTMLElement, opts: RenderOpts): RenderHandle
   // Determine which nodes to render (BFS if local)
   const allNodeIds = snap.nodes.map((n) => n.id);
   const visibleIds: Set<string> =
-    opts.depthLimit === -1 || !opts.centerId
+    opts.mode.kind === "global"
       ? new Set(allNodeIds)
-      : bfs(allNodeIds, snap.edges, opts.centerId, opts.depthLimit);
+      : bfs(allNodeIds, snap.edges, opts.mode.centerId, opts.mode.depthLimit);
 
   const nodeDataById = new Map<string, NodeDatum>();
   const nodes: NodeDatum[] = [];
@@ -170,7 +173,7 @@ export function createGraph(parent: HTMLElement, opts: RenderOpts): RenderHandle
   const links: LinkDatum[] = [];
   for (const e of snap.edges) {
     if (!nodeDataById.has(e.source) || !nodeDataById.has(e.target)) continue;
-    const tier = (e.confidence ?? "connected") as Tier;
+    const tier: Tier = e.confidence ?? "connected";
     const src = nodeDataById.get(e.source)!;
     const srcColor = hexToNumber(colorForProject(src.project));
     const style = tierStyle(tier, srcColor);

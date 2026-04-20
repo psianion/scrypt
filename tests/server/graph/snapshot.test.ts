@@ -83,6 +83,18 @@ describe("buildGraphSnapshot", () => {
     ]);
   });
 
+  test("normalises a malformed confidence value to null without crashing", () => {
+    db.run(`INSERT INTO graph_nodes (id, kind, label, note_path) VALUES
+      ('a.md','note','A','a.md'),
+      ('b.md','note','B','b.md')`);
+    db.run(`INSERT INTO graph_edges (source,target,relation,confidence,created_at) VALUES
+      ('a.md','b.md','weird','xyz',0)`);
+
+    const snap = buildGraphSnapshot(db);
+    expect(snap.edges).toHaveLength(1);
+    expect(snap.edges[0]!.confidence).toBeNull();
+  });
+
   test("sets generated_at to a number close to now", () => {
     const snap = buildGraphSnapshot(db);
     expect(Math.abs(Date.now() - snap.generated_at)).toBeLessThan(2000);

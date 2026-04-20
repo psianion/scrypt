@@ -49,7 +49,7 @@ export function GraphView() {
         saveVisited(visited);
       },
       enableRadial: true,
-      depthLimit: -1,
+      mode: { kind: "global" },
       width: rect.width,
       height: rect.height - 60,
     });
