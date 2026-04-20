@@ -107,8 +107,9 @@ export function GraphView() {
         if (!cancelled && handle) {
           handle.updateQueryFilter(visible, matches);
         }
-      } catch {
-        // fail silently; empty result keeps previous filter state
+      } catch (err) {
+        if ((err as { name?: string })?.name === "AbortError") return;
+        console.warn("[graph] search failed:", err);
       }
     }, 220);
     return () => {

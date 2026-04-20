@@ -17,6 +17,8 @@ type NoteWithContext = Note & {
 export function NoteContextPanel({ path }: Props) {
   const { snap } = useGraphSnapshot();
   const [note, setNote] = useState<NoteWithContext | null>(null);
+  const [noteError, setNoteError] = useState<Error | null>(null);
+  const [reloadTick, setReloadTick] = useState(0);
   const [semExpanded, setSemExpanded] = useState(false);
   const hostRef = useRef<HTMLDivElement>(null);
   const handleRef = useRef<RenderHandle | null>(null);
@@ -24,8 +26,28 @@ export function NoteContextPanel({ path }: Props) {
 
   useEffect(() => {
     if (!path) return;
-    api.notes.get(path).then(setNote).catch(() => setNote(null));
-  }, [path]);
+    let cancelled = false;
+    setNoteError(null);
+    api.notes
+      .get(path)
+      .then((n) => {
+        if (cancelled) return;
+        setNote(n);
+        setNoteError(null);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        const e = err instanceof Error ? err : new Error(String(err));
+        console.warn("[note-context] load failed:", path, e.message);
+        setNote(null);
+        setNoteError(e);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [path, reloadTick]);
+
+  const retryNote = () => setReloadTick((t) => t + 1);
 
   useEffect(() => {
     if (!snap || !hostRef.current || !path) return;
@@ -102,7 +124,14 @@ export function NoteContextPanel({ path }: Props) {
 
       <section className="note-context__related">
         <h4>Related</h4>
-        {loading ? (
+        {noteError ? (
+          <div className="note-context__empty">
+            Failed to load note.{" "}
+            <button type="button" className="link-btn" onClick={retryNote}>
+              Retry
+            </button>
+          </div>
+        ) : loading ? (
           <div className="note-context__empty">Loading…</div>
         ) : byTier.connected.length +
           byTier.mentions.length +

@@ -48,4 +48,53 @@ describe("tierFilter", () => {
     expect(out).toHaveLength(1);
     expect(out[0]!.target).toBe("b");
   });
+
+  test("loadTierFilter returns defaults for malformed JSON", () => {
+    ls.setItem("graph-tier-filter", "{not json");
+    expect(loadTierFilter(ls)).toEqual(DEFAULT_TIER_FILTER);
+  });
+
+  test("loadTierFilter returns defaults for null JSON", () => {
+    ls.setItem("graph-tier-filter", "null");
+    expect(loadTierFilter(ls)).toEqual(DEFAULT_TIER_FILTER);
+  });
+
+  test("loadTierFilter returns defaults for number JSON", () => {
+    ls.setItem("graph-tier-filter", "42");
+    expect(loadTierFilter(ls)).toEqual(DEFAULT_TIER_FILTER);
+  });
+
+  test("loadTierFilter returns defaults for array JSON", () => {
+    ls.setItem("graph-tier-filter", "[]");
+    expect(loadTierFilter(ls)).toEqual(DEFAULT_TIER_FILTER);
+  });
+
+  test("loadTierFilter returns defaults when version is missing (legacy)", () => {
+    ls.setItem(
+      "graph-tier-filter",
+      JSON.stringify({ connected: false, mentions: true, semantically_related: true }),
+    );
+    expect(loadTierFilter(ls)).toEqual(DEFAULT_TIER_FILTER);
+  });
+
+  test("loadTierFilter falls back per-field when a field has wrong type", () => {
+    ls.setItem(
+      "graph-tier-filter",
+      JSON.stringify({ version: 1, connected: "yes", mentions: true, semantically_related: false }),
+    );
+    expect(loadTierFilter(ls)).toEqual({
+      connected: true,
+      mentions: true,
+      semantically_related: false,
+    });
+  });
+
+  test("saveTierFilter writes version: 1", () => {
+    saveTierFilter(ls, { connected: false, mentions: true, semantically_related: true });
+    const raw = JSON.parse(ls.getItem("graph-tier-filter")!);
+    expect(raw.version).toBe(1);
+    expect(raw.connected).toBe(false);
+    expect(raw.mentions).toBe(true);
+    expect(raw.semantically_related).toBe(true);
+  });
 });
