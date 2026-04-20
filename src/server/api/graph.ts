@@ -1,6 +1,6 @@
 // src/server/api/graph.ts
-import { createHash } from "node:crypto";
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { createHash, randomUUID } from "node:crypto";
+import { existsSync, statSync } from "node:fs";
 import { join } from "node:path";
 import type { Router } from "../router";
 import type { Database } from "bun:sqlite";
@@ -38,31 +38,63 @@ export function graphRoutes(
   vaultDir: string,
   scheduler: SnapshotScheduler,
 ): void {
-  router.get("/api/graph/snapshot", (req) => {
+  // SHA1 is non-trivial on multi-MB snapshots; recompute only when scheduler
+  // has produced a new build, not per request.
+  const etagCache: { etag: string | null; buildCount: number } = {
+    etag: null,
+    buildCount: -1,
+  };
+
+  router.get("/api/graph/snapshot", async (req) => {
     const filePath = join(vaultDir, ".scrypt", "graph.json");
-
-    if (!existsSync(filePath)) {
-      writeGraphSnapshot(db, vaultDir);
-    } else {
-      const age = Date.now() - statSync(filePath).mtimeMs;
-      if (age > SNAPSHOT_STALE_MS) {
-        // stale-while-revalidate: serve file, schedule a rebuild in bg
-        scheduler.schedule();
+    try {
+      if (!existsSync(filePath)) {
+        await writeGraphSnapshot(db, vaultDir);
+      } else {
+        const age = Date.now() - statSync(filePath).mtimeMs;
+        if (age > SNAPSHOT_STALE_MS) {
+          scheduler.schedule();
+        }
       }
-    }
 
-    const body = readFileSync(filePath);
-    const etag = `"${createHash("sha1").update(body).digest("hex")}"`;
-    if (req.headers.get("If-None-Match") === etag) {
-      return new Response(null, { status: 304, headers: { ETag: etag } });
+      const buf = await Bun.file(filePath).arrayBuffer();
+      if (etagCache.etag === null || etagCache.buildCount !== scheduler.buildCount) {
+        etagCache.etag = `"${createHash("sha1").update(new Uint8Array(buf)).digest("hex")}"`;
+        etagCache.buildCount = scheduler.buildCount;
+      }
+      const etag = etagCache.etag;
+      if (req.headers.get("If-None-Match") === etag) {
+        return new Response(null, { status: 304, headers: { ETag: etag } });
+      }
+      return new Response(buf, {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+          "ETag": etag,
+          "Cache-Control": "no-cache",
+        },
+      });
+    } catch (err) {
+      const e = err instanceof Error ? err : new Error(String(err));
+      const errorId = randomUUID().slice(0, 8);
+      console.error("[scrypt] graph snapshot read failed", {
+        vaultDir,
+        errorMessage: e.message,
+        errorStack: e.stack,
+        errorId,
+      });
+      return Response.json(
+        { error: "graph snapshot unavailable", reason: e.message, errorId },
+        { status: 503 },
+      );
     }
-    return new Response(body, {
-      status: 200,
-      headers: {
-        "Content-Type": "application/json",
-        "ETag": etag,
-        "Cache-Control": "no-cache",
-      },
+  });
+
+  router.get("/api/graph/snapshot/health", () => {
+    return Response.json({
+      disabled: scheduler.disabled,
+      lastError: scheduler.lastError?.message ?? null,
+      buildCount: scheduler.buildCount,
     });
   });
 
