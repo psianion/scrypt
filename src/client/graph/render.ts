@@ -199,6 +199,22 @@ export function createGraph(parent: HTMLElement, opts: RenderOpts): RenderHandle
   const canvas = document.createElement("canvas");
   parent.appendChild(canvas);
 
+  // Block browser-level page-zoom from trackpad pinch / ctrl-wheel while the
+  // cursor is over the graph. Safari fires the `gesture*` family for pinches,
+  // which default to zooming the whole page (cropping top bar + sidebars).
+  // Chrome encodes pinch as wheel+ctrlKey; d3-zoom preventDefaults wheel but
+  // not until after its own handler runs, so we also block pinch-wheel here.
+  // `touch-action: none` keeps iOS/Android touch gestures from panning.
+  canvas.style.touchAction = "none";
+  const preventPageZoom = (e: Event) => e.preventDefault();
+  canvas.addEventListener("gesturestart", preventPageZoom);
+  canvas.addEventListener("gesturechange", preventPageZoom);
+  canvas.addEventListener("gestureend", preventPageZoom);
+  const blockPinchWheel = (e: WheelEvent) => {
+    if (e.ctrlKey) e.preventDefault();
+  };
+  canvas.addEventListener("wheel", blockPinchWheel, { passive: false });
+
   const tweenGroup = new TweenGroup();
   let rafId = 0;
   let destroyed = false;
@@ -243,8 +259,8 @@ export function createGraph(parent: HTMLElement, opts: RenderOpts): RenderHandle
       forceLink<NodeDatum, LinkDatum>(links).id((n) => n.id).distance(30),
     )
     .force("collide", forceCollide<NodeDatum>((d) => nodeRadius(d)).iterations(3))
-    .force("x", forceX<NodeDatum>((d) => projectAnchors.get(d.project)?.x ?? width / 2).strength(0.18))
-    .force("y", forceY<NodeDatum>((d) => projectAnchors.get(d.project)?.y ?? height / 2).strength(0.18))
+    .force("x", forceX<NodeDatum>((d) => projectAnchors.get(d.project)?.x ?? width / 2).strength(0.07))
+    .force("y", forceY<NodeDatum>((d) => projectAnchors.get(d.project)?.y ?? height / 2).strength(0.07))
     .alphaDecay(0.0228)
     .velocityDecay(0.4);
 
@@ -252,6 +268,14 @@ export function createGraph(parent: HTMLElement, opts: RenderOpts): RenderHandle
     const radius = (Math.min(width, height) / 2) * 0.8;
     simulation.force("radial", forceRadial(radius, width / 2, height / 2).strength(0.05));
   }
+
+  // Drive ticks from our RAF loop only. d3-force starts an internal timer on
+  // construction; leaving it running would double-tick (every RAF frame plus
+  // d3's own timer) which makes the initial settle too fast and leaves the
+  // sim at alpha ~= 0 by the time a user tries to drag — so nodes don't
+  // react. Stopping the internal timer puts us fully in control.
+  simulation.stop();
+  simulation.alpha(1);
 
   // Query filter state (applied over tween)
   let queryVisible: Set<string> | null = null;
@@ -292,9 +316,9 @@ export function createGraph(parent: HTMLElement, opts: RenderOpts): RenderHandle
   let hoveredNodeId: string | null = null;
 
   function computeLabelAlpha(id: string, hovered: string | null): number {
-    // Hidden by default. Visible for: hovered node + its 1-hop neighbours,
-    // AND — when searching — every node that passes the filter.
-    if (hovered) return isActive(id, hovered) ? 1 : 0;
+    // Hidden by default. On hover, only the hovered node's label shows —
+    // connected nodes stay un-labelled so the focus is unambiguous.
+    if (hovered) return id === hovered ? 1 : 0;
     if (queryVisible) {
       if (queryMatches.has(id)) return 1;
       if (queryVisible.has(id)) return 0.75;
@@ -452,7 +476,12 @@ export function createGraph(parent: HTMLElement, opts: RenderOpts): RenderHandle
           })
           .on("start", (event) => {
             if (!event.subject) return;
-            if (!event.active) simulation.alphaTarget(0.3).restart();
+            if (!event.active) {
+              // Reheat immediately — not just by setting alphaTarget, which
+              // only eases alpha up over many frames. Direct alpha bump means
+              // the graph reacts to the first drag frame, matching Quartz.
+              simulation.alphaTarget(0.3).alpha(0.3);
+            }
             event.subject.fx = event.subject.x;
             event.subject.fy = event.subject.y;
             dragStart = Date.now();
@@ -502,6 +531,9 @@ export function createGraph(parent: HTMLElement, opts: RenderOpts): RenderHandle
         rafId = requestAnimationFrame(animate);
       }
       rafId = requestAnimationFrame(animate);
+    })
+    .catch((err) => {
+      console.warn("[graph] pixi init failed:", err);
     });
 
   return {
@@ -510,9 +542,13 @@ export function createGraph(parent: HTMLElement, opts: RenderOpts): RenderHandle
     },
     destroy() {
       destroyed = true;
-      if (rafId) cancelAnimationFrame(rafId);
+      cancelAnimationFrame(rafId);
       simulation.stop();
       tweenGroup.removeAll();
+      canvas.removeEventListener("gesturestart", preventPageZoom);
+      canvas.removeEventListener("gesturechange", preventPageZoom);
+      canvas.removeEventListener("gestureend", preventPageZoom);
+      canvas.removeEventListener("wheel", blockPinchWheel);
       try {
         app.destroy(true, { children: true });
       } catch {
