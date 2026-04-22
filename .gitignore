@@ -62,3 +62,6 @@ ehthumbs.db
 # Misc project dirs kept local only
 docs/
 .github/
+
+# git worktrees
+.worktrees/
