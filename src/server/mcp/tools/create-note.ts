@@ -8,6 +8,7 @@ import { writeFileSync, mkdirSync } from "node:fs";
 import { dirname, resolve, relative, isAbsolute } from "node:path";
 import { McpError, MCP_ERROR } from "../errors";
 import { parseStructural } from "../../indexer/structural-parse";
+import { refreshNoteFts } from "../../indexer/fts-refresh";
 import type { ToolDef } from "../types";
 import type { Database } from "bun:sqlite";
 
@@ -126,6 +127,7 @@ export const createNoteTool: ToolDef<Input, Output> = {
             );
           }
         }
+        refreshNoteFts(ctx.db, input.path);
 
         const result: Output = {
           note_path: input.path,

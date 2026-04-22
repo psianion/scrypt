@@ -143,8 +143,81 @@ export class Indexer {
       )
       .run(path, path, note.title ?? "", contentHash);
 
-    // FTS5
-    this.db.query("INSERT OR REPLACE INTO notes_fts (rowid, title, content, path) VALUES (?, ?, ?, ?)").run(noteId, note.title, note.content, path);
+    // FTS5 — body is the legacy indexer's responsibility. Metadata + edge
+    // reasons get filled in by refreshNoteFts (called from MCP write tools).
+    // We pull whatever metadata/edges already exist so a body reindex never
+    // wipes a previously-indexed metadata blob.
+    const metaRow = this.db
+      .query<
+        {
+          description: string | null;
+          summary: string | null;
+          entities: string | null;
+          themes: string | null;
+        },
+        [string]
+      >(
+        `SELECT description, summary, entities, themes
+           FROM note_metadata WHERE note_path = ?`,
+      )
+      .get(path);
+    const edgeRows = this.db
+      .query<{ reason: string | null }, [string, string]>(
+        `SELECT reason FROM graph_edges WHERE source = ? OR target = ?`,
+      )
+      .all(path, path);
+    const summaryText = metaRow
+      ? [metaRow.description, metaRow.summary]
+          .filter((s): s is string => typeof s === "string" && s.length > 0)
+          .join(" ")
+      : "";
+    let entitiesText = "";
+    if (metaRow?.entities) {
+      try {
+        const parsed = JSON.parse(metaRow.entities) as Array<{ name?: unknown }>;
+        if (Array.isArray(parsed)) {
+          entitiesText = parsed
+            .map((e) => (e && typeof e.name === "string" ? e.name : ""))
+            .filter(Boolean)
+            .join(" ");
+        }
+      } catch {
+        entitiesText = "";
+      }
+    }
+    let themesText = "";
+    if (metaRow?.themes) {
+      try {
+        const parsed = JSON.parse(metaRow.themes) as unknown;
+        if (Array.isArray(parsed)) {
+          themesText = parsed
+            .filter((t): t is string => typeof t === "string")
+            .join(" ");
+        }
+      } catch {
+        themesText = "";
+      }
+    }
+    const edgeReasonsText = edgeRows
+      .map((r) => r.reason)
+      .filter((s): s is string => typeof s === "string" && s.length > 0)
+      .join(" ");
+    this.db
+      .query(
+        `INSERT OR REPLACE INTO notes_fts
+           (rowid, title, content, path, summary, entities, themes, edge_reasons)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        noteId,
+        note.title,
+        note.content,
+        path,
+        summaryText,
+        entitiesText,
+        themesText,
+        edgeReasonsText,
+      );
 
     // Aliases
     if (note.aliases.length > 0) {

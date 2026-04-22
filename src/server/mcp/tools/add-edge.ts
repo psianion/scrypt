@@ -5,6 +5,7 @@ import type { Database } from "bun:sqlite";
 import { TIER_VALUES, isTier } from "../confidence";
 import type { Tier } from "../../../shared/types";
 import { projectOf } from "../../graph/snapshot";
+import { refreshNoteFts } from "../../indexer/fts-refresh";
 
 interface Input {
   source: string;
@@ -150,6 +151,12 @@ export const addEdgeTool: ToolDef<Input, Output> = {
           input.client_tag,
           Date.now(),
         );
+      // Refresh FTS5 for both endpoints when they're notes — the new edge's
+      // reason text needs to land in each endpoint's edge_reasons column.
+      if (sourcePath) refreshNoteFts(ctx.db, sourcePath);
+      if (targetPath && targetPath !== sourcePath) {
+        refreshNoteFts(ctx.db, targetPath);
+      }
       ctx.scheduleGraphRebuild();
       return { edge_id: Number(res.lastInsertRowid) };
     });

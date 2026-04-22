@@ -6,6 +6,7 @@ import {
   type DocType,
   type NoteMetadataPatch,
 } from "../../indexer/metadata-repo";
+import { refreshNoteFts } from "../../indexer/fts-refresh";
 
 const SUMMARY_MAX = 1000;
 
@@ -98,6 +99,7 @@ export const updateNoteMetadataTool: ToolDef<Input, Output> = {
           updated.push("summary");
         }
         ctx.metadata.upsert(input.path, patch);
+        refreshNoteFts(ctx.db, input.path);
         ctx.scheduleGraphRebuild();
         return { note_path: input.path, updated_fields: updated };
       },

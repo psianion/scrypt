@@ -22,9 +22,32 @@ export function initSchema(db: Database): void {
     )
   `);
 
+  // graph-v2 (G4): widened FTS5 to also index summary, entities, themes, and
+  // edge_reasons so /api/search hits notes whose match lives only in metadata
+  // or in an edge's reason field. Detect the legacy 3-column shape and drop
+  // it — pre-beta, test vault, no migration. The FTS5 row is repopulated by
+  // the legacy indexer (body) and refreshNoteFts (metadata + edges).
+  const ftsCols = db
+    .query("PRAGMA table_info(notes_fts)")
+    .all() as { name: string }[];
+  const expectedFtsCols = [
+    "title",
+    "content",
+    "path",
+    "summary",
+    "entities",
+    "themes",
+    "edge_reasons",
+  ];
+  const haveFts = new Set(ftsCols.map((c) => c.name));
+  const ftsShapeMismatch =
+    ftsCols.length > 0 && expectedFtsCols.some((c) => !haveFts.has(c));
+  if (ftsShapeMismatch) {
+    db.run("DROP TABLE IF EXISTS notes_fts");
+  }
   db.run(`
     CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5(
-      title, content, path
+      title, content, path, summary, entities, themes, edge_reasons
     )
   `);
 
