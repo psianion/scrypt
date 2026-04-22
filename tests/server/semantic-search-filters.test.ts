@@ -41,7 +41,6 @@ function seedChunkEmbedding(
   embeddings.upsert({
     note_path: notePath,
     chunk_id: `${notePath}:${chunkIndex}`,
-    chunk_index: chunkIndex,
     chunk_text: text,
     start_line: 1,
     end_line: 2,

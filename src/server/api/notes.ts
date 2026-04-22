@@ -1,11 +1,19 @@
 // src/server/api/notes.ts
 import { join } from "node:path";
+import type { Database } from "bun:sqlite";
 import type { Router } from "../router";
 import type { FileManager } from "../file-manager";
 import type { Indexer } from "../indexer";
 import { parseTier, type NoteIncomingEdge } from "../../shared/types";
+import { moveNoteHandler } from "./notes-move";
 
-export function notesRoutes(router: Router, fm: FileManager, indexer: Indexer): void {
+export function notesRoutes(
+  router: Router,
+  fm: FileManager,
+  indexer: Indexer,
+  db?: Database,
+  vaultDir?: string,
+): void {
   router.get("/api/notes", async (req) => {
     const url = new URL(req.url);
     const tag = url.searchParams.get("tag");
@@ -94,4 +102,16 @@ export function notesRoutes(router: Router, fm: FileManager, indexer: Indexer): 
       return Response.json({ error: "Not found" }, { status: 404 });
     }
   });
+
+  // ingest-v3: promote / move a note between projects. Registered only when
+  // caller passes db + vaultDir (index.ts), so test harnesses can omit these.
+  if (db && vaultDir) {
+    router.post("/api/notes/*path/move", async (req, params) => {
+      return moveNoteHandler(req, {
+        db,
+        vaultDir,
+        oldPath: params.path,
+      });
+    });
+  }
 }

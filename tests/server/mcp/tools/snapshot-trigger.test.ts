@@ -295,7 +295,12 @@ describe("MCP write tools trigger snapshot rebuild", () => {
       h.spy.reset();
       await batchIngestTool.handler(
         h.ctx,
-        { source_dir: sourceDir, domain: "test", target_prefix: "research" },
+        {
+          source_dir: sourceDir,
+          project: "test",
+          doc_type: "research",
+          client_tag: "batch-snap-1",
+        },
         "corr-batch",
       );
       expect(h.spy.scheduleCalls.length).toBeGreaterThanOrEqual(1);

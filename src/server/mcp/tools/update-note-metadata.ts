@@ -45,7 +45,11 @@ export const updateNoteMetadataTool: ToolDef<Input, Output> = {
       themes: { type: "array" },
       doc_type: { type: "string", enum: [...DOC_TYPES] },
       summary: { type: "string" },
-      thread: { type: ["string", "null"] },
+      thread: {
+        type: "string",
+        description:
+          "Thread group slug. Pass null to detach the note from its thread.",
+      },
       project: { type: "string" },
       ingest: { type: "object" },
       client_tag: { type: "string" },
