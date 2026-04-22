@@ -123,7 +123,7 @@ export const batchIngestTool: ToolDef<Input, Output> = {
       domain: { type: "string", description: "Domain label for organizing ingested notes (default: dirname)" },
       target_prefix: { type: "string", description: "Vault path prefix (default: research/)" },
       batch_size: { type: "number", description: "Files per yield (default: 25)" },
-      min_similarity: { type: "number", description: "Cosine threshold for semantically_related edges. Default: SCRYPT_SIMILARITY_THRESHOLD env (0.75 if unset)." },
+      min_similarity: { type: "number", description: "Cosine threshold for semantically_related edges. Default: SCRYPT_SIMILARITY_THRESHOLD env (0.78 if unset)." },
     },
     required: ["source_dir"],
   },

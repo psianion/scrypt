@@ -168,9 +168,9 @@ describe("graph/semantic-similarity", () => {
   });
 
   describe("getSimilarityThreshold", () => {
-    test("default is 0.75 per spec §4.2", () => {
+    test("default is 0.78 (graph-v2 G3 single threshold)", () => {
       delete process.env.SCRYPT_SIMILARITY_THRESHOLD;
-      expect(getSimilarityThreshold()).toBe(0.75);
+      expect(getSimilarityThreshold()).toBe(0.78);
     });
 
     test("reads SCRYPT_SIMILARITY_THRESHOLD env var", () => {
@@ -181,7 +181,7 @@ describe("graph/semantic-similarity", () => {
 
     test("clamps to [0, 1] and falls back on garbage input", () => {
       process.env.SCRYPT_SIMILARITY_THRESHOLD = "garbage";
-      expect(getSimilarityThreshold()).toBe(0.75);
+      expect(getSimilarityThreshold()).toBe(0.78);
       process.env.SCRYPT_SIMILARITY_THRESHOLD = "1.5";
       expect(getSimilarityThreshold()).toBe(1);
       process.env.SCRYPT_SIMILARITY_THRESHOLD = "-0.2";

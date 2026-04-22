@@ -4,6 +4,7 @@ import type { ToolDef } from "../types";
 import type { Database } from "bun:sqlite";
 import { TIER_VALUES, isTier } from "../confidence";
 import type { Tier } from "../../../shared/types";
+import { projectOf } from "../../graph/snapshot";
 
 interface Input {
   source: string;
@@ -32,6 +33,31 @@ function endpointExists(db: Database, id: string): boolean {
       )
       .get(id)?.n ?? 0;
   return s > 0;
+}
+
+function endpointNotePath(db: Database, id: string): string | null {
+  const n = db
+    .query<{ note_path: string | null }, [string]>(
+      `SELECT note_path FROM graph_nodes WHERE id = ?`,
+    )
+    .get(id);
+  if (n) return n.note_path ?? null;
+  const s = db
+    .query<{ note_path: string | null }, [string]>(
+      `SELECT note_path FROM note_sections WHERE id = ?`,
+    )
+    .get(id);
+  return s?.note_path ?? null;
+}
+
+function docTypeFor(db: Database, notePath: string | null): string | null {
+  if (!notePath) return null;
+  const r = db
+    .query<{ doc_type: string | null }, [string]>(
+      `SELECT doc_type FROM note_metadata WHERE note_path = ?`,
+    )
+    .get(notePath);
+  return r?.doc_type ?? null;
 }
 
 export const addEdgeTool: ToolDef<Input, Output> = {
@@ -72,6 +98,44 @@ export const addEdgeTool: ToolDef<Input, Output> = {
           `target not found: ${input.target}`,
         );
       }
+
+      // Anti-connection rules — clean DB invariant. The snapshot enforces
+      // these at render time too, but we reject here so no junk row is stored.
+      const sourcePath = endpointNotePath(ctx.db, input.source);
+      const targetPath = endpointNotePath(ctx.db, input.target);
+      const sourceType = docTypeFor(ctx.db, sourcePath);
+      const targetType = docTypeFor(ctx.db, targetPath);
+
+      if (sourceType === "plan" && targetType === "plan") {
+        throw new McpError(
+          MCP_ERROR.INVALID_PARAMS,
+          "plan\u2194plan edges are filtered; would never render",
+        );
+      }
+      if (
+        input.tier === "connected" &&
+        (sourceType === "journal" ||
+          sourceType === "changelog" ||
+          targetType === "journal" ||
+          targetType === "changelog")
+      ) {
+        throw new McpError(
+          MCP_ERROR.INVALID_PARAMS,
+          "journal/changelog edges cap at tier='mentions'; got 'connected'",
+        );
+      }
+      if (
+        input.tier === "semantically_related" &&
+        sourcePath &&
+        targetPath &&
+        projectOf(sourcePath) !== projectOf(targetPath)
+      ) {
+        throw new McpError(
+          MCP_ERROR.INVALID_PARAMS,
+          "semantically_related edges must be within the same project",
+        );
+      }
+
       const res = ctx.db
         .query(
           `INSERT INTO graph_edges

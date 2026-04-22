@@ -26,15 +26,15 @@ interface ChunkRow {
 }
 
 /**
- * Default similarity threshold per spec §4.2: 0.75. Override via
+ * Single similarity threshold (graph-v2 G3). Default 0.78; override via
  * `SCRYPT_SIMILARITY_THRESHOLD` env. Clamped to [0, 1]; non-numeric values
- * fall back to the default.
+ * fall back to the default. Render-side filters were collapsed into this one.
  */
 export function getSimilarityThreshold(): number {
   const raw = process.env.SCRYPT_SIMILARITY_THRESHOLD;
-  if (raw === undefined || raw === "") return 0.75;
+  if (raw === undefined || raw === "") return 0.78;
   const n = Number.parseFloat(raw);
-  if (!Number.isFinite(n)) return 0.75;
+  if (!Number.isFinite(n)) return 0.78;
   return Math.min(1, Math.max(0, n));
 }
 

@@ -12,6 +12,7 @@ import { RESERVED_NAMESPACES, type Tag } from "../../shared/types";
 import { parseTag } from "../parsers";
 import type { SnapshotScheduler } from "../graph/snapshot-scheduler";
 import { writeGraphSnapshot } from "../graph/snapshot";
+import { getSimilarityThreshold } from "../graph/semantic-similarity";
 
 // Stale window > debounce so SWR converges before next request.
 const SNAPSHOT_STALE_MS = 10_000;
@@ -196,15 +197,15 @@ export function graphRoutes(
         averaged.push({ path, vec });
       }
 
-      // Cosine threshold; lower fills the graph with noise.
-      const SIM_THRESHOLD = 0.8;
+      // Single similarity threshold (SCRYPT_SIMILARITY_THRESHOLD, default 0.78).
+      const simThreshold = getSimilarityThreshold();
       for (let i = 0; i < averaged.length; i++) {
         for (let j = i + 1; j < averaged.length; j++) {
           const a = averaged[i];
           const b = averaged[j];
           let score = 0;
           for (let k = 0; k < a.vec.length; k++) score += a.vec[k] * b.vec[k];
-          if (score >= SIM_THRESHOLD) {
+          if (score >= simThreshold) {
             edges.push({
               source: a.path,
               target: b.path,

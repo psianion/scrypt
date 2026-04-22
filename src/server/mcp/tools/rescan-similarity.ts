@@ -14,7 +14,7 @@ import {
 interface Input {
   /** When set, only emit pairs that include at least one of these paths. */
   paths?: string[];
-  /** Cosine threshold; defaults to SCRYPT_SIMILARITY_THRESHOLD env (0.75). */
+  /** Cosine threshold; defaults to SCRYPT_SIMILARITY_THRESHOLD env (0.78). */
   min_similarity?: number;
   /** Embedding model to scan; defaults to SCRYPT_EMBED_MODEL env. */
   model?: string;

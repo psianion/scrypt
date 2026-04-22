@@ -74,19 +74,49 @@ export function buildGraphSnapshot(db: Database): GraphSnapshot {
   const projectById = new Map<string, string>();
   for (const r of nodeRows) projectById.set(r.id, projectOf(r.note_path));
 
+  const pathById = new Map<string, string>();
+  for (const r of nodeRows) pathById.set(r.id, r.note_path);
+
+  const metaRows = db
+    .query<MetaRow, []>(`SELECT note_path, doc_type FROM note_metadata`)
+    .all();
+  const docType = new Map<string, string | null>();
+  for (const m of metaRows) docType.set(m.note_path, m.doc_type);
+
+  // Resolve doc_type by node id via its note_path; the snapshot enforces
+  // anti-connection rules here so the renderer never sees disallowed edges.
+  const docTypeById = (id: string): string | null => {
+    const p = pathById.get(id);
+    return p ? docType.get(p) ?? null : null;
+  };
+
   const edgeRows = db
     .query<EdgeRow, []>(
       `SELECT source, target, tier, reason FROM graph_edges`,
     )
     .all();
 
-  // Drop cross-project semantic edges — cosine-close unrelated pairs create hairballs.
   const edges: SnapshotEdge[] = [];
   const degree = new Map<string, number>();
   for (const e of edgeRows) {
     if (!noteIds.has(e.source) || !noteIds.has(e.target)) continue;
-    const tier = parseTier(e.tier);
+    let tier = parseTier(e.tier);
     if (tier === null) continue;
+
+    const srcType = docTypeById(e.source);
+    const tgtType = docTypeById(e.target);
+
+    if (srcType === "plan" && tgtType === "plan") continue;
+
+    if (
+      srcType === "journal" ||
+      srcType === "changelog" ||
+      tgtType === "journal" ||
+      tgtType === "changelog"
+    ) {
+      if (tier === "connected") tier = "mentions";
+    }
+
     if (
       tier === "semantically_related" &&
       projectById.get(e.source) !== projectById.get(e.target)
@@ -102,12 +132,6 @@ export function buildGraphSnapshot(db: Database): GraphSnapshot {
     degree.set(e.source, (degree.get(e.source) ?? 0) + 1);
     degree.set(e.target, (degree.get(e.target) ?? 0) + 1);
   }
-
-  const metaRows = db
-    .query<MetaRow, []>(`SELECT note_path, doc_type FROM note_metadata`)
-    .all();
-  const docType = new Map<string, string | null>();
-  for (const m of metaRows) docType.set(m.note_path, m.doc_type);
 
   // Fallback community ids so clusters colour consistently before cluster_graph runs.
   const projectIndex = new Map<string, number>();

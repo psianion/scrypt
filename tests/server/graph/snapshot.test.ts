@@ -88,6 +88,108 @@ describe("buildGraphSnapshot", () => {
   });
 });
 
+describe("buildGraphSnapshot anti-connection rules (G3)", () => {
+  let db: Database;
+  beforeEach(() => {
+    db = new Database(":memory:");
+    initSchema(db);
+  });
+
+  test("plan↔plan edges are dropped regardless of tier", () => {
+    db.run(`INSERT INTO graph_nodes (id, kind, label, note_path) VALUES
+      ('research/p/a.md','note','A','research/p/a.md'),
+      ('research/p/b.md','note','B','research/p/b.md')`);
+    db.run(`INSERT INTO graph_edges (source,target,tier,created_at) VALUES
+      ('research/p/a.md','research/p/b.md','connected',0)`);
+    db.run(`INSERT INTO note_metadata (note_path,doc_type,updated_at) VALUES
+      ('research/p/a.md','plan',0),
+      ('research/p/b.md','plan',0)`);
+    const snap = buildGraphSnapshot(db);
+    expect(snap.edges).toEqual([]);
+  });
+
+  test("journal source caps tier at 'mentions'", () => {
+    db.run(`INSERT INTO graph_nodes (id, kind, label, note_path) VALUES
+      ('research/p/j.md','note','J','research/p/j.md'),
+      ('research/p/n.md','note','N','research/p/n.md')`);
+    db.run(`INSERT INTO graph_edges (source,target,tier,reason,created_at) VALUES
+      ('research/p/j.md','research/p/n.md','connected','x',0)`);
+    db.run(`INSERT INTO note_metadata (note_path,doc_type,updated_at) VALUES
+      ('research/p/j.md','journal',0),
+      ('research/p/n.md','research',0)`);
+    const snap = buildGraphSnapshot(db);
+    expect(snap.edges).toHaveLength(1);
+    expect(snap.edges[0].tier).toBe("mentions");
+  });
+
+  test("changelog target caps tier at 'mentions'", () => {
+    db.run(`INSERT INTO graph_nodes (id, kind, label, note_path) VALUES
+      ('research/p/n.md','note','N','research/p/n.md'),
+      ('research/p/c.md','note','C','research/p/c.md')`);
+    db.run(`INSERT INTO graph_edges (source,target,tier,reason,created_at) VALUES
+      ('research/p/n.md','research/p/c.md','connected','y',0)`);
+    db.run(`INSERT INTO note_metadata (note_path,doc_type,updated_at) VALUES
+      ('research/p/n.md','research',0),
+      ('research/p/c.md','changelog',0)`);
+    const snap = buildGraphSnapshot(db);
+    expect(snap.edges).toHaveLength(1);
+    expect(snap.edges[0].tier).toBe("mentions");
+  });
+
+  test("regression: cross-project semantic still dropped", () => {
+    db.run(`INSERT INTO graph_nodes (id, kind, label, note_path) VALUES
+      ('research/x/a.md','note','A','research/x/a.md'),
+      ('research/y/b.md','note','B','research/y/b.md')`);
+    db.run(`INSERT INTO graph_edges (source,target,tier,created_at) VALUES
+      ('research/x/a.md','research/y/b.md','semantically_related',0)`);
+    const snap = buildGraphSnapshot(db);
+    expect(snap.edges).toEqual([]);
+  });
+
+  test("regression: same-project semantic preserved", () => {
+    db.run(`INSERT INTO graph_nodes (id, kind, label, note_path) VALUES
+      ('research/x/a.md','note','A','research/x/a.md'),
+      ('research/x/b.md','note','B','research/x/b.md')`);
+    db.run(`INSERT INTO graph_edges (source,target,tier,created_at) VALUES
+      ('research/x/a.md','research/x/b.md','semantically_related',0)`);
+    const snap = buildGraphSnapshot(db);
+    expect(snap.edges).toHaveLength(1);
+    expect(snap.edges[0].tier).toBe("semantically_related");
+  });
+
+  test("end-to-end: only rule-compliant edges survive a mixed insert batch", () => {
+    db.run(`INSERT INTO graph_nodes (id, kind, label, note_path) VALUES
+      ('research/p/plan1.md','note','P1','research/p/plan1.md'),
+      ('research/p/plan2.md','note','P2','research/p/plan2.md'),
+      ('research/p/journal.md','note','J','research/p/journal.md'),
+      ('research/p/regular.md','note','R','research/p/regular.md'),
+      ('research/p/other.md','note','O','research/p/other.md'),
+      ('research/q/elsewhere.md','note','E','research/q/elsewhere.md')`);
+    db.run(`INSERT INTO note_metadata (note_path,doc_type,updated_at) VALUES
+      ('research/p/plan1.md','plan',0),
+      ('research/p/plan2.md','plan',0),
+      ('research/p/journal.md','journal',0),
+      ('research/p/regular.md','research',0),
+      ('research/p/other.md','research',0),
+      ('research/q/elsewhere.md','research',0)`);
+    db.run(`INSERT INTO graph_edges (source,target,tier,created_at) VALUES
+      ('research/p/plan1.md','research/p/plan2.md','connected',0),
+      ('research/p/journal.md','research/p/regular.md','connected',0),
+      ('research/p/regular.md','research/p/other.md','connected',0),
+      ('research/p/regular.md','research/p/other.md','semantically_related',0),
+      ('research/p/regular.md','research/q/elsewhere.md','semantically_related',0)`);
+    const snap = buildGraphSnapshot(db);
+    const summary = snap.edges
+      .map((e) => `${e.source}->${e.target}:${e.tier}`)
+      .sort();
+    expect(summary).toEqual([
+      "research/p/journal.md->research/p/regular.md:mentions",
+      "research/p/regular.md->research/p/other.md:connected",
+      "research/p/regular.md->research/p/other.md:semantically_related",
+    ]);
+  });
+});
+
 describe("writeGraphSnapshot atomicity", () => {
   let db: Database;
   let vaultDir: string;
