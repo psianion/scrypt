@@ -19,7 +19,6 @@ export type DocType = (typeof DOC_TYPES)[number];
 
 export interface NoteMetadataPatch {
   description?: string;
-  auto_tags?: string[];
   entities?: { name: string; kind: string }[];
   themes?: string[];
   doc_type?: DocType;
@@ -29,7 +28,6 @@ export interface NoteMetadataPatch {
 interface NoteMetadata {
   note_path: string;
   description: string | null;
-  auto_tags: string[] | null;
   entities: { name: string; kind: string }[] | null;
   themes: string[] | null;
   doc_type: DocType | null;
@@ -40,7 +38,6 @@ interface NoteMetadata {
 interface Row {
   note_path: string;
   description: string | null;
-  auto_tags: string | null;
   entities: string | null;
   themes: string | null;
   doc_type: string | null;
@@ -59,7 +56,6 @@ export class MetadataRepo {
     return {
       note_path: row.note_path,
       description: row.description,
-      auto_tags: row.auto_tags ? JSON.parse(row.auto_tags) : null,
       entities: row.entities ? JSON.parse(row.entities) : null,
       themes: row.themes ? JSON.parse(row.themes) : null,
       doc_type: (row.doc_type as DocType | null) ?? null,
@@ -75,10 +71,6 @@ export class MetadataRepo {
         patch.description !== undefined
           ? patch.description
           : existing?.description ?? null,
-      auto_tags:
-        patch.auto_tags !== undefined
-          ? patch.auto_tags
-          : existing?.auto_tags ?? null,
       entities:
         patch.entities !== undefined
           ? patch.entities
@@ -95,11 +87,10 @@ export class MetadataRepo {
     this.db
       .query(
         `INSERT INTO note_metadata
-           (note_path, description, auto_tags, entities, themes, doc_type, summary, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+           (note_path, description, entities, themes, doc_type, summary, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(note_path) DO UPDATE SET
            description = excluded.description,
-           auto_tags   = excluded.auto_tags,
            entities    = excluded.entities,
            themes      = excluded.themes,
            doc_type    = excluded.doc_type,
@@ -109,7 +100,6 @@ export class MetadataRepo {
       .run(
         notePath,
         merged.description,
-        merged.auto_tags ? JSON.stringify(merged.auto_tags) : null,
         merged.entities ? JSON.stringify(merged.entities) : null,
         merged.themes ? JSON.stringify(merged.themes) : null,
         merged.doc_type,

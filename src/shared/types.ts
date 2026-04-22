@@ -50,8 +50,7 @@ export function parseTier(s: string | null): Tier | null {
 export interface NoteIncomingEdge {
   source: string;
   target: string;
-  relation: string;
-  confidence: Tier | null;
+  tier: Tier;
   reason: string | null;
 }
 

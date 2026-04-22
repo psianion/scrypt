@@ -1,13 +1,13 @@
 // src/server/mcp/tools/remove-edge.ts
-import { McpError, MCP_ERROR } from "../errors";
 import type { ToolDef } from "../types";
-
-const RESERVED = ["wikilink", "subdomain", "domain", "tag"];
+import { TIER_VALUES, isTier } from "../confidence";
+import { McpError, MCP_ERROR } from "../errors";
+import type { Tier } from "../../../shared/types";
 
 interface Input {
   source: string;
   target: string;
-  relation?: string;
+  tier?: Tier;
   client_tag: string;
 }
 
@@ -18,13 +18,13 @@ interface Output {
 export const removeEdgeTool: ToolDef<Input, Output> = {
   name: "remove_edge",
   description:
-    "Removes semantic edges between two nodes. Structural edges are never touched.",
+    "Removes user-added (MCP-tagged) edges between two nodes. Structural indexer edges (client_tag IS NULL) are never touched.",
   inputSchema: {
     type: "object",
     properties: {
       source: { type: "string" },
       target: { type: "string" },
-      relation: { type: "string" },
+      tier: { type: "string", enum: [...TIER_VALUES] },
       client_tag: { type: "string" },
     },
     required: ["source", "target", "client_tag"],
@@ -34,27 +34,26 @@ export const removeEdgeTool: ToolDef<Input, Output> = {
       "remove_edge",
       input.client_tag,
       async () => {
-        if (input.relation && RESERVED.includes(input.relation)) {
+        if (input.tier !== undefined && !isTier(input.tier)) {
           throw new McpError(
-            MCP_ERROR.CONFLICT,
-            "cannot remove structural edges",
+            MCP_ERROR.INVALID_PARAMS,
+            `invalid tier: ${String(input.tier)}. Allowed: ${TIER_VALUES.join(", ")}`,
           );
         }
-        const nonReserved = `relation NOT IN ('wikilink','subdomain','domain','tag')`;
-        if (input.relation) {
+        if (input.tier) {
           const res = ctx.db
             .query(
               `DELETE FROM graph_edges
-               WHERE source = ? AND target = ? AND ${nonReserved} AND relation = ?`,
+               WHERE source = ? AND target = ? AND client_tag IS NOT NULL AND tier = ?`,
             )
-            .run(input.source, input.target, input.relation);
+            .run(input.source, input.target, input.tier);
           ctx.scheduleGraphRebuild();
           return { removed: res.changes };
         }
         const res = ctx.db
           .query(
             `DELETE FROM graph_edges
-             WHERE source = ? AND target = ? AND ${nonReserved}`,
+             WHERE source = ? AND target = ? AND client_tag IS NOT NULL`,
           )
           .run(input.source, input.target);
         ctx.scheduleGraphRebuild();

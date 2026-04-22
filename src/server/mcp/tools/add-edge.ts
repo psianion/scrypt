@@ -2,19 +2,13 @@
 import { McpError, MCP_ERROR } from "../errors";
 import type { ToolDef } from "../types";
 import type { Database } from "bun:sqlite";
-import {
-  CONFIDENCE_VALUES,
-  isConfidence,
-  type Confidence,
-} from "../confidence";
-
-const RESERVED = new Set(["wikilink", "subdomain", "domain", "tag"]);
+import { TIER_VALUES, isTier } from "../confidence";
+import type { Tier } from "../../../shared/types";
 
 interface Input {
   source: string;
   target: string;
-  relation: string;
-  confidence: Confidence;
+  tier: Tier;
   reason?: string;
   client_tag: string;
 }
@@ -43,36 +37,27 @@ function endpointExists(db: Database, id: string): boolean {
 export const addEdgeTool: ToolDef<Input, Output> = {
   name: "add_edge",
   description:
-    "Adds a semantic edge between two existing nodes (note or section).",
+    "Adds a tiered edge between two existing nodes (note or section).",
   inputSchema: {
     type: "object",
     properties: {
       source: { type: "string" },
       target: { type: "string" },
-      relation: { type: "string" },
-      confidence: {
+      tier: {
         type: "string",
-        enum: [...CONFIDENCE_VALUES],
+        enum: [...TIER_VALUES],
       },
       reason: { type: "string" },
       client_tag: { type: "string" },
     },
-    required: ["source", "target", "relation", "confidence", "client_tag"],
+    required: ["source", "target", "tier", "client_tag"],
   },
   async handler(ctx, input) {
     return ctx.idempotency.runCached("add_edge", input.client_tag, async () => {
-      if (!isConfidence(input.confidence)) {
+      if (!isTier(input.tier)) {
         throw new McpError(
           MCP_ERROR.INVALID_PARAMS,
-          `invalid confidence: ${String(input.confidence)}. Allowed: ${CONFIDENCE_VALUES.join(
-            ", ",
-          )}`,
-        );
-      }
-      if (RESERVED.has(input.relation)) {
-        throw new McpError(
-          MCP_ERROR.CONFLICT,
-          `relation '${input.relation}' is structural; managed by the parse pass`,
+          `invalid tier: ${String(input.tier)}. Allowed: ${TIER_VALUES.join(", ")}`,
         );
       }
       if (!endpointExists(ctx.db, input.source)) {
@@ -90,14 +75,13 @@ export const addEdgeTool: ToolDef<Input, Output> = {
       const res = ctx.db
         .query(
           `INSERT INTO graph_edges
-             (source, target, relation, confidence, reason, client_tag, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+             (source, target, tier, reason, client_tag, created_at)
+           VALUES (?, ?, ?, ?, ?, ?)`,
         )
         .run(
           input.source,
           input.target,
-          input.relation,
-          input.confidence,
+          input.tier,
           input.reason ?? null,
           input.client_tag,
           Date.now(),

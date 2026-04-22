@@ -4,8 +4,7 @@
 //
 // Averages chunk embeddings into a per-note vector, finds pairs whose
 // cosine similarity meets the configured threshold, and writes them as
-// `graph_edges.relation = 'semantically_related'` with
-// `confidence = 'semantically_related'` (Wave 9 confidence enum, spec §4.1).
+// `graph_edges.tier = 'semantically_related'` (graph-v2 tier enum).
 import type { Database } from "bun:sqlite";
 
 export interface SimilarPair {
@@ -130,7 +129,7 @@ export function findSimilarPairs(
 
 /**
  * Insert one `graph_edges` row per pair as a `semantically_related` edge.
- * Idempotent — relies on the existing `UNIQUE (source, target, relation)`
+ * Idempotent — relies on the existing `UNIQUE (source, target, tier)`
  * constraint to skip duplicates. Returns the count of newly inserted rows.
  */
 export function upsertSemanticEdges(
@@ -140,8 +139,8 @@ export function upsertSemanticEdges(
   if (pairs.length === 0) return 0;
   const insert = db.prepare(
     `INSERT OR IGNORE INTO graph_edges
-       (source, target, relation, weight, confidence, reason, created_at)
-     VALUES (?, ?, 'semantically_related', ?, 'semantically_related', ?, ?)`,
+       (source, target, tier, weight, reason, created_at)
+     VALUES (?, ?, 'semantically_related', ?, ?, ?)`,
   );
   const now = Date.now();
   let created = 0;

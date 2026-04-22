@@ -76,8 +76,8 @@ const sampleSnap: GraphSnapshot = {
     { id: "c.md", title: "Gamma", doc_type: null, project: "p", degree: 1, community: null },
   ],
   edges: [
-    { source: "a.md", target: "b.md", relation: "wikilink", confidence: "connected", reason: null },
-    { source: "a.md", target: "c.md", relation: "mentions", confidence: "mentions", reason: null },
+    { source: "a.md", target: "b.md", tier: "connected", reason: null },
+    { source: "a.md", target: "c.md", tier: "mentions", reason: null },
   ],
 };
 

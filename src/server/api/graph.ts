@@ -123,7 +123,8 @@ export function graphRoutes(
 
     const linkRows = db
       .query(
-        `SELECT source, target FROM graph_edges WHERE relation = 'wikilink'`,
+        `SELECT source, target FROM graph_edges
+         WHERE tier = 'connected' AND client_tag IS NULL`,
       )
       .all() as { source: string; target: string }[];
     for (const row of linkRows) {

@@ -44,13 +44,16 @@ export function notesRoutes(router: Router, fm: FileManager, indexer: Indexer): 
     const backlinks = indexer.getBacklinks(params.path);
     const incoming_edges: NoteIncomingEdge[] = indexer
       .getIncomingEdges(params.path)
-      .map((e) => ({
-        source: e.source,
-        target: e.target,
-        relation: e.relation,
-        confidence: parseTier(e.confidence),
-        reason: e.reason,
-      }));
+      .flatMap((e) => {
+        const tier = parseTier(e.tier);
+        if (tier === null) return [];
+        return [{
+          source: e.source,
+          target: e.target,
+          tier,
+          reason: e.reason,
+        }];
+      });
     return Response.json({ ...note, backlinks, incoming_edges });
   });
 

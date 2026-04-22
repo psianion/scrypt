@@ -159,7 +159,7 @@ export function createGraph(parent: HTMLElement, opts: RenderOpts): RenderHandle
   const links: LinkDatum[] = [];
   for (const e of snap.edges) {
     if (!nodeDataById.has(e.source) || !nodeDataById.has(e.target)) continue;
-    const tier: Tier = e.confidence ?? "connected";
+    const tier: Tier = e.tier;
     const src = nodeDataById.get(e.source)!;
     const srcColor = hexToNumber(colorForProject(src.project));
     const style = tierStyle(tier, srcColor);

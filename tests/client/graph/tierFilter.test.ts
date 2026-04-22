@@ -41,9 +41,9 @@ describe("tierFilter", () => {
 
   test("filterEdgesByTier keeps only enabled tiers", () => {
     const edges: SnapshotEdge[] = [
-      { source: "a", target: "b", relation: "x", confidence: "connected", reason: null },
-      { source: "a", target: "c", relation: "x", confidence: "mentions", reason: null },
-      { source: "a", target: "d", relation: "x", confidence: "semantically_related", reason: null },
+      { source: "a", target: "b", tier: "connected", reason: null },
+      { source: "a", target: "c", tier: "mentions", reason: null },
+      { source: "a", target: "d", tier: "semantically_related", reason: null },
     ];
     const out = filterEdgesByTier(edges, { connected: true, mentions: false, semantically_related: false });
     expect(out).toHaveLength(1);

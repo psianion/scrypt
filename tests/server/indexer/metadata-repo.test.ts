@@ -17,10 +17,10 @@ describe("MetadataRepo", () => {
 
   test("upsert merges partial updates", () => {
     repo.upsert("a.md", { description: "first" });
-    repo.upsert("a.md", { auto_tags: ["x", "y"] });
+    repo.upsert("a.md", { themes: ["x", "y"] });
     const m = repo.get("a.md");
     expect(m?.description).toBe("first");
-    expect(m?.auto_tags).toEqual(["x", "y"]);
+    expect(m?.themes).toEqual(["x", "y"]);
   });
 
   test("get returns null for unknown note", () => {
@@ -63,15 +63,13 @@ describe("MetadataRepo", () => {
     expect(m?.summary).toBe("updated");
   });
 
-  test("partial update of doc_type does not clobber auto_tags/entities/themes", () => {
+  test("partial update of doc_type does not clobber entities/themes", () => {
     repo.upsert("a.md", {
-      auto_tags: ["a"],
       entities: [{ name: "E", kind: "person" }],
       themes: ["t"],
     });
     repo.upsert("a.md", { doc_type: "journal" });
     const m = repo.get("a.md");
-    expect(m?.auto_tags).toEqual(["a"]);
     expect(m?.entities).toEqual([{ name: "E", kind: "person" }]);
     expect(m?.themes).toEqual(["t"]);
     expect(m?.doc_type).toBe("journal");

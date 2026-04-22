@@ -161,8 +161,7 @@ describe("MCP write tools trigger snapshot rebuild", () => {
       {
         source: "a.md",
         target: "b.md",
-        relation: "elaborates",
-        confidence: "mentions",
+        tier: "mentions",
         client_tag: "edge-1",
       },
       "corr-edge",
@@ -183,8 +182,7 @@ describe("MCP write tools trigger snapshot rebuild", () => {
       {
         source: "a.md",
         target: "b.md",
-        relation: "elaborates",
-        confidence: "mentions",
+        tier: "mentions",
         client_tag: "edge-setup",
       },
       "corr-setup",
@@ -268,8 +266,8 @@ describe("MCP write tools trigger snapshot rebuild", () => {
        VALUES (?, 'note', ?, ?)`,
     );
     const insertEdge = h.db.prepare(
-      `INSERT INTO graph_edges (source, target, relation)
-       VALUES (?, ?, 'wikilink')`,
+      `INSERT INTO graph_edges (source, target, tier)
+       VALUES (?, ?, 'connected')`,
     );
     for (const n of ["a", "b", "c"]) insertNode.run(n, n, n);
     insertEdge.run("a", "b");

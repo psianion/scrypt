@@ -204,7 +204,6 @@ Outperforms baselines on Atari.
       {
         path: "rl/new-paper.md",
         description: "A new PG variant",
-        auto_tags: ["rl", "policy-gradient"],
         themes: ["reinforcement learning"],
         client_tag: "scenario-meta",
       },
@@ -232,8 +231,7 @@ Outperforms baselines on Atari.
       {
         source: "rl/new-paper.md",
         target: "rl/actor-critic.md",
-        relation: "elaborates",
-        confidence: "mentions",
+        tier: "mentions",
         reason: "new-paper extends actor-critic",
         client_tag: "scenario-edge",
       },
@@ -249,14 +247,14 @@ Outperforms baselines on Atari.
     )) as {
       metadata: { description: string };
       sections: { heading_text: string; summary: string | null }[];
-      outgoing_edges: { relation: string }[];
+      outgoing_edges: { tier: string }[];
     };
     expect(note.metadata.description).toBe("A new PG variant");
     expect(
       note.sections.find((s) => s.heading_text === "Method")?.summary,
     ).toBe("Proposes new policy gradient variant");
     expect(
-      note.outgoing_edges.some((e) => e.relation === "elaborates"),
+      note.outgoing_edges.some((e) => e.tier === "mentions"),
     ).toBe(true);
   });
 

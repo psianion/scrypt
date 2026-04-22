@@ -134,14 +134,4 @@ describe("semantic_search + find_similar", () => {
     expect(r.results.map((h) => h.path)).not.toContain("rl.md");
   });
 
-  test("semantic_search tag filter narrows results via note metadata", async () => {
-    ctx.metadata.upsert("rl.md", { auto_tags: ["ml"] });
-    ctx.metadata.upsert("cooking.md", { auto_tags: ["food"] });
-    const r = await semanticSearchTool.handler(
-      ctx,
-      { query: "1,1,0", limit: 10, min_score: 0, tag: "food" },
-      "c",
-    );
-    expect(r.results.map((h) => h.path)).toEqual(["cooking.md"]);
-  });
 });

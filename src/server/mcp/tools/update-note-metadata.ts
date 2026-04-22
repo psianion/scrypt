@@ -12,7 +12,6 @@ const SUMMARY_MAX = 1000;
 interface Input {
   path: string;
   description?: string;
-  auto_tags?: string[];
   entities?: { name: string; kind: string }[];
   themes?: string[];
   doc_type?: DocType;
@@ -28,13 +27,12 @@ interface Output {
 export const updateNoteMetadataTool: ToolDef<Input, Output> = {
   name: "update_note_metadata",
   description:
-    "Upserts semantic metadata (description, auto_tags, entities, themes, doc_type, summary) for a note.",
+    "Upserts semantic metadata (description, entities, themes, doc_type, summary) for a note.",
   inputSchema: {
     type: "object",
     properties: {
       path: { type: "string" },
       description: { type: "string" },
-      auto_tags: { type: "array" },
       entities: { type: "array" },
       themes: { type: "array" },
       doc_type: { type: "string", enum: [...DOC_TYPES] },
@@ -82,10 +80,6 @@ export const updateNoteMetadataTool: ToolDef<Input, Output> = {
         if (input.description !== undefined) {
           patch.description = input.description;
           updated.push("description");
-        }
-        if (input.auto_tags !== undefined) {
-          patch.auto_tags = input.auto_tags;
-          updated.push("auto_tags");
         }
         if (input.entities !== undefined) {
           patch.entities = input.entities;

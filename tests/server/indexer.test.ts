@@ -86,7 +86,7 @@ describe("reindexNote", () => {
     await indexer.reindexNote("notes/target.md");
     await indexer.reindexNote("notes/fancy.md");
 
-    const edges = db.query("SELECT * FROM graph_edges WHERE relation = 'wikilink'").all();
+    const edges = db.query("SELECT * FROM graph_edges WHERE tier = 'connected'").all();
     expect(edges.length).toBeGreaterThanOrEqual(1);
   });
 
@@ -107,7 +107,7 @@ describe("reindexNote", () => {
     await indexer.reindexNote("notes/g1.md");
 
     const edges = db
-      .query("SELECT * FROM graph_edges WHERE relation = 'wikilink'")
+      .query("SELECT * FROM graph_edges WHERE tier = 'connected'")
       .all() as any[];
     expect(edges.length).toBeGreaterThanOrEqual(1);
     expect(edges[0].source).toBe("notes/g1.md");
@@ -280,7 +280,7 @@ describe("link_index population", () => {
 
     const edge = db
       .query(
-        "SELECT source, target FROM graph_edges WHERE source = ? AND target = ? AND relation = 'wikilink'",
+        "SELECT source, target FROM graph_edges WHERE source = ? AND target = ? AND tier = 'connected'",
       )
       .get("notes/inbox/source.md", "dnd/research/target-note.md") as any;
     expect(edge).toBeTruthy();

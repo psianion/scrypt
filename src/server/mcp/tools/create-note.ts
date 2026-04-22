@@ -68,9 +68,10 @@ function upsertWikilinkEdges(
   targets: string[],
 ): number {
   if (targets.length === 0) return 0;
-  // Clear structural edges from this note first.
+  // graph-v2: structural wikilinks land as tier='connected'. Clear prior
+  // tier='connected' rows from this source before re-inserting.
   db.query(
-    `DELETE FROM graph_edges WHERE source = ? AND relation = 'wikilink'`,
+    `DELETE FROM graph_edges WHERE source = ? AND tier = 'connected' AND client_tag IS NULL`,
   ).run(sourcePath);
   const ensureNode = db.prepare(
     `INSERT OR IGNORE INTO graph_nodes (id, kind, note_path, label)
@@ -78,8 +79,8 @@ function upsertWikilinkEdges(
   );
   const insert = db.prepare(
     `INSERT OR IGNORE INTO graph_edges
-       (source, target, relation, weight, created_at)
-     VALUES (?, ?, 'wikilink', 3, ?)`,
+       (source, target, tier, weight, created_at)
+     VALUES (?, ?, 'connected', 3, ?)`,
   );
   let count = 0;
   const now = Date.now();

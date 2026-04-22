@@ -9,7 +9,7 @@ const snap: GraphSnapshot = {
     { id: "spec.md", title: "VTT spec", doc_type: "spec", project: "x", degree: 2, community: 1 },
     { id: "other.md", title: "Something else", doc_type: "other", project: "x", degree: 0, community: 2 },
   ],
-  edges: [{ source: "vtt.md", target: "spec.md", relation: "x", confidence: "connected", reason: null }],
+  edges: [{ source: "vtt.md", target: "spec.md", tier: "connected", reason: null }],
 };
 
 describe("search", () => {

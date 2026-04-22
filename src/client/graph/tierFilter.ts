@@ -53,5 +53,5 @@ export function filterEdgesByTier(
   edges: SnapshotEdge[],
   filter: TierFilter,
 ): SnapshotEdge[] {
-  return edges.filter((e) => filter[e.confidence ?? "connected"] ?? false);
+  return edges.filter((e) => filter[e.tier] ?? false);
 }

@@ -196,8 +196,8 @@ export class Indexer {
       this.db
         .query(
           `INSERT OR IGNORE INTO graph_edges
-             (source, target, relation, weight, created_at)
-           VALUES (?, ?, 'wikilink', 3, ?)`,
+             (source, target, tier, weight, created_at)
+           VALUES (?, ?, 'connected', 3, ?)`,
         )
         .run(path, targetPath, Date.now());
     }
@@ -287,20 +287,18 @@ export class Indexer {
   getIncomingEdges(path: string): Array<{
     source: string;
     target: string;
-    relation: string;
-    confidence: string | null;
+    tier: string;
     reason: string | null;
   }> {
     return this.db
       .query(
-        `SELECT source, target, relation, confidence, reason
+        `SELECT source, target, tier, reason
          FROM graph_edges WHERE target = ?`,
       )
       .all(path) as Array<{
         source: string;
         target: string;
-        relation: string;
-        confidence: string | null;
+        tier: string;
         reason: string | null;
       }>;
   }
@@ -326,7 +324,7 @@ export class Indexer {
 
     const edges = this.db
       .query(
-        "SELECT source, target, relation as type FROM graph_edges",
+        "SELECT source, target, tier as type FROM graph_edges",
       )
       .all() as LocalGraphEdge[];
 
@@ -390,7 +388,7 @@ export class Indexer {
 
     const edges = this.db
       .query(
-        `SELECT source, target, relation as type
+        `SELECT source, target, tier as type
          FROM graph_edges
          WHERE source IN (${placeholders}) AND target IN (${placeholders})`,
       )

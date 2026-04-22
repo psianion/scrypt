@@ -22,9 +22,9 @@ describe("buildGraphSnapshot", () => {
       ('a.md','note','A','a.md',1),
       ('b.md','note','B','b.md',1),
       ('c.md','note','C','c.md',2)`);
-    db.run(`INSERT INTO graph_edges (source,target,relation,confidence,created_at) VALUES
-      ('a.md','b.md','elaborates','connected', 0),
-      ('a.md','c.md','references','mentions', 0)`);
+    db.run(`INSERT INTO graph_edges (source,target,tier,created_at) VALUES
+      ('a.md','b.md','connected', 0),
+      ('a.md','c.md','mentions', 0)`);
     db.run(`INSERT INTO note_metadata (note_path,doc_type,summary,updated_at) VALUES
       ('a.md','research','sum',0),
       ('b.md','spec','sum',0)`);
@@ -40,17 +40,16 @@ describe("buildGraphSnapshot", () => {
     expect(c.doc_type).toBeNull();
   });
 
-  test("emits edges with source/target/relation/confidence/reason", () => {
+  test("emits edges with source/target/tier/reason", () => {
     db.run(`INSERT INTO graph_nodes (id, kind, label, note_path) VALUES ('a.md','note','A','a.md'),('b.md','note','B','b.md')`);
-    db.run(`INSERT INTO graph_edges (source,target,relation,confidence,reason,created_at) VALUES
-      ('a.md','b.md','implements','connected','does the thing',0)`);
+    db.run(`INSERT INTO graph_edges (source,target,tier,reason,created_at) VALUES
+      ('a.md','b.md','connected','does the thing',0)`);
     const snap = buildGraphSnapshot(db);
     expect(snap.edges).toEqual([
       {
         source: "a.md",
         target: "b.md",
-        relation: "implements",
-        confidence: "connected",
+        tier: "connected",
         reason: "does the thing",
       },
     ]);
@@ -58,7 +57,7 @@ describe("buildGraphSnapshot", () => {
 
   test("skips non-note nodes and dangling edges", () => {
     db.run(`INSERT INTO graph_nodes (id, kind, label, note_path) VALUES ('a.md','note','A','a.md')`);
-    db.run(`INSERT INTO graph_edges (source,target,relation,confidence,created_at) VALUES ('a.md','ghost.md','x','connected',0)`);
+    db.run(`INSERT INTO graph_edges (source,target,tier,created_at) VALUES ('a.md','ghost.md','connected',0)`);
     const snap = buildGraphSnapshot(db);
     expect(snap.nodes).toHaveLength(1);
     expect(snap.edges).toHaveLength(0);
@@ -70,29 +69,17 @@ describe("buildGraphSnapshot", () => {
       ('research/dnd/b.md','note','B','research/dnd/b.md'),
       ('research/goveva/c.md','note','C','research/goveva/c.md'),
       ('research/goveva/d.md','note','D','research/goveva/d.md')`);
-    db.run(`INSERT INTO graph_edges (source,target,relation,confidence,created_at) VALUES
-      ('research/dnd/a.md','research/goveva/c.md','references','mentions',0),
-      ('research/dnd/a.md','research/goveva/d.md','similar','semantically_related',0),
-      ('research/dnd/a.md','research/dnd/b.md','similar','semantically_related',0)`);
+    db.run(`INSERT INTO graph_edges (source,target,tier,created_at) VALUES
+      ('research/dnd/a.md','research/goveva/c.md','mentions',0),
+      ('research/dnd/a.md','research/goveva/d.md','semantically_related',0),
+      ('research/dnd/a.md','research/dnd/b.md','semantically_related',0)`);
 
     const snap = buildGraphSnapshot(db);
-    const pairs = snap.edges.map((e) => `${e.source}->${e.target}:${e.confidence}`).sort();
+    const pairs = snap.edges.map((e) => `${e.source}->${e.target}:${e.tier}`).sort();
     expect(pairs).toEqual([
       "research/dnd/a.md->research/dnd/b.md:semantically_related",
       "research/dnd/a.md->research/goveva/c.md:mentions",
     ]);
-  });
-
-  test("normalises a malformed confidence value to null without crashing", () => {
-    db.run(`INSERT INTO graph_nodes (id, kind, label, note_path) VALUES
-      ('a.md','note','A','a.md'),
-      ('b.md','note','B','b.md')`);
-    db.run(`INSERT INTO graph_edges (source,target,relation,confidence,created_at) VALUES
-      ('a.md','b.md','weird','xyz',0)`);
-
-    const snap = buildGraphSnapshot(db);
-    expect(snap.edges).toHaveLength(1);
-    expect(snap.edges[0]!.confidence).toBeNull();
   });
 
   test("sets generated_at to a number close to now", () => {

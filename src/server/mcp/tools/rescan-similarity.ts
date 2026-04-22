@@ -32,7 +32,7 @@ const DEFAULT_MODEL = "Xenova/bge-small-en-v1.5";
 export const rescanSimilarityTool: ToolDef<Input, Output> = {
   name: "rescan_similarity",
   description:
-    "Scan note chunk embeddings and emit `semantically_related` edges (relation+confidence both set) for note pairs above the cosine threshold. Idempotent — duplicates are skipped via UNIQUE(source,target,relation). When `paths` is provided, only pairs touching one of those paths are emitted.",
+    "Scan note chunk embeddings and emit `tier='semantically_related'` edges for note pairs above the cosine threshold. Idempotent — duplicates are skipped via UNIQUE(source,target,tier). When `paths` is provided, only pairs touching one of those paths are emitted.",
   inputSchema: {
     type: "object",
     properties: {

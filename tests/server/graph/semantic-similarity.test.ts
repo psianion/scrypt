@@ -128,7 +128,7 @@ describe("graph/semantic-similarity", () => {
   });
 
   describe("upsertSemanticEdges", () => {
-    test("inserts edges with relation+confidence semantically_related and reason", () => {
+    test("inserts edges with tier=semantically_related and reason", () => {
       insertNode(db, "a.md");
       insertNode(db, "b.md");
       const created = upsertSemanticEdges(db, [
@@ -137,12 +137,11 @@ describe("graph/semantic-similarity", () => {
       expect(created).toBe(1);
       const row = db
         .query<
-          { relation: string; confidence: string; reason: string; weight: number },
+          { tier: string; reason: string; weight: number },
           []
-        >(`SELECT relation, confidence, reason, weight FROM graph_edges WHERE source='a.md' AND target='b.md'`)
+        >(`SELECT tier, reason, weight FROM graph_edges WHERE source='a.md' AND target='b.md'`)
         .get();
-      expect(row?.relation).toBe("semantically_related");
-      expect(row?.confidence).toBe("semantically_related");
+      expect(row?.tier).toBe("semantically_related");
       expect(row?.reason).toContain("cosine");
       expect(row?.weight).toBeCloseTo(0.92, 2);
     });

@@ -70,20 +70,15 @@ describe("Wave 8 write tools", () => {
       {
         path: "a.md",
         description: "about A",
-        auto_tags: ["x", "y"],
         themes: ["topic1"],
         client_tag: "m1",
       },
       "c",
     );
-    expect(r.updated_fields.sort()).toEqual([
-      "auto_tags",
-      "description",
-      "themes",
-    ]);
+    expect(r.updated_fields.sort()).toEqual(["description", "themes"]);
     const m = ctx.metadata.get("a.md");
     expect(m?.description).toBe("about A");
-    expect(m?.auto_tags).toEqual(["x", "y"]);
+    expect(m?.themes).toEqual(["topic1"]);
   });
 
   test("update_note_metadata persists doc_type and summary round-trip", async () => {
@@ -143,7 +138,6 @@ describe("Wave 8 write tools", () => {
       {
         path: "a.md",
         description: "about A",
-        auto_tags: ["x"],
         themes: ["t"],
         summary: "initial",
         client_tag: "m-seed",
@@ -159,7 +153,6 @@ describe("Wave 8 write tools", () => {
     expect(m?.doc_type).toBe("architecture");
     expect(m?.summary).toBe("initial");
     expect(m?.description).toBe("about A");
-    expect(m?.auto_tags).toEqual(["x"]);
     expect(m?.themes).toEqual(["t"]);
   });
 
@@ -213,14 +206,13 @@ describe("Wave 8 write tools", () => {
     expect(caught).toMatchObject({ code: MCP_ERROR.NOT_FOUND });
   });
 
-  test("add_edge inserts a semantic edge", async () => {
+  test("add_edge inserts a tiered edge", async () => {
     const r = await addEdgeTool.handler(
       ctx,
       {
         source: "a.md",
         target: "b.md",
-        relation: "elaborates",
-        confidence: "mentions",
+        tier: "mentions",
         reason: "because tests",
         client_tag: "e1",
       },
@@ -229,46 +221,43 @@ describe("Wave 8 write tools", () => {
     expect(r.edge_id).toBeGreaterThan(0);
     const rows = ctx.db
       .query<
-        { relation: string; confidence: string; reason: string },
+        { tier: string; reason: string },
         []
-      >(`SELECT relation, confidence, reason FROM graph_edges`)
+      >(`SELECT tier, reason FROM graph_edges`)
       .all();
     expect(rows[0]).toEqual({
-      relation: "elaborates",
-      confidence: "mentions",
+      tier: "mentions",
       reason: "because tests",
     });
   });
 
-  test("add_edge accepts all three new-tier confidence values", async () => {
-    for (const [i, conf] of [
+  test("add_edge accepts all three tier values", async () => {
+    for (const tier of [
       "connected",
       "mentions",
       "semantically_related",
-    ].entries()) {
+    ] as const) {
       await addEdgeTool.handler(
         ctx,
         {
           source: "a.md",
           target: "b.md",
-          relation: `rel_${i}`,
-          // @ts-expect-error — test enum literal widening
-          confidence: conf,
-          client_tag: `tier-${conf}`,
+          tier,
+          client_tag: `tier-${tier}`,
         },
         "c",
       );
     }
-    const confs = ctx.db
-      .query<{ confidence: string }, []>(
-        `SELECT confidence FROM graph_edges ORDER BY id`,
+    const tiers = ctx.db
+      .query<{ tier: string }, []>(
+        `SELECT tier FROM graph_edges ORDER BY id`,
       )
       .all()
-      .map((r) => r.confidence);
-    expect(confs).toEqual(["connected", "mentions", "semantically_related"]);
+      .map((r) => r.tier);
+    expect(tiers).toEqual(["connected", "mentions", "semantically_related"]);
   });
 
-  test("add_edge rejects legacy confidence values (extracted/inferred/ambiguous)", async () => {
+  test("add_edge rejects legacy values (extracted/inferred/ambiguous)", async () => {
     for (const legacy of ["extracted", "inferred", "ambiguous"]) {
       let caught: unknown = null;
       try {
@@ -277,9 +266,8 @@ describe("Wave 8 write tools", () => {
           {
             source: "a.md",
             target: "b.md",
-            relation: "elaborates",
             // @ts-expect-error — intentional legacy value
-            confidence: legacy,
+            tier: legacy,
             client_tag: `legacy-${legacy}`,
           },
           "c",
@@ -291,7 +279,7 @@ describe("Wave 8 write tools", () => {
     }
   });
 
-  test("add_edge rejects unknown confidence strings with INVALID_PARAMS", async () => {
+  test("add_edge rejects unknown tier strings with INVALID_PARAMS", async () => {
     let caught: unknown = null;
     try {
       await addEdgeTool.handler(
@@ -299,9 +287,8 @@ describe("Wave 8 write tools", () => {
         {
           source: "a.md",
           target: "b.md",
-          relation: "elaborates",
           // @ts-expect-error — intentional invalid value
-          confidence: "speculative",
+          tier: "speculative",
           client_tag: "e-bogus",
         },
         "c",
@@ -312,26 +299,6 @@ describe("Wave 8 write tools", () => {
     expect(caught).toMatchObject({ code: MCP_ERROR.INVALID_PARAMS });
   });
 
-  test("add_edge rejects reserved structural relations", async () => {
-    let caught: unknown = null;
-    try {
-      await addEdgeTool.handler(
-        ctx,
-        {
-          source: "a.md",
-          target: "b.md",
-          relation: "wikilink",
-          confidence: "connected",
-          client_tag: "e2",
-        },
-        "c",
-      );
-    } catch (e) {
-      caught = e;
-    }
-    expect(caught).toMatchObject({ code: MCP_ERROR.CONFLICT });
-  });
-
   test("add_edge errors when endpoint missing", async () => {
     let caught: unknown = null;
     try {
@@ -340,8 +307,7 @@ describe("Wave 8 write tools", () => {
         {
           source: "a.md",
           target: "nope.md",
-          relation: "elaborates",
-          confidence: "mentions",
+          tier: "mentions",
           client_tag: "e3",
         },
         "c",
@@ -352,21 +318,21 @@ describe("Wave 8 write tools", () => {
     expect(caught).toMatchObject({ code: MCP_ERROR.NOT_FOUND });
   });
 
-  test("remove_edge deletes matching semantic edges only", async () => {
+  test("remove_edge deletes user-tagged edges only, leaves structural", async () => {
     await addEdgeTool.handler(
       ctx,
       {
         source: "a.md",
         target: "b.md",
-        relation: "elaborates",
-        confidence: "mentions",
+        tier: "mentions",
         client_tag: "r-setup",
       },
       "c",
     );
+    // Structural wikilink edge — client_tag IS NULL.
     ctx.db
       .query(
-        `INSERT INTO graph_edges (source, target, relation) VALUES ('a.md', 'b.md', 'wikilink')`,
+        `INSERT INTO graph_edges (source, target, tier) VALUES ('a.md', 'b.md', 'connected')`,
       )
       .run();
 
@@ -377,8 +343,10 @@ describe("Wave 8 write tools", () => {
     );
     expect(r.removed).toBe(1);
     const rest = ctx.db
-      .query<{ relation: string }, []>(`SELECT relation FROM graph_edges`)
+      .query<{ tier: string; client_tag: string | null }, []>(
+        `SELECT tier, client_tag FROM graph_edges`,
+      )
       .all();
-    expect(rest.map((x) => x.relation)).toEqual(["wikilink"]);
+    expect(rest).toEqual([{ tier: "connected", client_tag: null }]);
   });
 });

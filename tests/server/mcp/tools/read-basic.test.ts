@@ -85,7 +85,7 @@ alpha body
     ]);
     ctx.metadata.upsert("notes/hi.md", { description: "greeting" });
     db.query(
-      `INSERT INTO graph_edges (source, target, relation) VALUES ('notes/hi.md', 'other.md', 'wikilink')`,
+      `INSERT INTO graph_edges (source, target, tier) VALUES ('notes/hi.md', 'other.md', 'connected')`,
     ).run();
   });
 

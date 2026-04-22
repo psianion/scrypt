@@ -31,8 +31,7 @@ export function projectOf(path: string): string {
 export interface SnapshotEdge {
   source: string;
   target: string;
-  relation: string;
-  confidence: Tier | null;
+  tier: Tier;
   reason: string | null;
 }
 
@@ -52,8 +51,7 @@ interface NodeRow {
 interface EdgeRow {
   source: string;
   target: string;
-  relation: string;
-  confidence: string | null;
+  tier: string;
   reason: string | null;
 }
 
@@ -78,7 +76,7 @@ export function buildGraphSnapshot(db: Database): GraphSnapshot {
 
   const edgeRows = db
     .query<EdgeRow, []>(
-      `SELECT source, target, relation, confidence, reason FROM graph_edges`,
+      `SELECT source, target, tier, reason FROM graph_edges`,
     )
     .all();
 
@@ -87,7 +85,8 @@ export function buildGraphSnapshot(db: Database): GraphSnapshot {
   const degree = new Map<string, number>();
   for (const e of edgeRows) {
     if (!noteIds.has(e.source) || !noteIds.has(e.target)) continue;
-    const tier = parseTier(e.confidence);
+    const tier = parseTier(e.tier);
+    if (tier === null) continue;
     if (
       tier === "semantically_related" &&
       projectById.get(e.source) !== projectById.get(e.target)
@@ -97,8 +96,7 @@ export function buildGraphSnapshot(db: Database): GraphSnapshot {
     edges.push({
       source: e.source,
       target: e.target,
-      relation: e.relation,
-      confidence: tier,
+      tier,
       reason: e.reason,
     });
     degree.set(e.source, (degree.get(e.source) ?? 0) + 1);
