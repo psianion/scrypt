@@ -28,6 +28,28 @@ function main(): void {
 
   const db = new Database(dbPath);
   try {
+    // Tolerate pre-v2 schema: if the `graph_edges.tier` column is missing the
+    // server hasn't booted on v2 yet and initSchema will drop the legacy
+    // table outright on next start, making this script a no-op anyway.
+    const cols = (
+      db.query("PRAGMA table_info(graph_edges)").all() as { name: string }[]
+    ).map((c) => c.name);
+    if (cols.length === 0 || !cols.includes("tier")) {
+      console.log(
+        JSON.stringify(
+          {
+            vaultPath,
+            dbPath,
+            deleted: 0,
+            note: "legacy schema — initSchema will drop graph_edges on server boot",
+          },
+          null,
+          2,
+        ),
+      );
+      return;
+    }
+
     const before = (
       db
         .query<{ c: number }, []>(
