@@ -79,6 +79,14 @@ export function seedNote(ctx: TestCtx, opts: SeedNoteOpts): string {
     `INSERT INTO notes (path, title, project, doc_type, thread) VALUES (?, ?, ?, ?, ?)`,
     [path, title, opts.project, opts.doc_type, opts.thread ?? null],
   );
+  // Mirror the create_note graph_nodes upsert so add_edge endpoint checks
+  // (which look up graph_nodes) can find the seeded endpoints.
+  ctx.db.run(
+    `INSERT INTO graph_nodes (id, kind, label, note_path, content_hash)
+       VALUES (?, 'note', ?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET label = excluded.label`,
+    [path, title, path, `hash:${path}`],
+  );
   return path;
 }
 

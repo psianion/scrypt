@@ -37,9 +37,11 @@ export function buildVaultPath(
 
 // Extended projectOf — recognizes the new `projects/...` layout AND the old
 // `research/<dom>/...` layout for the transition window. Drop the research/
-// branch once every vault is reingested.
+// branch once every vault is reingested. Matches snapshot.ts: single-segment
+// paths (e.g. "a.md") return "root" so legacy tests keep working.
 export function projectOf(path: string): string {
   const parts = path.split("/");
+  if (parts.length <= 1) return "root";
   if (parts[0] === "projects" && parts.length > 1 && parts[1]) return parts[1];
   if (parts[0] === "research" && parts.length > 2 && parts[1]) return parts[1];
   return parts[0] ?? "root";
