@@ -87,6 +87,18 @@ export function seedNote(ctx: TestCtx, opts: SeedNoteOpts): string {
      ON CONFLICT(id) DO UPDATE SET label = excluded.label`,
     [path, title, path, `hash:${path}`],
   );
+  // Seed FTS5 so keyword-search tests work without a full reindex. rowid
+  // matches notes.id so JOINs in the search SQL line up.
+  const noteId = ctx.db
+    .query<{ id: number }, [string]>(`SELECT id FROM notes WHERE path = ?`)
+    .get(path)?.id;
+  if (typeof noteId === "number") {
+    ctx.db.run(
+      `INSERT INTO notes_fts (rowid, title, content, path, summary, entities, themes, edge_reasons)
+       VALUES (?, ?, ?, ?, '', '', '', '')`,
+      [noteId, title, opts.body ?? `# ${title}\n\nbody`, path],
+    );
+  }
   return path;
 }
 
