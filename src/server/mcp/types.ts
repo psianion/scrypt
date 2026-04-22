@@ -32,6 +32,8 @@ export interface ToolContext {
   idempotency: Idempotency;
   userId: string | null;
   vaultDir: string;
+  /** Fire-and-forget debounced rebuild of vault/.scrypt/graph.json. */
+  scheduleGraphRebuild: () => void;
   // Optional: when set, create_note will delegate to the legacy indexer
   // after writing the file so the notes / notes_fts / tags / backlinks /
   // tasks tables get populated the same way an external editor write

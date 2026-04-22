@@ -24,10 +24,10 @@ describe("walk_graph", () => {
       insertNode.run(n, n, n);
     }
     db.query(
-      `INSERT INTO graph_edges (source, target, relation, confidence) VALUES
-        ('a.md', 'b.md', 'elaborates', 'connected'),
-        ('b.md', 'c.md', 'elaborates', 'mentions'),
-        ('c.md', 'd.md', 'elaborates', 'semantically_related')`,
+      `INSERT INTO graph_edges (source, target, tier) VALUES
+        ('a.md', 'b.md', 'connected'),
+        ('b.md', 'c.md', 'mentions'),
+        ('c.md', 'd.md', 'semantically_related')`,
     ).run();
     ctx = {
       db,
@@ -41,6 +41,7 @@ describe("walk_graph", () => {
       idempotency: new Idempotency(db),
       userId: null,
       vaultDir: "/tmp",
+      scheduleGraphRebuild: () => {},
     };
   });
 
@@ -55,10 +56,10 @@ describe("walk_graph", () => {
     expect(r.nodes.map((n) => n.id).sort()).toEqual(["a.md", "b.md"]);
   });
 
-  test("confidence_min filters low-confidence edges", async () => {
+  test("tier_min filters low-tier edges", async () => {
     const r = await walkGraphTool.handler(
       ctx,
-      { from: "a.md", depth: 3, confidence_min: "mentions" },
+      { from: "a.md", depth: 3, tier_min: "mentions" },
       "c",
     );
     const ids = r.nodes.map((n) => n.id).sort();
@@ -66,19 +67,10 @@ describe("walk_graph", () => {
     expect(ids).not.toContain("d.md");
   });
 
-  test("relation_filter restricts traversal", async () => {
-    const r = await walkGraphTool.handler(
-      ctx,
-      { from: "a.md", depth: 3, relation_filter: ["cites"] },
-      "c",
-    );
-    expect(r.nodes.map((n) => n.id)).toEqual(["a.md"]);
-  });
-
   test("edges are deduped when traversal revisits them", async () => {
     const r = await walkGraphTool.handler(ctx, { from: "a.md", depth: 3 }, "c");
     const seen = new Set(
-      r.edges.map((e) => `${e.source}|${e.target}|${e.relation}`),
+      r.edges.map((e) => `${e.source}|${e.target}|${e.tier}`),
     );
     expect(seen.size).toBe(r.edges.length);
     expect(r.edges.length).toBe(3);

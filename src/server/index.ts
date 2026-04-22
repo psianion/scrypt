@@ -21,6 +21,7 @@ import { memoryRoutes } from "./api/memories";
 import { dailyContextRoutes } from "./api/daily-context";
 import { activityRoutes } from "./api/activity";
 import { graphRoutes } from "./api/graph";
+import { taskListRoutes } from "./api/tasks";
 import { mcpRoutes } from "./mcp/routes";
 import { ToolRegistry } from "./mcp/registry";
 import { registerAllTools } from "./mcp/tools";
@@ -37,6 +38,7 @@ import { Worker } from "node:worker_threads";
 import { fileURLToPath } from "node:url";
 import { dirname } from "node:path";
 import { Idempotency } from "./mcp/idempotency";
+import { SnapshotScheduler } from "./graph/snapshot-scheduler";
 import { wireWebSocketSink } from "./embeddings/ws-sink";
 import type { ToolContext } from "./mcp/types";
 import { IngestRouter } from "./ingest/router";
@@ -88,6 +90,7 @@ export function createApp(config: AppConfig) {
   const wave8Sections = new SectionsRepo(db);
   const wave8Metadata = new MetadataRepo(db);
   const wave9Tasks = new TasksRepo(db);
+  const snapshotScheduler = new SnapshotScheduler(db, config.vaultPath);
   const wave8Embeddings = new ChunkEmbeddingsRepo(db);
   const wave8Bus = new ProgressBus();
   // Parent-side engine is kept only for query-time operations (e.g.
@@ -141,7 +144,10 @@ export function createApp(config: AppConfig) {
 
   // Register API routes
   notesRoutes(router, fm, indexer);
-  searchRoutes(router, indexer);
+  // graphRoutes must come before searchRoutes — searchRoutes registers a
+  // catch-all /api/graph/*path that would otherwise swallow /api/graph/snapshot.
+  graphRoutes(router, db, config.vaultPath, snapshotScheduler, wave8Engine, wave8Embeddings);
+  searchRoutes(router, indexer, wave8Engine, wave8Embeddings);
   journalRoutes(router, fm, indexer, config.vaultPath);
   templateRoutes(router, fm, config.vaultPath);
   // Wave 9: legacy /api/tasks REST endpoint removed. Tasks are managed via
@@ -165,7 +171,7 @@ export function createApp(config: AppConfig) {
   memoryRoutes(router, fm);
   dailyContextRoutes(router, fm, indexer, config.vaultPath);
   activityRoutes(router, activity);
-  graphRoutes(router, db);
+  taskListRoutes(router, wave9Tasks);
   embedHealthRoutes(router, wave8EmbedClient);
 
   // Wave 8: MCP streamable-http transport mounted at POST /mcp. Reuses
@@ -185,6 +191,7 @@ export function createApp(config: AppConfig) {
     idempotency: new Idempotency(db),
     userId: null,
     vaultDir: config.vaultPath,
+    scheduleGraphRebuild: () => snapshotScheduler.schedule(),
     // Wire the legacy indexer so MCP write tools repopulate notes /
     // notes_fts / backlinks / tags / tasks / link_index without having
     // to wait for the fs watcher (unreliable under Docker on macOS).

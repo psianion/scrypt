@@ -6,7 +6,6 @@ import type { ToolDef } from "../types";
 interface Input {
   query: string;
   limit?: number;
-  tag?: string;
   folder?: string;
   min_score?: number;
 }
@@ -34,7 +33,6 @@ export const semanticSearchTool: ToolDef<Input, Output> = {
     properties: {
       query: { type: "string" },
       limit: { type: "number" },
-      tag: { type: "string" },
       folder: { type: "string" },
       min_score: { type: "number" },
     },
@@ -66,13 +64,6 @@ export const semanticSearchTool: ToolDef<Input, Output> = {
     let grouped = groupByNote(hits, limit);
     if (input.folder) {
       grouped = grouped.filter((g) => g.note_path.startsWith(input.folder!));
-    }
-    if (input.tag) {
-      const tag = input.tag;
-      grouped = grouped.filter((g) => {
-        const m = ctx.metadata.get(g.note_path);
-        return !!m?.auto_tags?.includes(tag);
-      });
     }
     return {
       results: grouped.map((g) => ({

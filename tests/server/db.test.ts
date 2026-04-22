@@ -144,3 +144,25 @@ describe("initSchema > new research node tables", () => {
     expect(names).toContain("idx_runs_status");
   });
 });
+
+describe("graph-v2 schema constraints", () => {
+  test("graph_edges CHECK rejects invalid tier values (e.g. 'wikilink')", () => {
+    const db = createDatabase(":memory:");
+    initSchema(db);
+    expect(() =>
+      db.run(
+        `INSERT INTO graph_edges (source, target, tier) VALUES ('a','b','wikilink')`,
+      ),
+    ).toThrow();
+  });
+
+  test("note_metadata has no auto_tags column", () => {
+    const db = createDatabase(":memory:");
+    initSchema(db);
+    const cols = db
+      .query("PRAGMA table_info(note_metadata)")
+      .all() as { name: string }[];
+    const names = cols.map((c) => c.name);
+    expect(names).not.toContain("auto_tags");
+  });
+});

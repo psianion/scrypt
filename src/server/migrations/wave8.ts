@@ -1,7 +1,7 @@
 // src/server/migrations/wave8.ts
 //
 // Wave 8 adds four new tables alongside the refactored graph layer:
-//   - note_metadata      (semantic per-note metadata: description, auto_tags, entities, themes)
+//   - note_metadata      (semantic per-note metadata: description, entities, themes)
 //   - note_sections      (per-heading rows; targets for section-level edges)
 //   - note_chunk_embeddings  (N rows per note — one vector per chunk)
 //   - mcp_dedup          (client_tag-based idempotency for MCP write tools)
@@ -17,7 +17,6 @@ const STATEMENTS: string[] = [
   `CREATE TABLE IF NOT EXISTS note_metadata (
      note_path   TEXT PRIMARY KEY,
      description TEXT,
-     auto_tags   TEXT,
      entities    TEXT,
      themes      TEXT,
      updated_at  INTEGER NOT NULL
@@ -59,6 +58,14 @@ const STATEMENTS: string[] = [
 ];
 
 export function applyWave8Migration(db: Database): void {
+  // graph-v2: pre-beta destructive drop if legacy `auto_tags` column is
+  // present. Test vault re-ingests after the series, so no migration.
+  const cols = (db.query(`PRAGMA table_info(note_metadata)`).all() as { name: string }[]).map(
+    (c) => c.name,
+  );
+  if (cols.length > 0 && cols.includes("auto_tags")) {
+    db.run(`DROP TABLE note_metadata`);
+  }
   for (const sql of STATEMENTS) {
     db.run(sql);
   }

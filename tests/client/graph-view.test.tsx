@@ -1,121 +1,340 @@
-import { describe, test, expect, afterEach, beforeEach } from "bun:test";
-import { render, screen, cleanup, fireEvent } from "@testing-library/react";
-import { BrowserRouter } from "react-router";
-import { GraphView } from "../../src/client/views/GraphView";
+import {
+  describe,
+  test,
+  expect,
+  beforeEach,
+  afterEach,
+  mock,
+  spyOn,
+} from "bun:test";
+import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
+import { MemoryRouter, Route, Routes } from "react-router";
 
-const fixture = {
+import type { GraphSnapshot } from "../../src/server/graph/snapshot";
+import type { RenderHandle, RenderOpts } from "../../src/client/graph/render";
+import { __resetSnapshotCache } from "../../src/client/graph/useGraphSnapshot";
+
+// Spy ledger captured by the mocked renderer. One entry per createGraph call.
+interface CreateCall {
+  opts: RenderOpts;
+  handle: RenderHandle & {
+    updateFilterCalls: Array<RenderOpts["tierFilter"]>;
+    updateQueryCalls: Array<{ visible: Set<string> | null; matches: Set<string> }>;
+    focusCalls: string[];
+    destroyed: boolean;
+  };
+}
+
+const createCalls: CreateCall[] = [];
+
+mock.module("../../src/client/graph/render", () => {
+  return {
+    createGraph(_parent: HTMLElement, opts: RenderOpts): RenderHandle {
+      const fakeCanvas = document.createElement("canvas");
+      const updateFilterCalls: Array<RenderOpts["tierFilter"]> = [];
+      const updateQueryCalls: Array<{
+        visible: Set<string> | null;
+        matches: Set<string>;
+      }> = [];
+      const focusCalls: string[] = [];
+      const handle = {
+        canvas: fakeCanvas,
+        destroy() {
+          handle.destroyed = true;
+        },
+        focusNode(id: string) {
+          focusCalls.push(id);
+        },
+        updateFilter(f: RenderOpts["tierFilter"]) {
+          updateFilterCalls.push({ ...f });
+        },
+        updateQueryFilter(visible: Set<string> | null, matches: Set<string>) {
+          updateQueryCalls.push({
+            visible: visible ? new Set(visible) : null,
+            matches: new Set(matches),
+          });
+        },
+        destroyed: false,
+        updateFilterCalls,
+        updateQueryCalls,
+        focusCalls,
+      };
+      createCalls.push({ opts, handle });
+      return handle as unknown as RenderHandle;
+    },
+  };
+});
+
+// Imported AFTER mock.module so the GraphView module resolves the mocked renderer.
+const { GraphView } = await import("../../src/client/views/GraphView");
+
+const sampleSnap: GraphSnapshot = {
+  generated_at: 1,
   nodes: [
-    { id: 1, path: "dnd/research/a.md", title: "A", domain: "dnd", subdomain: "research", tags: [{ namespace: "type", value: "research", raw: "type:research" }], connectionCount: 2 },
-    { id: 2, path: "dnd/research/b.md", title: "B", domain: "dnd", subdomain: "research", tags: [{ namespace: "type", value: "research", raw: "type:research" }], connectionCount: 2 },
-    { id: 3, path: "dnd/plans/c.md", title: "C", domain: "dnd", subdomain: "plans", tags: [], connectionCount: 1 },
+    { id: "a.md", title: "Alpha", doc_type: null, project: "p", degree: 2, community: null },
+    { id: "b.md", title: "Beta", doc_type: null, project: "p", degree: 1, community: null },
+    { id: "c.md", title: "Gamma", doc_type: null, project: "p", degree: 1, community: null },
   ],
   edges: [
-    { source: 1, target: 2, type: "subdomain", weight: 2 },
-    { source: 1, target: 3, type: "domain", weight: 1 },
-    { source: 1, target: 2, type: "tag", weight: 1.5 },
+    { source: "a.md", target: "b.md", tier: "connected", reason: null },
+    { source: "a.md", target: "c.md", tier: "mentions", reason: null },
   ],
 };
 
 let originalFetch: typeof globalThis.fetch;
-const mockFetch = (async (url: string) => {
-  if (url.startsWith("/api/graph")) {
-    return new Response(JSON.stringify(fixture));
-  }
-  return new Response("[]");
-}) as any;
+let warnSpy: ReturnType<typeof spyOn> | null = null;
+
+function installFetch(handler: (url: string, init?: RequestInit) => Response | Promise<Response>) {
+  globalThis.fetch = ((url: any, init?: RequestInit) =>
+    Promise.resolve(handler(String(url), init))) as any;
+}
+
+function renderAt(initialEntry = "/graph") {
+  return render(
+    <MemoryRouter initialEntries={[initialEntry]}>
+      <Routes>
+        <Route path="/graph" element={<GraphView />} />
+        <Route path="/note/*" element={<div data-testid="note-page" />} />
+      </Routes>
+    </MemoryRouter>,
+  );
+}
 
 beforeEach(() => {
   originalFetch = globalThis.fetch;
-  globalThis.fetch = mockFetch;
+  __resetSnapshotCache();
+  createCalls.length = 0;
+  localStorage.clear();
+  warnSpy = spyOn(console, "warn").mockImplementation(() => {});
 });
+
 afterEach(() => {
-  globalThis.fetch = originalFetch;
   cleanup();
+  warnSpy?.mockRestore();
+  warnSpy = null;
+  globalThis.fetch = originalFetch;
 });
 
-describe("GraphView", () => {
-  test("renders one circle per node", async () => {
-    render(
-      <BrowserRouter>
-        <GraphView />
-      </BrowserRouter>,
+describe("GraphView integration", () => {
+  test("snapshot fetch wires full snapshot + global mode into renderer", async () => {
+    installFetch(() =>
+      new Response(JSON.stringify(sampleSnap), {
+        status: 200,
+        headers: { ETag: '"v1"', "Content-Type": "application/json" },
+      }),
     );
-    await new Promise((r) => setTimeout(r, 50));
-    const circles = document.querySelectorAll(
-      "svg [data-testid='graph-node']",
-    );
-    expect(circles.length).toBe(3);
+
+    renderAt();
+    await waitFor(() => expect(createCalls.length).toBeGreaterThan(0));
+
+    const call = createCalls[0]!;
+    expect(call.opts.mode).toEqual({ kind: "global" });
+    expect(call.opts.snap.nodes.length).toBe(3);
+    expect(call.opts.snap.edges.length).toBe(2);
+    // tier filter defaults from tierFilter.ts (only `connected` on)
+    expect(call.opts.tierFilter.connected).toBe(true);
+    expect(call.opts.tierFilter.mentions).toBe(false);
   });
 
-  test("renders edges with type-specific class", async () => {
-    render(
-      <BrowserRouter>
-        <GraphView />
-      </BrowserRouter>,
+  test("tier toggle pushes new filter to renderer and persists v1 schema to localStorage", async () => {
+    installFetch(() =>
+      new Response(JSON.stringify(sampleSnap), {
+        status: 200,
+        headers: { ETag: '"v1"' },
+      }),
     );
-    await new Promise((r) => setTimeout(r, 50));
-    const subdomainLines = document.querySelectorAll("line[data-edge-type='subdomain']");
-    const domainLines = document.querySelectorAll("line[data-edge-type='domain']");
-    const tagLines = document.querySelectorAll("line[data-edge-type='tag']");
-    expect(subdomainLines.length).toBe(1);
-    expect(domainLines.length).toBe(1);
-    expect(tagLines.length).toBe(1);
-  });
-});
 
-describe("GraphView interactions", () => {
-  test("hovering a node fades non-neighbors", async () => {
-    render(
-      <BrowserRouter>
-        <GraphView />
-      </BrowserRouter>,
-    );
-    await new Promise((r) => setTimeout(r, 50));
-    const nodes = document.querySelectorAll("circle[data-testid='graph-node']") as NodeListOf<SVGCircleElement>;
-    expect(nodes.length).toBe(3);
-    fireEvent.mouseEnter(nodes[0]);
-    expect(nodes[0].getAttribute("opacity")).not.toBe("0.2");
+    renderAt();
+    await waitFor(() => expect(createCalls.length).toBeGreaterThan(0));
+    const call = createCalls[0]!;
+
+    const mentionsCheckbox = screen.getByLabelText("mentions") as HTMLInputElement;
+    expect(mentionsCheckbox.checked).toBe(false);
+    fireEvent.click(mentionsCheckbox);
+
+    await waitFor(() => expect(call.handle.updateFilterCalls.length).toBeGreaterThan(0));
+    const last = call.handle.updateFilterCalls.at(-1)!;
+    expect(last.mentions).toBe(true);
+    expect(last.connected).toBe(true);
+
+    const stored = JSON.parse(localStorage.getItem("graph-tier-filter") ?? "{}");
+    expect(stored.version).toBe(1);
+    expect(stored.mentions).toBe(true);
   });
 
-  test("scrolling the SVG updates the root transform (zoom)", async () => {
-    render(
-      <BrowserRouter>
-        <GraphView />
-      </BrowserRouter>,
-    );
-    await new Promise((r) => setTimeout(r, 50));
-    const svg = document.querySelector("svg") as SVGSVGElement;
-    fireEvent.wheel(svg, { deltaY: -100, clientX: 400, clientY: 300 });
-    const rootG = svg.querySelector("g.root") as SVGGElement;
-    expect(rootG.getAttribute("transform")).toMatch(/scale\(/);
-  });
-});
+  test("typing in search reaches renderer; failed search retains state and warns", async () => {
+    let searchCalls = 0;
+    installFetch((url) => {
+      if (url.startsWith("/api/graph/snapshot")) {
+        return new Response(JSON.stringify(sampleSnap), {
+          status: 200,
+          headers: { ETag: '"v1"' },
+        });
+      }
+      if (url.startsWith("/api/graph/search")) {
+        searchCalls++;
+        if (searchCalls === 1) {
+          return new Response(
+            JSON.stringify({
+              hits: [
+                {
+                  path: "a.md",
+                  title: "Alpha",
+                  score: 0.5,
+                  fts_rank: 1,
+                  sem_rank: null,
+                  hop_distance: null,
+                },
+              ],
+            }),
+            { status: 200 },
+          );
+        }
+        // second call: server error → GraphView must catch and warn, not crash
+        return new Response("nope", { status: 500 });
+      }
+      return new Response("[]");
+    });
 
-describe("GraphView filter panel", () => {
-  test("unchecking 'tag' hides tag-type edges", async () => {
-    render(
-      <BrowserRouter>
-        <GraphView />
-      </BrowserRouter>,
+    renderAt();
+    await waitFor(() => expect(createCalls.length).toBeGreaterThan(0));
+    const call = createCalls[0]!;
+
+    const search = screen.getByPlaceholderText("Search notes…") as HTMLInputElement;
+    fireEvent.change(search, { target: { value: "alpha" } });
+
+    await waitFor(
+      () => {
+        const ok = call.handle.updateQueryCalls.some((c) => c.matches.has("a.md"));
+        expect(ok).toBe(true);
+      },
+      { timeout: 1500 },
     );
-    await new Promise((r) => setTimeout(r, 50));
-    const tagBox = screen.getByLabelText("Tag") as HTMLInputElement;
-    expect(document.querySelectorAll("line[data-edge-type='tag']").length).toBe(1);
-    fireEvent.click(tagBox);
-    expect(document.querySelectorAll("line[data-edge-type='tag'][data-hidden='true']").length).toBe(1);
+
+    const beforeFailureCalls = call.handle.updateQueryCalls.length;
+    fireEvent.change(search, { target: { value: "beta" } });
+
+    await waitFor(
+      () => {
+        expect(searchCalls).toBeGreaterThanOrEqual(2);
+        expect(warnSpy!.mock.calls.length).toBeGreaterThan(0);
+      },
+      { timeout: 1500 },
+    );
+
+    // Renderer state from successful search is preserved (no extra
+    // updateQueryFilter call for the failed request).
+    expect(call.handle.updateQueryCalls.length).toBe(beforeFailureCalls);
   });
 
-  test("'domain' is unchecked by default and domain edges are hidden initially", async () => {
-    render(
-      <BrowserRouter>
-        <GraphView />
-      </BrowserRouter>,
+  test("snapshot fetch failure surfaces error UI and skips renderer", async () => {
+    installFetch(() => new Response("boom", { status: 500 }));
+
+    renderAt();
+    await waitFor(() => {
+      expect(screen.getByText(/failed to load graph/i)).toBeDefined();
+    });
+    expect(createCalls.length).toBe(0);
+  });
+
+  test("?focus=<path> calls focusNode after snapshot lands", async () => {
+    installFetch(() =>
+      new Response(JSON.stringify(sampleSnap), {
+        status: 200,
+        headers: { ETag: '"v1"' },
+      }),
     );
-    await new Promise((r) => setTimeout(r, 50));
-    const domainBox = screen.getByLabelText("Domain") as HTMLInputElement;
-    expect(domainBox.checked).toBe(false);
-    expect(
-      document.querySelectorAll("line[data-edge-type='domain'][data-hidden='true']").length,
-    ).toBe(1);
+
+    renderAt("/graph?focus=a.md");
+    await waitFor(() => expect(createCalls.length).toBeGreaterThan(0));
+    const call = createCalls[0]!;
+
+    await waitFor(() => expect(call.handle.focusCalls).toContain("a.md"));
+  });
+
+  test("search box hits /api/graph/search with focus param + hits drive updateQueryFilter", async () => {
+    const seenSearchUrls: string[] = [];
+    installFetch((url) => {
+      if (url.startsWith("/api/graph/snapshot")) {
+        return new Response(JSON.stringify(sampleSnap), {
+          status: 200,
+          headers: { ETag: '"v1"' },
+        });
+      }
+      if (url.startsWith("/api/graph/search")) {
+        seenSearchUrls.push(url);
+        return new Response(
+          JSON.stringify({
+            hits: [
+              { path: "b.md", title: "Beta", score: 0.9, fts_rank: 1, sem_rank: 2, hop_distance: 1 },
+              { path: "c.md", title: "Gamma", score: 0.4, fts_rank: 2, sem_rank: null, hop_distance: 2 },
+              // hit not in snap — must be filtered out
+              { path: "ghost.md", title: "Ghost", score: 0.3, fts_rank: 3, sem_rank: null, hop_distance: null },
+            ],
+          }),
+          { status: 200 },
+        );
+      }
+      return new Response("[]");
+    });
+
+    renderAt("/graph?focus=a.md");
+    await waitFor(() => expect(createCalls.length).toBeGreaterThan(0));
+    const call = createCalls[0]!;
+
+    // ?focus= triggers a setQuery(node.title) — wait for that to flush a search.
+    await waitFor(
+      () => {
+        expect(seenSearchUrls.length).toBeGreaterThan(0);
+      },
+      { timeout: 1500 },
+    );
+
+    const url = seenSearchUrls.at(-1)!;
+    expect(url).toContain("/api/graph/search?");
+    expect(url).toContain("q=");
+    expect(url).toContain("focus=a.md");
+
+    await waitFor(
+      () => {
+        const last = call.handle.updateQueryCalls.at(-1);
+        if (!last) throw new Error("no update yet");
+        expect(last.matches.has("b.md")).toBe(true);
+        expect(last.matches.has("c.md")).toBe(true);
+        expect(last.matches.has("ghost.md")).toBe(false);
+      },
+      { timeout: 1500 },
+    );
+  });
+
+  test("ETag round-trip — second snapshot fetch sends If-None-Match", async () => {
+    let snapCalls = 0;
+    const seenIfNoneMatch: Array<string | null> = [];
+    installFetch((url, init) => {
+      if (!url.startsWith("/api/graph/snapshot")) return new Response("[]");
+      snapCalls++;
+      const inm =
+        (init?.headers && (init.headers as Record<string, string>)["If-None-Match"]) ?? null;
+      seenIfNoneMatch.push(inm);
+      if (snapCalls === 1) {
+        return new Response(JSON.stringify(sampleSnap), {
+          status: 200,
+          headers: { ETag: '"v1"' },
+        });
+      }
+      return new Response(null, { status: 304, headers: { ETag: '"v1"' } });
+    });
+
+    renderAt();
+    await waitFor(() => expect(createCalls.length).toBeGreaterThan(0));
+
+    // Force a second fetch via the module's exported helper — the hook normally
+    // refetches on a tick, but we can drive it deterministically.
+    const { fetchSnapshot } = await import("../../src/client/graph/useGraphSnapshot");
+    await fetchSnapshot(true);
+
+    expect(snapCalls).toBe(2);
+    expect(seenIfNoneMatch[0]).toBeNull();
+    expect(seenIfNoneMatch[1]).toBe('"v1"');
   });
 });

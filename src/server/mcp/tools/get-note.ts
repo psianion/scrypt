@@ -12,8 +12,7 @@ interface Input {
 interface EdgeRow {
   source: string;
   target: string;
-  relation: string;
-  confidence: string | null;
+  tier: string;
   reason: string | null;
 }
 
@@ -65,13 +64,13 @@ export const getNoteTool: ToolDef<Input, Output> = {
     const metadata = ctx.metadata.get(input.path);
     const outgoing = ctx.db
       .query<EdgeRow, [string]>(
-        `SELECT source, target, relation, confidence, reason
+        `SELECT source, target, tier, reason
          FROM graph_edges WHERE source = ?`,
       )
       .all(input.path);
     const incoming = ctx.db
       .query<EdgeRow, [string]>(
-        `SELECT source, target, relation, confidence, reason
+        `SELECT source, target, tier, reason
          FROM graph_edges WHERE target = ?`,
       )
       .all(input.path);

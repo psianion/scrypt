@@ -38,6 +38,22 @@ export interface Backlink {
   context: string;
 }
 
+export type Tier = "connected" | "mentions" | "semantically_related";
+
+export function parseTier(s: string | null): Tier | null {
+  if (s === "connected" || s === "mentions" || s === "semantically_related") {
+    return s;
+  }
+  return null;
+}
+
+export interface NoteIncomingEdge {
+  source: string;
+  target: string;
+  tier: Tier;
+  reason: string | null;
+}
+
 // Legacy indexer-table shapes used by GET /api/graph/*path (the local
 // subgraph walk). The canonical full-graph types with 4 edge weights live
 // in `./graph-types.ts` and are used by GET /api/graph.
@@ -55,16 +71,28 @@ export interface LocalGraphEdge {
   type: string;
 }
 
+export type TaskType =
+  | "BRAINSTORM"
+  | "PLAN"
+  | "BUILD"
+  | "RESEARCH"
+  | "REVIEW"
+  | "CUSTOM";
+
+export type TaskStatus = "open" | "in_progress" | "closed";
+
 export interface Task {
   id: number;
-  noteId: number;
-  notePath: string;
-  text: string;
-  done: boolean;
-  dueDate: string | null;
+  note_path: string | null;
+  title: string;
+  type: TaskType;
+  status: TaskStatus;
+  due_date: string | null;
   priority: number;
-  board: string;
-  line: number;
+  metadata: Record<string, unknown> | null;
+  client_tag: string | null;
+  created_at: number;
+  updated_at: number;
 }
 
 export interface SearchResult {

@@ -1,13 +1,13 @@
 // src/shared/graph-types.ts
 //
 // Canonical graph types used by GET /api/graph (the domain-aware full graph
-// with four edge types: wikilink, subdomain, domain, tag). A simpler
+// with derived edge types: subdomain, domain, tag, similarity). A simpler
 // `LocalGraphNode`/`LocalGraphEdge` pair lives in `./types` and is used by
 // GET /api/graph/*path (local subgraph via the indexer's graph_nodes/edges
 // tables).
 import type { Tag } from "./types";
 
-export type GraphEdgeType = "wikilink" | "subdomain" | "domain" | "tag" | "similarity";
+export type GraphEdgeType = "subdomain" | "domain" | "tag" | "similarity";
 
 export interface GraphNode {
   id: string;

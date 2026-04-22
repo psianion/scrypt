@@ -4,10 +4,8 @@ import { randomUUID } from "node:crypto";
 import type { FileManager } from "./file-manager";
 import {
   parseFrontmatter,
-  extractWikiLinks,
   extractTags,
 } from "./parsers";
-import { resolveSlug } from "./slug-resolver";
 import { parseStructural } from "./indexer/structural-parse";
 import type { SectionsRepo } from "./indexer/sections-repo";
 import type { EmbedderLike } from "./embeddings/service";
@@ -145,8 +143,81 @@ export class Indexer {
       )
       .run(path, path, note.title ?? "", contentHash);
 
-    // FTS5
-    this.db.query("INSERT OR REPLACE INTO notes_fts (rowid, title, content, path) VALUES (?, ?, ?, ?)").run(noteId, note.title, note.content, path);
+    // FTS5 — body is the legacy indexer's responsibility. Metadata + edge
+    // reasons get filled in by refreshNoteFts (called from MCP write tools).
+    // We pull whatever metadata/edges already exist so a body reindex never
+    // wipes a previously-indexed metadata blob.
+    const metaRow = this.db
+      .query<
+        {
+          description: string | null;
+          summary: string | null;
+          entities: string | null;
+          themes: string | null;
+        },
+        [string]
+      >(
+        `SELECT description, summary, entities, themes
+           FROM note_metadata WHERE note_path = ?`,
+      )
+      .get(path);
+    const edgeRows = this.db
+      .query<{ reason: string | null }, [string, string]>(
+        `SELECT reason FROM graph_edges WHERE source = ? OR target = ?`,
+      )
+      .all(path, path);
+    const summaryText = metaRow
+      ? [metaRow.description, metaRow.summary]
+          .filter((s): s is string => typeof s === "string" && s.length > 0)
+          .join(" ")
+      : "";
+    let entitiesText = "";
+    if (metaRow?.entities) {
+      try {
+        const parsed = JSON.parse(metaRow.entities) as Array<{ name?: unknown }>;
+        if (Array.isArray(parsed)) {
+          entitiesText = parsed
+            .map((e) => (e && typeof e.name === "string" ? e.name : ""))
+            .filter(Boolean)
+            .join(" ");
+        }
+      } catch {
+        entitiesText = "";
+      }
+    }
+    let themesText = "";
+    if (metaRow?.themes) {
+      try {
+        const parsed = JSON.parse(metaRow.themes) as unknown;
+        if (Array.isArray(parsed)) {
+          themesText = parsed
+            .filter((t): t is string => typeof t === "string")
+            .join(" ");
+        }
+      } catch {
+        themesText = "";
+      }
+    }
+    const edgeReasonsText = edgeRows
+      .map((r) => r.reason)
+      .filter((s): s is string => typeof s === "string" && s.length > 0)
+      .join(" ");
+    this.db
+      .query(
+        `INSERT OR REPLACE INTO notes_fts
+           (rowid, title, content, path, summary, entities, themes, edge_reasons)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        noteId,
+        note.title,
+        note.content,
+        path,
+        summaryText,
+        entitiesText,
+        themesText,
+        edgeReasonsText,
+      );
 
     // Aliases
     if (note.aliases.length > 0) {
@@ -163,44 +234,9 @@ export class Indexer {
       tagStmt.run(noteId, tag);
     }
 
-    // Wiki-links → backlinks + graph_edges
-    const links = extractWikiLinks(note.content);
-    for (const link of links) {
-      const match = resolveSlug(link.target, this.db);
-      const targetPath = match ? match.path : this.resolveLink(link.target);
-      if (!targetPath) continue;
-
-      const target = this.db
-        .query("SELECT id FROM notes WHERE path = ?")
-        .get(targetPath) as { id: number } | null;
-      if (!target) continue;
-
-      // Extract context: the line containing the link
-      const contextLine = note.content
-        .split("\n")
-        .find((l) => l.includes(`[[${link.target}`)) || "";
-
-      this.db
-        .query("INSERT OR IGNORE INTO backlinks (source_id, target_id, context) VALUES (?, ?, ?)")
-        .run(noteId, target.id, contextLine.trim());
-
-      // Ensure the target has a graph_nodes row even if it hasn't been
-      // fully reindexed yet (e.g. during fullReindex pass 1).
-      this.db
-        .query(
-          `INSERT OR IGNORE INTO graph_nodes (id, kind, note_path, label)
-           VALUES (?, 'note', ?, ?)`,
-        )
-        .run(targetPath, targetPath, targetPath);
-
-      this.db
-        .query(
-          `INSERT OR IGNORE INTO graph_edges
-             (source, target, relation, weight, created_at)
-           VALUES (?, ?, 'wikilink', 3, ?)`,
-        )
-        .run(path, targetPath, Date.now());
-    }
+    // graph-v2 (G2): wikilink edge production removed. The body is no longer
+    // scanned for [[…]]; backlinks/graph_edges from prose links are gone.
+    // All connections come from add_edge (LLM-curated) or rescan_similarity.
 
     // Wave 9: legacy checkbox-based task extraction is dead. Tasks now come
     // from MCP create_task (LLM-decided during ingest, or ad-hoc) against the
@@ -284,6 +320,25 @@ export class Indexer {
       .all(path) as Backlink[];
   }
 
+  getIncomingEdges(path: string): Array<{
+    source: string;
+    target: string;
+    tier: string;
+    reason: string | null;
+  }> {
+    return this.db
+      .query(
+        `SELECT source, target, tier, reason
+         FROM graph_edges WHERE target = ?`,
+      )
+      .all(path) as Array<{
+        source: string;
+        target: string;
+        tier: string;
+        reason: string | null;
+      }>;
+  }
+
   getGraph(): { nodes: LocalGraphNode[]; edges: LocalGraphEdge[] } {
     const nodes = this.db
       .query(
@@ -305,7 +360,7 @@ export class Indexer {
 
     const edges = this.db
       .query(
-        "SELECT source, target, relation as type FROM graph_edges",
+        "SELECT source, target, tier as type FROM graph_edges",
       )
       .all() as LocalGraphEdge[];
 
@@ -369,7 +424,7 @@ export class Indexer {
 
     const edges = this.db
       .query(
-        `SELECT source, target, relation as type
+        `SELECT source, target, tier as type
          FROM graph_edges
          WHERE source IN (${placeholders}) AND target IN (${placeholders})`,
       )

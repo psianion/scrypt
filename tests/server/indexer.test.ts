@@ -69,27 +69,6 @@ describe("reindexNote", () => {
     expect(hash1).toBe(hash2);
   });
 
-  test("extracts wiki-links and inserts backlinks", async () => {
-    await writeTestNote("notes/source.md", "---\ntitle: Source\n---\nSee [[target]].");
-    await writeTestNote("notes/target.md", "---\ntitle: Target\n---\nTarget note.");
-    await indexer.reindexNote("notes/target.md");
-    await indexer.reindexNote("notes/source.md");
-
-    const backlinks = indexer.getBacklinks("notes/target.md");
-    expect(backlinks.length).toBeGreaterThanOrEqual(1);
-    expect(backlinks[0].sourcePath).toBe("notes/source.md");
-  });
-
-  test("handles [[link|display text]] syntax", async () => {
-    await writeTestNote("notes/fancy.md", "---\ntitle: Fancy\n---\nLink to [[target|Target Note]].");
-    await writeTestNote("notes/target.md", "---\ntitle: Target\n---\nTarget.");
-    await indexer.reindexNote("notes/target.md");
-    await indexer.reindexNote("notes/fancy.md");
-
-    const edges = db.query("SELECT * FROM graph_edges WHERE relation = 'wikilink'").all();
-    expect(edges.length).toBeGreaterThanOrEqual(1);
-  });
-
   test("extracts inline #tags and frontmatter tags", async () => {
     await writeTestNote("notes/tagged.md", "---\ntitle: Tagged\ntags: [project]\n---\nInline #active tag.");
     await indexer.reindexNote("notes/tagged.md");
@@ -98,20 +77,6 @@ describe("reindexNote", () => {
     const tagNames = tags.map((t) => t.tag);
     expect(tagNames).toContain("project");
     expect(tagNames).toContain("active");
-  });
-
-  test("creates graph_edges for links", async () => {
-    await writeTestNote("notes/g1.md", "---\ntitle: G1\n---\nLink to [[g2]].");
-    await writeTestNote("notes/g2.md", "---\ntitle: G2\n---\nTarget.");
-    await indexer.reindexNote("notes/g2.md");
-    await indexer.reindexNote("notes/g1.md");
-
-    const edges = db
-      .query("SELECT * FROM graph_edges WHERE relation = 'wikilink'")
-      .all() as any[];
-    expect(edges.length).toBeGreaterThanOrEqual(1);
-    expect(edges[0].source).toBe("notes/g1.md");
-    expect(edges[0].target).toBe("notes/g2.md");
   });
 
   // Wave 9: legacy checkbox-task extraction is dead. Task creation now goes
@@ -175,44 +140,14 @@ describe("search", () => {
   });
 });
 
-describe("getBacklinks", () => {
-  test("returns notes linking to target with context snippet", async () => {
-    await writeTestNote("notes/ref.md", "---\ntitle: Referrer\n---\nPlease see [[target-note]] for more.");
-    await writeTestNote("notes/target-note.md", "---\ntitle: Target Note\n---\nTarget content.");
-    await indexer.fullReindex();
-
-    const backlinks = indexer.getBacklinks("notes/target-note.md");
-    expect(backlinks).toHaveLength(1);
-    expect(backlinks[0].sourcePath).toBe("notes/ref.md");
-    expect(backlinks[0].context).toContain("target-note");
-  });
-});
-
 describe("getGraph", () => {
-  test("returns all nodes and edges", async () => {
-    await writeTestNote("notes/n1.md", "---\ntitle: N1\n---\nLink to [[n2]].");
-    await writeTestNote("notes/n2.md", "---\ntitle: N2\n---\nStandalone.");
+  test("returns all nodes (edges now come from add_edge / similarity, not body parse)", async () => {
+    await writeTestNote("notes/n1.md", "---\ntitle: N1\n---\nbody one.");
+    await writeTestNote("notes/n2.md", "---\ntitle: N2\n---\nbody two.");
     await indexer.fullReindex();
 
     const graph = indexer.getGraph();
     expect(graph.nodes.length).toBe(2);
-    expect(graph.edges.length).toBeGreaterThanOrEqual(1);
-  });
-});
-
-describe("getLocalGraph", () => {
-  test("returns nodes within N hops", async () => {
-    await writeTestNote("notes/center.md", "---\ntitle: Center\n---\nLink to [[hop1]].");
-    await writeTestNote("notes/hop1.md", "---\ntitle: Hop1\n---\nLink to [[hop2]].");
-    await writeTestNote("notes/hop2.md", "---\ntitle: Hop2\n---\nEnd.");
-    await writeTestNote("notes/isolated.md", "---\ntitle: Isolated\n---\nNo links.");
-    await indexer.fullReindex();
-
-    const local = indexer.getLocalGraph("notes/center.md", 1);
-    const paths = local.nodes.map((n) => n.path);
-    expect(paths).toContain("notes/center.md");
-    expect(paths).toContain("notes/hop1.md");
-    expect(paths).not.toContain("notes/isolated.md");
   });
 });
 
@@ -265,26 +200,4 @@ describe("link_index population", () => {
     ).toBe(0);
   });
 
-  test("resolves [[basename]] wiki-links across folders", async () => {
-    mkdirSync(join(vaultPath, "notes/inbox"), { recursive: true });
-    mkdirSync(join(vaultPath, "dnd/research"), { recursive: true });
-    await writeTestNote(
-      "notes/inbox/source.md",
-      "---\ntitle: Source\n---\nSee [[target-note]] for details.",
-    );
-    await writeTestNote(
-      "dnd/research/target-note.md",
-      "---\ntitle: Target Note\n---\nbody",
-    );
-    await indexer.fullReindex();
-
-    const edge = db
-      .query(
-        "SELECT source, target FROM graph_edges WHERE source = ? AND target = ? AND relation = 'wikilink'",
-      )
-      .get("notes/inbox/source.md", "dnd/research/target-note.md") as any;
-    expect(edge).toBeTruthy();
-    expect(edge.source).toBe("notes/inbox/source.md");
-    expect(edge.target).toBe("dnd/research/target-note.md");
-  });
 });

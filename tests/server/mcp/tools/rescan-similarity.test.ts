@@ -62,6 +62,7 @@ function buildCtx(): ToolContext {
     idempotency: new Idempotency(db),
     userId: null,
     vaultDir: "/tmp/vault",
+    scheduleGraphRebuild: () => {},
   };
 }
 
@@ -84,13 +85,11 @@ describe("rescan_similarity tool", () => {
     expect(r.threshold).toBe(0.5);
     expect(r.model).toBe(MODEL);
     const rel = ctx.db
-      .query<{ relation: string; confidence: string }, []>(
-        `SELECT relation, confidence FROM graph_edges`,
+      .query<{ tier: string }, []>(
+        `SELECT tier FROM graph_edges`,
       )
       .all();
-    expect(rel).toEqual([
-      { relation: "semantically_related", confidence: "semantically_related" },
-    ]);
+    expect(rel).toEqual([{ tier: "semantically_related" }]);
   });
 
   test("scopedTo paths restricts emitted pairs", async () => {

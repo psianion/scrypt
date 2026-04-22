@@ -25,7 +25,7 @@ describe("cluster_graph + get_report", () => {
       insertNode.run(n, n, n);
     }
     const insertEdge = db.prepare(
-      `INSERT INTO graph_edges (source, target, relation) VALUES (?, ?, 'wikilink')`,
+      `INSERT INTO graph_edges (source, target, tier) VALUES (?, ?, 'connected')`,
     );
     for (const [s, t] of [
       ["a1", "a2"],
@@ -49,6 +49,7 @@ describe("cluster_graph + get_report", () => {
       idempotency: new Idempotency(db),
       userId: null,
       vaultDir: "/tmp",
+      scheduleGraphRebuild: () => {},
     };
   });
 

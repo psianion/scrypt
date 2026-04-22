@@ -1,5 +1,5 @@
 // src/client/api.ts
-import type { Note, NoteMeta, SearchResult, Task, LocalGraphNode, LocalGraphEdge, WsMessage } from "../shared/types";
+import type { Note, NoteMeta, NoteIncomingEdge, SearchResult, Task, LocalGraphNode, LocalGraphEdge, WsMessage } from "../shared/types";
 import { useEmbeddingProgress } from "./stores/embeddingProgress";
 import type { GraphResponse } from "../shared/graph-types";
 
@@ -18,7 +18,10 @@ export const api = {
       const qs = new URLSearchParams(params as Record<string, string>).toString();
       return json<NoteMeta[]>(`/api/notes${qs ? `?${qs}` : ""}`);
     },
-    get: (path: string) => json<Note & { backlinks: any[] }>(`/api/notes/${path}`),
+    get: (path: string) =>
+      json<Note & { backlinks: any[]; incoming_edges: NoteIncomingEdge[] }>(
+        `/api/notes/${path}`,
+      ),
     create: (data: { path: string; content: string; tags?: string[] }) =>
       json<{ path: string }>("/api/notes", {
         method: "POST",
@@ -37,6 +40,23 @@ export const api = {
 
   search: (q: string) => json<SearchResult[]>(`/api/search?q=${encodeURIComponent(q)}`),
   searchTags: (q: string) => json<{ tag: string; count: number }[]>(`/api/search/tags?q=${encodeURIComponent(q)}`),
+  searchGraph: (q: string) =>
+    json<{ paths: string[] }>(`/api/search/graph?q=${encodeURIComponent(q)}`),
+  graphSearch: (q: string, opts?: { focus?: string | null; limit?: number }) => {
+    const qs = new URLSearchParams({ q });
+    if (opts?.focus) qs.set("focus", opts.focus);
+    if (opts?.limit) qs.set("limit", String(opts.limit));
+    return json<{
+      hits: Array<{
+        path: string;
+        title: string;
+        score: number;
+        fts_rank: number | null;
+        sem_rank: number | null;
+        hop_distance: number | null;
+      }>;
+    }>(`/api/graph/search?${qs.toString()}`);
+  },
 
   graph: {
     full: () => json<GraphResponse>("/api/graph"),
@@ -62,16 +82,21 @@ export const api = {
   },
 
   tasks: {
-    list: (params?: { board?: string; done?: string; tag?: string }) => {
-      const qs = new URLSearchParams(params as Record<string, string>).toString();
-      return json<Task[]>(`/api/tasks${qs ? `?${qs}` : ""}`);
+    list(params?: {
+      status?: "open" | "in_progress" | "closed" | "all";
+      type?: string;
+      note_path?: string;
+      limit?: number;
+      offset?: number;
+    }) {
+      const qs = new URLSearchParams();
+      for (const [k, v] of Object.entries(params ?? {})) {
+        if (v !== undefined) qs.set(k, String(v));
+      }
+      return json<{ tasks: Task[]; total: number }>(
+        `/api/tasks/list${qs.toString() ? `?${qs}` : ""}`,
+      );
     },
-    update: (id: number, data: Partial<Pick<Task, "done" | "board" | "priority">>) =>
-      json<void>(`/api/tasks/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      }),
   },
 
   data: {

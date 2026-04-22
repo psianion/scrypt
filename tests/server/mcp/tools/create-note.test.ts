@@ -75,6 +75,7 @@ describe("create_note tool", () => {
       idempotency: new Idempotency(db),
       userId: "u1",
       vaultDir,
+      scheduleGraphRebuild: () => {},
     };
   });
 
@@ -186,25 +187,4 @@ alpha only
     expect(rows[0].chunk_id).toBe("n_md:alpha");
   });
 
-  test("wikilinks land as graph_edges with relation='wikilink'", async () => {
-    const content = `---
-title: A
----
-
-See [[b]] and [[c]].
-`;
-    const res = await createNoteTool.handler(
-      ctx,
-      { path: "a.md", content, client_tag: "link-1" },
-      "corr-x",
-    );
-    expect(res.edges_created).toBe(2);
-    const edges = ctx.db
-      .query<{ source: string; target: string; relation: string }, []>(
-        `SELECT source, target, relation FROM graph_edges ORDER BY target`,
-      )
-      .all();
-    expect(edges.map((e) => e.target)).toEqual(["b", "c"]);
-    expect(edges.every((e) => e.relation === "wikilink")).toBe(true);
-  });
 });

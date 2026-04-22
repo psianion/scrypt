@@ -102,34 +102,6 @@ function upsertNode(
   ).run(notePath, title, notePath, contentHash);
 }
 
-function upsertWikilinkEdges(
-  db: Database,
-  sourcePath: string,
-  targets: string[],
-): number {
-  if (targets.length === 0) return 0;
-  db.query(
-    `DELETE FROM graph_edges WHERE source = ? AND relation = 'wikilink'`,
-  ).run(sourcePath);
-  const ensureNode = db.prepare(
-    `INSERT OR IGNORE INTO graph_nodes (id, kind, note_path, label)
-     VALUES (?, 'note', ?, ?)`,
-  );
-  const insert = db.prepare(
-    `INSERT OR IGNORE INTO graph_edges
-       (source, target, relation, weight, created_at)
-     VALUES (?, ?, 'wikilink', 3, ?)`,
-  );
-  let count = 0;
-  const now = Date.now();
-  for (const t of targets) {
-    ensureNode.run(t, t, t);
-    const res = insert.run(sourcePath, t, now);
-    if (res.changes > 0) count += 1;
-  }
-  return count;
-}
-
 function allEmbeddedPaths(db: Database, model: string): string[] {
   return (
     db
@@ -151,7 +123,7 @@ export const batchIngestTool: ToolDef<Input, Output> = {
       domain: { type: "string", description: "Domain label for organizing ingested notes (default: dirname)" },
       target_prefix: { type: "string", description: "Vault path prefix (default: research/)" },
       batch_size: { type: "number", description: "Files per yield (default: 25)" },
-      min_similarity: { type: "number", description: "Cosine threshold for semantically_related edges. Default: SCRYPT_SIMILARITY_THRESHOLD env (0.75 if unset)." },
+      min_similarity: { type: "number", description: "Cosine threshold for semantically_related edges. Default: SCRYPT_SIMILARITY_THRESHOLD env (0.78 if unset)." },
     },
     required: ["source_dir"],
   },
@@ -209,11 +181,6 @@ export const batchIngestTool: ToolDef<Input, Output> = {
             );
 
             upsertNode(ctx.db, vaultPath, title, parsed.contentHash);
-            upsertWikilinkEdges(
-              ctx.db,
-              vaultPath,
-              parsed.wikilinks.map((w) => w.target),
-            );
 
             const embed = await ctx.embedService.embedNote(parsed, correlationId);
 
@@ -264,6 +231,8 @@ export const batchIngestTool: ToolDef<Input, Output> = {
       });
       simEdges = upsertSemanticEdges(ctx.db, pairs);
     }
+
+    ctx.scheduleGraphRebuild();
 
     return {
       scanned: mdFiles.length,

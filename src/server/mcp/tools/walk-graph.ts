@@ -1,29 +1,20 @@
 // src/server/mcp/tools/walk-graph.ts
 import type { ToolDef } from "../types";
-import {
-  CONFIDENCE_RANK,
-  CONFIDENCE_VALUES,
-  type Confidence,
-} from "../confidence";
+import { TIER_RANK, TIER_VALUES } from "../confidence";
+import type { Tier } from "../../../shared/types";
 
 const MAX_NODES = 500;
-
-// Default fallback for edges with NULL confidence (structural edges created
-// by the indexer). Treated as strongest so they always pass confidence_min.
-const DEFAULT_EDGE_CONFIDENCE: Confidence = "connected";
 
 interface Input {
   from: string;
   depth?: number;
-  relation_filter?: string[];
-  confidence_min?: Confidence;
+  tier_min?: Tier;
 }
 
 interface EdgeRow {
   source: string;
   target: string;
-  relation: string;
-  confidence: string | null;
+  tier: string;
 }
 
 interface NodeRow {
@@ -41,28 +32,22 @@ interface Output {
 export const walkGraphTool: ToolDef<Input, Output> = {
   name: "walk_graph",
   description:
-    "BFS traversal from a starting node. Caps at 500 nodes. Filters by relation and confidence.",
+    "BFS traversal from a starting node. Caps at 500 nodes. Filters by tier.",
   inputSchema: {
     type: "object",
     properties: {
       from: { type: "string" },
       depth: { type: "number" },
-      relation_filter: { type: "array" },
-      confidence_min: {
+      tier_min: {
         type: "string",
-        enum: [...CONFIDENCE_VALUES],
+        enum: [...TIER_VALUES],
       },
     },
     required: ["from"],
   },
   async handler(ctx, input) {
     const depth = input.depth ?? 1;
-    const minRank =
-      CONFIDENCE_RANK[input.confidence_min ?? "semantically_related"];
-    const relFilter =
-      input.relation_filter && input.relation_filter.length > 0
-        ? new Set(input.relation_filter)
-        : null;
+    const minRank = TIER_RANK[input.tier_min ?? "semantically_related"];
 
     const visited = new Set<string>([input.from]);
     const seenEdges = new Set<string>();
@@ -70,7 +55,7 @@ export const walkGraphTool: ToolDef<Input, Output> = {
     let frontier = [input.from];
 
     const neighborStmt = ctx.db.prepare(
-      `SELECT source, target, relation, confidence
+      `SELECT source, target, tier
        FROM graph_edges WHERE source = ? OR target = ?`,
     );
 
@@ -83,11 +68,9 @@ export const walkGraphTool: ToolDef<Input, Output> = {
       for (const node of frontier) {
         const neighbors = neighborStmt.all(node, node) as EdgeRow[];
         for (const e of neighbors) {
-          if (relFilter && !relFilter.has(e.relation)) continue;
-          const confKey = (e.confidence as Confidence | null) ?? DEFAULT_EDGE_CONFIDENCE;
-          const rank = CONFIDENCE_RANK[confKey] ?? CONFIDENCE_RANK[DEFAULT_EDGE_CONFIDENCE];
+          const rank = TIER_RANK[e.tier as Tier] ?? -1;
           if (rank < minRank) continue;
-          const key = `${e.source}\u0000${e.target}\u0000${e.relation}`;
+          const key = `${e.source}\u0000${e.target}\u0000${e.tier}`;
           if (seenEdges.has(key)) continue;
           seenEdges.add(key);
           edges.push(e);

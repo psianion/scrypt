@@ -11,6 +11,7 @@ import { EmbeddingEngine } from "../embeddings/engine";
 import { EmbeddingService } from "../embeddings/service";
 import { ProgressBus } from "../embeddings/progress";
 import { Idempotency } from "./idempotency";
+import { SnapshotScheduler } from "../graph/snapshot-scheduler";
 import type { ToolContext } from "./types";
 
 interface ContextFactoryOptions {
@@ -50,6 +51,7 @@ function buildContext(
     },
   });
   const idempotency = new Idempotency(db);
+  const snapshotScheduler = new SnapshotScheduler(db, opts.vaultDir);
 
   return {
     db,
@@ -63,6 +65,7 @@ function buildContext(
     idempotency,
     userId,
     vaultDir: opts.vaultDir,
+    scheduleGraphRebuild: () => snapshotScheduler.schedule(),
   };
 }
 

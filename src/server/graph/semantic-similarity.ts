@@ -4,8 +4,7 @@
 //
 // Averages chunk embeddings into a per-note vector, finds pairs whose
 // cosine similarity meets the configured threshold, and writes them as
-// `graph_edges.relation = 'semantically_related'` with
-// `confidence = 'semantically_related'` (Wave 9 confidence enum, spec §4.1).
+// `graph_edges.tier = 'semantically_related'` (graph-v2 tier enum).
 import type { Database } from "bun:sqlite";
 
 export interface SimilarPair {
@@ -27,15 +26,15 @@ interface ChunkRow {
 }
 
 /**
- * Default similarity threshold per spec §4.2: 0.75. Override via
+ * Single similarity threshold (graph-v2 G3). Default 0.78; override via
  * `SCRYPT_SIMILARITY_THRESHOLD` env. Clamped to [0, 1]; non-numeric values
- * fall back to the default.
+ * fall back to the default. Render-side filters were collapsed into this one.
  */
 export function getSimilarityThreshold(): number {
   const raw = process.env.SCRYPT_SIMILARITY_THRESHOLD;
-  if (raw === undefined || raw === "") return 0.75;
+  if (raw === undefined || raw === "") return 0.78;
   const n = Number.parseFloat(raw);
-  if (!Number.isFinite(n)) return 0.75;
+  if (!Number.isFinite(n)) return 0.78;
   return Math.min(1, Math.max(0, n));
 }
 
@@ -130,7 +129,7 @@ export function findSimilarPairs(
 
 /**
  * Insert one `graph_edges` row per pair as a `semantically_related` edge.
- * Idempotent — relies on the existing `UNIQUE (source, target, relation)`
+ * Idempotent — relies on the existing `UNIQUE (source, target, tier)`
  * constraint to skip duplicates. Returns the count of newly inserted rows.
  */
 export function upsertSemanticEdges(
@@ -140,8 +139,8 @@ export function upsertSemanticEdges(
   if (pairs.length === 0) return 0;
   const insert = db.prepare(
     `INSERT OR IGNORE INTO graph_edges
-       (source, target, relation, weight, confidence, reason, created_at)
-     VALUES (?, ?, 'semantically_related', ?, 'semantically_related', ?, ?)`,
+       (source, target, tier, weight, reason, created_at)
+     VALUES (?, ?, 'semantically_related', ?, ?, ?)`,
   );
   const now = Date.now();
   let created = 0;

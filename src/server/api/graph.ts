@@ -1,4 +1,6 @@
-// src/server/api/graph.ts
+import { createHash, randomUUID } from "node:crypto";
+import { existsSync, statSync } from "node:fs";
+import { join } from "node:path";
 import type { Router } from "../router";
 import type { Database } from "bun:sqlite";
 import type {
@@ -8,6 +10,15 @@ import type {
 } from "../../shared/graph-types";
 import { RESERVED_NAMESPACES, type Tag } from "../../shared/types";
 import { parseTag } from "../parsers";
+import type { SnapshotScheduler } from "../graph/snapshot-scheduler";
+import { writeGraphSnapshot, buildGraphSnapshot } from "../graph/snapshot";
+import { getSimilarityThreshold } from "../graph/semantic-similarity";
+import { hybridSearch } from "../graph/hybrid-search";
+import type { EngineLike } from "../embeddings/service";
+import type { ChunkEmbeddingsRepo } from "../embeddings/chunks-repo";
+
+// Stale window > debounce so SWR converges before next request.
+const SNAPSHOT_STALE_MS = 10_000;
 
 interface NoteRow {
   path: string;
@@ -25,7 +36,112 @@ const RESERVED_PREFIXES = [
   "dist/",
 ];
 
-export function graphRoutes(router: Router, db: Database): void {
+export function graphRoutes(
+  router: Router,
+  db: Database,
+  vaultDir: string,
+  scheduler: SnapshotScheduler,
+  engine?: EngineLike,
+  embeddings?: ChunkEmbeddingsRepo,
+): void {
+  // SHA1 is non-trivial on multi-MB snapshots; recompute only on new builds.
+  const etagCache: { etag: string | null; buildCount: number } = {
+    etag: null,
+    buildCount: -1,
+  };
+
+  router.get("/api/graph/snapshot", async (req) => {
+    const filePath = join(vaultDir, ".scrypt", "graph.json");
+    try {
+      if (!existsSync(filePath)) {
+        await writeGraphSnapshot(db, vaultDir);
+      } else {
+        const age = Date.now() - statSync(filePath).mtimeMs;
+        if (age > SNAPSHOT_STALE_MS) {
+          scheduler.schedule();
+        }
+      }
+
+      const buf = await Bun.file(filePath).arrayBuffer();
+      if (etagCache.etag === null || etagCache.buildCount !== scheduler.buildCount) {
+        etagCache.etag = `"${createHash("sha1").update(new Uint8Array(buf)).digest("hex")}"`;
+        etagCache.buildCount = scheduler.buildCount;
+      }
+      const etag = etagCache.etag;
+      if (req.headers.get("If-None-Match") === etag) {
+        return new Response(null, { status: 304, headers: { ETag: etag } });
+      }
+      return new Response(buf, {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+          "ETag": etag,
+          "Cache-Control": "no-cache",
+        },
+      });
+    } catch (err) {
+      const e = err instanceof Error ? err : new Error(String(err));
+      const errorId = randomUUID().slice(0, 8);
+      console.error("[scrypt] graph snapshot read failed", {
+        vaultDir,
+        errorMessage: e.message,
+        errorStack: e.stack,
+        errorId,
+      });
+      return Response.json(
+        { error: "graph snapshot unavailable", reason: e.message, errorId },
+        { status: 503 },
+      );
+    }
+  });
+
+  router.get("/api/graph/snapshot/health", () => {
+    return Response.json({
+      disabled: scheduler.disabled,
+      lastError: scheduler.lastError?.message ?? null,
+      buildCount: scheduler.buildCount,
+    });
+  });
+
+  router.get("/api/graph/search", async (req) => {
+    const url = new URL(req.url);
+    const q = url.searchParams.get("q");
+    if (!q || q.trim() === "") {
+      return Response.json(
+        { error: "missing query parameter 'q'" },
+        { status: 400 },
+      );
+    }
+    const limitRaw = url.searchParams.get("limit");
+    const limit = limitRaw ? Math.max(1, Math.min(200, Number(limitRaw) | 0)) : 30;
+    const focus = url.searchParams.get("focus");
+    let snapshot = null;
+    if (focus) {
+      try {
+        snapshot = buildGraphSnapshot(db);
+      } catch {
+        snapshot = null;
+      }
+    }
+    try {
+      const hits = await hybridSearch(db, {
+        query: q,
+        limit,
+        focus,
+        snapshot,
+        engine,
+        embeddings,
+      });
+      return Response.json({ hits });
+    } catch (err) {
+      const e = err instanceof Error ? err : new Error(String(err));
+      return Response.json(
+        { error: "hybrid search failed", reason: e.message },
+        { status: 500 },
+      );
+    }
+  });
+
   router.get("/api/graph", async () => {
     const noteRows = db
       .query(
@@ -50,26 +166,10 @@ export function graphRoutes(router: Router, db: Database): void {
     const visibleIds = new Set(nodes.map((n) => n.id));
     const edges: GraphEdge[] = [];
 
-    // 1. wikilink edges — Wave 8 graph_edges uses relation='wikilink'.
-    const linkRows = db
-      .query(
-        `SELECT source, target FROM graph_edges WHERE relation = 'wikilink'`,
-      )
-      .all() as { source: string; target: string }[];
-    for (const row of linkRows) {
-      if (!visibleIds.has(row.source) || !visibleIds.has(row.target))
-        continue;
-      edges.push({
-        source: row.source,
-        target: row.target,
-        type: "wikilink",
-        weight: 3,
-      });
-    }
+    // graph-v2 (G2): wikilink edges retired. No producers remain — the only
+    // edge sources here are derived (subdomain/domain/tag) plus semantic
+    // similarity below.
 
-    // 2. subdomain: equal (domain, subdomain), both non-null
-    // 3. domain: equal domain, different (or one missing) subdomain
-    // 4. tag: shared namespaced tag from RESERVED_NAMESPACES, same ns AND value
     for (let i = 0; i < nodes.length; i++) {
       for (let j = i + 1; j < nodes.length; j++) {
         const a = nodes[i];
@@ -104,7 +204,6 @@ export function graphRoutes(router: Router, db: Database): void {
       }
     }
 
-    // 5. similarity edges from embeddings
     const model = process.env.SCRYPT_EMBED_MODEL ?? "Xenova/bge-small-en-v1.5";
     const chunkRows = db
       .query<
@@ -116,7 +215,6 @@ export function graphRoutes(router: Router, db: Database): void {
       .all(model);
 
     if (chunkRows.length > 0) {
-      // Average chunk vectors per note
       const noteVecs = new Map<string, { sum: Float32Array; count: number }>();
       for (const r of chunkRows) {
         if (!visibleIds.has(r.note_path)) continue;
@@ -132,7 +230,6 @@ export function graphRoutes(router: Router, db: Database): void {
         entry.count += 1;
       }
 
-      // Normalize averaged vectors
       const averaged: Array<{ path: string; vec: Float32Array }> = [];
       for (const [path, entry] of noteVecs) {
         const vec = entry.sum;
@@ -144,15 +241,15 @@ export function graphRoutes(router: Router, db: Database): void {
         averaged.push({ path, vec });
       }
 
-      // Pairwise cosine similarity — add edges above threshold
-      const SIM_THRESHOLD = 0.8;
+      // Single similarity threshold (SCRYPT_SIMILARITY_THRESHOLD, default 0.78).
+      const simThreshold = getSimilarityThreshold();
       for (let i = 0; i < averaged.length; i++) {
         for (let j = i + 1; j < averaged.length; j++) {
           const a = averaged[i];
           const b = averaged[j];
           let score = 0;
           for (let k = 0; k < a.vec.length; k++) score += a.vec[k] * b.vec[k];
-          if (score >= SIM_THRESHOLD) {
+          if (score >= simThreshold) {
             edges.push({
               source: a.path,
               target: b.path,
@@ -164,7 +261,6 @@ export function graphRoutes(router: Router, db: Database): void {
       }
     }
 
-    // connectionCount
     const countMap = new Map<string, number>();
     for (const e of edges) {
       countMap.set(e.source, (countMap.get(e.source) ?? 0) + 1);

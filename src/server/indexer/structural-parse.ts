@@ -2,8 +2,8 @@
 //
 // Deterministic structural parse shared by the file-watch indexer and the
 // MCP create_note tool. Produces everything downstream code needs without
-// any LLM call: frontmatter, wikilinks, tags, heading tree with section
-// ranges, and a content hash of the body.
+// any LLM call: frontmatter, tags, heading tree with section ranges, and
+// a content hash of the body.
 import matter from "gray-matter";
 import { createHash } from "crypto";
 
@@ -16,24 +16,17 @@ export interface ParsedSection {
   endLine: number;
 }
 
-export interface ParsedWikilink {
-  target: string;
-  line: number;
-}
-
 export interface ParsedStructural {
   notePath: string;
   frontmatter: Record<string, unknown>;
   body: string;
   title: string;
   sections: ParsedSection[];
-  wikilinks: ParsedWikilink[];
   tags: string[];
   contentHash: string;
 }
 
 const SLUG_RE = /[^a-z0-9]+/g;
-const WIKILINK_RE = /\[\[([^\]]+)\]\]/g;
 const TAG_RE = /(?:^|\s)#([a-zA-Z][a-zA-Z0-9_/-]*)/g;
 
 function slugify(text: string): string {
@@ -112,14 +105,6 @@ export function parseStructural(
     });
   });
 
-  const wikilinks: ParsedWikilink[] = [];
-  lines.forEach((ln, i) => {
-    for (const m of ln.matchAll(WIKILINK_RE)) {
-      const raw = m[1].split("|")[0].trim();
-      wikilinks.push({ target: raw, line: i });
-    }
-  });
-
   const tagSet = new Set<string>();
   for (const m of body.matchAll(TAG_RE)) tagSet.add(m[1]);
   if (Array.isArray(fm.tags)) for (const t of fm.tags) tagSet.add(String(t));
@@ -138,7 +123,6 @@ export function parseStructural(
     body,
     title,
     sections,
-    wikilinks,
     tags: Array.from(tagSet),
     contentHash,
   };

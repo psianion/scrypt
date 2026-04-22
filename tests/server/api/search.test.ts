@@ -63,17 +63,14 @@ describe("GET /api/graph/*path", () => {
 });
 
 describe("GET /api/backlinks/*path", () => {
-  test("returns linking notes with context", async () => {
+  // graph-v2 (G2): wikilink edge production removed; the backlinks table is
+  // no longer populated from prose [[…]]. Endpoint stays for API stability
+  // but always returns [] now.
+  test("returns array (empty after graph-v2)", async () => {
     const res = await fetch(`${env.baseUrl}/api/backlinks/notes/react.md`);
     expect(res.status).toBe(200);
     const data = await res.json();
-    // 'linked.md' links to 'react'
-    expect(data.some((b: any) => b.sourcePath === "notes/linked.md")).toBe(true);
-  });
-
-  test("returns empty array if no backlinks", async () => {
-    const res = await fetch(`${env.baseUrl}/api/backlinks/notes/linked.md`);
-    const data = await res.json();
     expect(Array.isArray(data)).toBe(true);
+    expect(data).toHaveLength(0);
   });
 });

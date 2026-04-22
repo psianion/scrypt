@@ -4,7 +4,9 @@
 //   - drop legacy checkbox-based `tasks` table and recreate with full CRUD schema
 //     (type CHECK, status CHECK, nullable note_path, default unixepoch timestamps)
 //   - add `doc_type` and `summary` columns to `note_metadata`
-//   - wipe edges using retired confidence values (extracted/inferred/ambiguous)
+//
+// Note: the legacy graph_edges (relation, confidence) → graph-v2 (tier) move
+// is handled destructively in db.ts initSchema (pre-beta, test vault).
 //
 // No back-compat: pre-beta, we drop+recreate the `tasks` table and discard old
 // rows. The migration is idempotent — safe to run multiple times.
@@ -87,27 +89,4 @@ export function applyWave9Migration(db: Database): void {
     }
   }
 
-  // Wave 9 swaps the add_edge confidence enum: extracted/inferred/ambiguous
-  // → connected/mentions/semantically_related. Pre-beta: wipe any rows using
-  // the retired values rather than remapping (old values had different
-  // semantics so translation would be wrong).
-  const graphEdgesCols = tableCols(db, "graph_edges");
-  if (graphEdgesCols.includes("confidence")) {
-    db.run(
-      `DELETE FROM graph_edges
-       WHERE confidence IN ('extracted','inferred','ambiguous')`,
-    );
-    // Old batch_ingest emitted relation='similarity'. Wave 9 unifies that
-    // under the new vocabulary as relation='semantically_related'. Use
-    // UPDATE OR IGNORE so rows that would collide with an already-correct
-    // edge (UNIQUE source,target,relation) are silently dropped instead.
-    db.run(
-      `UPDATE OR IGNORE graph_edges
-         SET relation = 'semantically_related'
-       WHERE relation = 'similarity'`,
-    );
-    // Drop any leftover 'similarity' rows that the UPDATE OR IGNORE skipped
-    // due to UNIQUE collisions.
-    db.run(`DELETE FROM graph_edges WHERE relation = 'similarity'`);
-  }
 }

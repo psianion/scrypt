@@ -34,8 +34,6 @@ export default defineConfig({
           ],
           // React + router core — stable, cache-friendly vendor group
           react: ["react", "react-dom", "react-router"],
-          // DnD-kit — only loaded on /tasks (Kanban)
-          dnd: ["@dnd-kit/core", "@dnd-kit/sortable", "@dnd-kit/utilities"],
         },
       },
     },

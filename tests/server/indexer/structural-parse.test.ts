@@ -7,7 +7,7 @@ title: Actor-Critic Methods
 tags: [ml, rl]
 ---
 
-Intro paragraph with a [[policy-gradient]] link and a #topic/rl tag.
+Intro paragraph with a #topic/rl tag.
 
 ## Policy Gradients
 
@@ -15,7 +15,7 @@ Body of the policy gradients section.
 
 ## Advantage Estimation
 
-More content here with [[gae]] link.
+More content here.
 `;
 
 describe("parseStructural", () => {
@@ -23,14 +23,6 @@ describe("parseStructural", () => {
     const r = parseStructural("research/actor-critic.md", SAMPLE);
     expect(r.frontmatter.title).toBe("Actor-Critic Methods");
     expect(r.frontmatter.tags).toEqual(["ml", "rl"]);
-  });
-
-  test("extracts wikilinks", () => {
-    const r = parseStructural("research/actor-critic.md", SAMPLE);
-    expect(r.wikilinks.map((w) => w.target).sort()).toEqual([
-      "gae",
-      "policy-gradient",
-    ]);
   });
 
   test("extracts inline tags", () => {
