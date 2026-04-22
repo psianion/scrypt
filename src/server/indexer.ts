@@ -4,10 +4,8 @@ import { randomUUID } from "node:crypto";
 import type { FileManager } from "./file-manager";
 import {
   parseFrontmatter,
-  extractWikiLinks,
   extractTags,
 } from "./parsers";
-import { resolveSlug } from "./slug-resolver";
 import { parseStructural } from "./indexer/structural-parse";
 import type { SectionsRepo } from "./indexer/sections-repo";
 import type { EmbedderLike } from "./embeddings/service";
@@ -163,44 +161,9 @@ export class Indexer {
       tagStmt.run(noteId, tag);
     }
 
-    // Wiki-links → backlinks + graph_edges
-    const links = extractWikiLinks(note.content);
-    for (const link of links) {
-      const match = resolveSlug(link.target, this.db);
-      const targetPath = match ? match.path : this.resolveLink(link.target);
-      if (!targetPath) continue;
-
-      const target = this.db
-        .query("SELECT id FROM notes WHERE path = ?")
-        .get(targetPath) as { id: number } | null;
-      if (!target) continue;
-
-      // Extract context: the line containing the link
-      const contextLine = note.content
-        .split("\n")
-        .find((l) => l.includes(`[[${link.target}`)) || "";
-
-      this.db
-        .query("INSERT OR IGNORE INTO backlinks (source_id, target_id, context) VALUES (?, ?, ?)")
-        .run(noteId, target.id, contextLine.trim());
-
-      // Ensure the target has a graph_nodes row even if it hasn't been
-      // fully reindexed yet (e.g. during fullReindex pass 1).
-      this.db
-        .query(
-          `INSERT OR IGNORE INTO graph_nodes (id, kind, note_path, label)
-           VALUES (?, 'note', ?, ?)`,
-        )
-        .run(targetPath, targetPath, targetPath);
-
-      this.db
-        .query(
-          `INSERT OR IGNORE INTO graph_edges
-             (source, target, tier, weight, created_at)
-           VALUES (?, ?, 'connected', 3, ?)`,
-        )
-        .run(path, targetPath, Date.now());
-    }
+    // graph-v2 (G2): wikilink edge production removed. The body is no longer
+    // scanned for [[…]]; backlinks/graph_edges from prose links are gone.
+    // All connections come from add_edge (LLM-curated) or rescan_similarity.
 
     // Wave 9: legacy checkbox-based task extraction is dead. Tasks now come
     // from MCP create_task (LLM-decided during ingest, or ad-hoc) against the

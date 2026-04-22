@@ -121,22 +121,9 @@ export function graphRoutes(
     const visibleIds = new Set(nodes.map((n) => n.id));
     const edges: GraphEdge[] = [];
 
-    const linkRows = db
-      .query(
-        `SELECT source, target FROM graph_edges
-         WHERE tier = 'connected' AND client_tag IS NULL`,
-      )
-      .all() as { source: string; target: string }[];
-    for (const row of linkRows) {
-      if (!visibleIds.has(row.source) || !visibleIds.has(row.target))
-        continue;
-      edges.push({
-        source: row.source,
-        target: row.target,
-        type: "wikilink",
-        weight: 3,
-      });
-    }
+    // graph-v2 (G2): wikilink edges retired. No producers remain — the only
+    // edge sources here are derived (subdomain/domain/tag) plus semantic
+    // similarity below.
 
     for (let i = 0; i < nodes.length; i++) {
       for (let j = i + 1; j < nodes.length; j++) {

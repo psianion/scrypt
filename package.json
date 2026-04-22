@@ -10,7 +10,8 @@
     "test:server": "bun test tests/server/",
     "test:client": "bun test tests/client/",
     "scrypt-mcp": "bun run scripts/scrypt-mcp.ts",
-    "scrypt-reindex": "bun run scripts/scrypt-reindex.ts"
+    "scrypt-reindex": "bun run scripts/scrypt-reindex.ts",
+    "zap:structural": "bun run scripts/zap-structural-edges.ts"
   },
   "dependencies": {
     "@codemirror/commands": "^6.0.0",

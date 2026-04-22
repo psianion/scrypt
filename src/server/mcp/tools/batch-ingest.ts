@@ -102,34 +102,6 @@ function upsertNode(
   ).run(notePath, title, notePath, contentHash);
 }
 
-function upsertWikilinkEdges(
-  db: Database,
-  sourcePath: string,
-  targets: string[],
-): number {
-  if (targets.length === 0) return 0;
-  db.query(
-    `DELETE FROM graph_edges WHERE source = ? AND tier = 'connected' AND client_tag IS NULL`,
-  ).run(sourcePath);
-  const ensureNode = db.prepare(
-    `INSERT OR IGNORE INTO graph_nodes (id, kind, note_path, label)
-     VALUES (?, 'note', ?, ?)`,
-  );
-  const insert = db.prepare(
-    `INSERT OR IGNORE INTO graph_edges
-       (source, target, tier, weight, created_at)
-     VALUES (?, ?, 'connected', 3, ?)`,
-  );
-  let count = 0;
-  const now = Date.now();
-  for (const t of targets) {
-    ensureNode.run(t, t, t);
-    const res = insert.run(sourcePath, t, now);
-    if (res.changes > 0) count += 1;
-  }
-  return count;
-}
-
 function allEmbeddedPaths(db: Database, model: string): string[] {
   return (
     db
@@ -209,11 +181,6 @@ export const batchIngestTool: ToolDef<Input, Output> = {
             );
 
             upsertNode(ctx.db, vaultPath, title, parsed.contentHash);
-            upsertWikilinkEdges(
-              ctx.db,
-              vaultPath,
-              parsed.wikilinks.map((w) => w.target),
-            );
 
             const embed = await ctx.embedService.embedNote(parsed, correlationId);
 

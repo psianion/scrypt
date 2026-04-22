@@ -187,25 +187,4 @@ alpha only
     expect(rows[0].chunk_id).toBe("n_md:alpha");
   });
 
-  test("wikilinks land as graph_edges with tier='connected'", async () => {
-    const content = `---
-title: A
----
-
-See [[b]] and [[c]].
-`;
-    const res = await createNoteTool.handler(
-      ctx,
-      { path: "a.md", content, client_tag: "link-1" },
-      "corr-x",
-    );
-    expect(res.edges_created).toBe(2);
-    const edges = ctx.db
-      .query<{ source: string; target: string; tier: string }, []>(
-        `SELECT source, target, tier FROM graph_edges ORDER BY target`,
-      )
-      .all();
-    expect(edges.map((e) => e.target)).toEqual(["b", "c"]);
-    expect(edges.every((e) => e.tier === "connected")).toBe(true);
-  });
 });

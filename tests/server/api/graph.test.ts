@@ -20,7 +20,7 @@ beforeAll(async () => {
   await env.app.ingestRouter.ingest({
     kind: "note",
     title: "A",
-    content: "See [[b-note]].",
+    content: "body",
     frontmatter: {
       domain: "dnd",
       subdomain: "research",
@@ -81,13 +81,6 @@ describe("GET /api/graph", () => {
     expect(paths).toContain("scrypt-dev/specs/d-scrypt.md");
   });
 
-  test("generates wikilink edge from [[b-note]] in A to B Note", async () => {
-    const res = await fetch(`${env.baseUrl}/api/graph`);
-    const data = await res.json();
-    const wikilinks = data.edges.filter((e: any) => e.type === "wikilink");
-    expect(wikilinks.length).toBe(1);
-  });
-
   test("generates subdomain edge between A and B (both dnd/research)", async () => {
     const res = await fetch(`${env.baseUrl}/api/graph`);
     const data = await res.json();
@@ -124,7 +117,7 @@ describe("GET /api/graph", () => {
   test("undirected edges deduplicated (no source>target pairs)", async () => {
     const res = await fetch(`${env.baseUrl}/api/graph`);
     const data = await res.json();
-    for (const e of data.edges.filter((e: any) => e.type !== "wikilink")) {
+    for (const e of data.edges) {
       // Wave 8: node ids are note paths (strings), compared lexicographically.
       expect(e.source < e.target).toBe(true);
     }

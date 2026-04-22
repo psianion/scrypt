@@ -11,6 +11,11 @@ import { parseStructural } from "../../indexer/structural-parse";
 import type { ToolDef } from "../types";
 import type { Database } from "bun:sqlite";
 
+// graph-v2 (G2): wikilink edge production removed. The body is no longer
+// scanned for [[…]]; all connections come from add_edge (LLM-curated) or
+// rescan_similarity (semantic). `edges_created` stays in the response for
+// backward compat with callers but is always 0.
+
 interface Input {
   path: string;
   content: string;
@@ -62,36 +67,6 @@ function upsertNode(
   ).run(notePath, title, notePath, contentHash);
 }
 
-function upsertWikilinkEdges(
-  db: Database,
-  sourcePath: string,
-  targets: string[],
-): number {
-  if (targets.length === 0) return 0;
-  // graph-v2: structural wikilinks land as tier='connected'. Clear prior
-  // tier='connected' rows from this source before re-inserting.
-  db.query(
-    `DELETE FROM graph_edges WHERE source = ? AND tier = 'connected' AND client_tag IS NULL`,
-  ).run(sourcePath);
-  const ensureNode = db.prepare(
-    `INSERT OR IGNORE INTO graph_nodes (id, kind, note_path, label)
-     VALUES (?, 'note', ?, ?)`,
-  );
-  const insert = db.prepare(
-    `INSERT OR IGNORE INTO graph_edges
-       (source, target, tier, weight, created_at)
-     VALUES (?, ?, 'connected', 3, ?)`,
-  );
-  let count = 0;
-  const now = Date.now();
-  for (const t of targets) {
-    ensureNode.run(t, t, t);
-    const res = insert.run(sourcePath, t, now);
-    if (res.changes > 0) count += 1;
-  }
-  return count;
-}
-
 export const createNoteTool: ToolDef<Input, Output> = {
   name: "create_note",
   description:
@@ -131,15 +106,6 @@ export const createNoteTool: ToolDef<Input, Output> = {
 
         upsertNode(ctx.db, input.path, parsed.title, parsed.contentHash);
 
-        // Wikilink targets are literal strings from [[x]]; the parser
-        // doesn't resolve them against real notes. Store them as-is —
-        // the indexer's resolveSlug will fix them up on its own pass.
-        const edgesCreated = upsertWikilinkEdges(
-          ctx.db,
-          input.path,
-          parsed.wikilinks.map((w) => w.target),
-        );
-
         const embed = await ctx.embedService.embedNote(parsed, correlationId);
 
         // Delegate to the legacy indexer if one is wired in. Docker's
@@ -169,7 +135,7 @@ export const createNoteTool: ToolDef<Input, Output> = {
             heading_text: s.headingText,
             level: s.level,
           })),
-          edges_created: edgesCreated,
+          edges_created: 0,
           chunks_embedded: embed.chunks_embedded,
           chunks_total: embed.chunks_total,
           embed_ms: embed.embed_ms,
