@@ -90,6 +90,7 @@ describe("create_note tool", () => {
         path: "notes/hello.md",
         content: SAMPLE,
         client_tag: "tag-1",
+        allow_nonstandard_path: true,
       },
       "corr-1",
     );
@@ -151,12 +152,12 @@ describe("create_note tool", () => {
   test("idempotent by client_tag", async () => {
     const r1 = await createNoteTool.handler(
       ctx,
-      { path: "n.md", content: SAMPLE, client_tag: "dup" },
+      { path: "n.md", content: SAMPLE, client_tag: "dup", allow_nonstandard_path: true },
       "corr-1",
     );
     const r2 = await createNoteTool.handler(
       ctx,
-      { path: "n.md", content: SAMPLE, client_tag: "dup" },
+      { path: "n.md", content: SAMPLE, client_tag: "dup", allow_nonstandard_path: true },
       "corr-2",
     );
     expect(r2).toEqual(r1);
@@ -166,7 +167,7 @@ describe("create_note tool", () => {
   test("re-calling with edited content prunes stale chunks", async () => {
     await createNoteTool.handler(
       ctx,
-      { path: "n.md", content: SAMPLE, client_tag: "t1" },
+      { path: "n.md", content: SAMPLE, client_tag: "t1", allow_nonstandard_path: true },
       "c1",
     );
     const edited = `---
@@ -179,7 +180,7 @@ alpha only
 `;
     await createNoteTool.handler(
       ctx,
-      { path: "n.md", content: edited, client_tag: "t2" },
+      { path: "n.md", content: edited, client_tag: "t2", allow_nonstandard_path: true },
       "c2",
     );
     const rows = ctx.embeddings.listByNote("n.md", "fake");
@@ -187,4 +188,91 @@ alpha only
     expect(rows[0].chunk_id).toBe("n_md:alpha");
   });
 
+  // --- Project-first ingest validation (ingest-v3) ----------------------
+
+  const okFrontmatter = `---
+title: Demo
+slug: demo
+project: testp
+doc_type: plan
+tags: []
+ingest:
+  original_filename: src.md
+  original_path: /abs/src.md
+  source_hash: sha256:ab
+  source_size: 10
+  source_mtime: 2026-04-22T00:00:00Z
+  tokens: null
+  cost_usd: null
+  model: null
+  ingested_at: 2026-04-22T00:00:00Z
+  ingest_version: 1
+---
+
+body
+`;
+
+  test("accepts valid projects path + matching frontmatter; denormalizes columns", async () => {
+    const res = await createNoteTool.handler(
+      ctx,
+      {
+        path: "projects/testp/plan/demo.md",
+        content: okFrontmatter,
+        client_tag: "valid-1",
+      },
+      "corr-valid-1",
+    );
+    expect(res.note_path).toBe("projects/testp/plan/demo.md");
+    const row = ctx.db
+      .query(
+        "SELECT project, doc_type, thread FROM notes WHERE path = ?",
+      )
+      .get("projects/testp/plan/demo.md") as
+      | { project: string | null; doc_type: string | null; thread: string | null }
+      | undefined;
+    expect(row).toBeDefined();
+    expect(row!.project).toBe("testp");
+    expect(row!.doc_type).toBe("plan");
+    expect(row!.thread).toBeNull();
+  });
+
+  test("rejects path outside projects/ layout", async () => {
+    let caught: unknown = null;
+    try {
+      await createNoteTool.handler(
+        ctx,
+        {
+          path: "random/x.md",
+          content: "---\n---\n",
+          client_tag: "bad-layout",
+        },
+        "corr-bad-layout",
+      );
+    } catch (e) {
+      caught = e;
+    }
+    expect(caught).toMatchObject({ code: MCP_ERROR.INVALID_PARAMS });
+    expect(String((caught as { message?: string }).message ?? "")).toMatch(
+      /projects\//,
+    );
+  });
+
+  test("rejects path/frontmatter mismatch", async () => {
+    const bad = okFrontmatter.replace("project: testp", "project: other");
+    let caught: unknown = null;
+    try {
+      await createNoteTool.handler(
+        ctx,
+        {
+          path: "projects/testp/plan/demo.md",
+          content: bad,
+          client_tag: "bad-mismatch",
+        },
+        "corr-bad-mismatch",
+      );
+    } catch (e) {
+      caught = e;
+    }
+    expect(caught).toMatchObject({ code: MCP_ERROR.INVALID_PARAMS });
+  });
 });

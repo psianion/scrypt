@@ -187,6 +187,7 @@ A new policy-gradient variant.
 Outperforms baselines on Atari.
 `,
         client_tag: "scenario-create",
+        allow_nonstandard_path: true,
       },
       ctx,
       "corr-3",
@@ -263,6 +264,7 @@ Outperforms baselines on Atari.
       path: "rl/dup.md",
       content: `---\ntitle: D\n---\n\n## S\n\nbody\n`,
       client_tag: "scenario-dup",
+      allow_nonstandard_path: true,
     };
     const r1 = await registry.call("create_note", input, ctx, "corr-a");
     const r2 = await registry.call("create_note", input, ctx, "corr-b");
