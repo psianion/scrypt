@@ -146,7 +146,7 @@ export function createApp(config: AppConfig) {
   notesRoutes(router, fm, indexer);
   // graphRoutes must come before searchRoutes — searchRoutes registers a
   // catch-all /api/graph/*path that would otherwise swallow /api/graph/snapshot.
-  graphRoutes(router, db, config.vaultPath, snapshotScheduler);
+  graphRoutes(router, db, config.vaultPath, snapshotScheduler, wave8Engine, wave8Embeddings);
   searchRoutes(router, indexer, wave8Engine, wave8Embeddings);
   journalRoutes(router, fm, indexer, config.vaultPath);
   templateRoutes(router, fm, config.vaultPath);

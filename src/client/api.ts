@@ -42,6 +42,21 @@ export const api = {
   searchTags: (q: string) => json<{ tag: string; count: number }[]>(`/api/search/tags?q=${encodeURIComponent(q)}`),
   searchGraph: (q: string) =>
     json<{ paths: string[] }>(`/api/search/graph?q=${encodeURIComponent(q)}`),
+  graphSearch: (q: string, opts?: { focus?: string | null; limit?: number }) => {
+    const qs = new URLSearchParams({ q });
+    if (opts?.focus) qs.set("focus", opts.focus);
+    if (opts?.limit) qs.set("limit", String(opts.limit));
+    return json<{
+      hits: Array<{
+        path: string;
+        title: string;
+        score: number;
+        fts_rank: number | null;
+        sem_rank: number | null;
+        hop_distance: number | null;
+      }>;
+    }>(`/api/graph/search?${qs.toString()}`);
+  },
 
   graph: {
     full: () => json<GraphResponse>("/api/graph"),

@@ -171,10 +171,24 @@ describe("GraphView integration", () => {
           headers: { ETag: '"v1"' },
         });
       }
-      if (url.startsWith("/api/search/graph")) {
+      if (url.startsWith("/api/graph/search")) {
         searchCalls++;
         if (searchCalls === 1) {
-          return new Response(JSON.stringify({ paths: ["a.md"] }), { status: 200 });
+          return new Response(
+            JSON.stringify({
+              hits: [
+                {
+                  path: "a.md",
+                  title: "Alpha",
+                  score: 0.5,
+                  fts_rank: 1,
+                  sem_rank: null,
+                  hop_distance: null,
+                },
+              ],
+            }),
+            { status: 200 },
+          );
         }
         // second call: server error → GraphView must catch and warn, not crash
         return new Response("nope", { status: 500 });
@@ -236,6 +250,61 @@ describe("GraphView integration", () => {
     const call = createCalls[0]!;
 
     await waitFor(() => expect(call.handle.focusCalls).toContain("a.md"));
+  });
+
+  test("search box hits /api/graph/search with focus param + hits drive updateQueryFilter", async () => {
+    const seenSearchUrls: string[] = [];
+    installFetch((url) => {
+      if (url.startsWith("/api/graph/snapshot")) {
+        return new Response(JSON.stringify(sampleSnap), {
+          status: 200,
+          headers: { ETag: '"v1"' },
+        });
+      }
+      if (url.startsWith("/api/graph/search")) {
+        seenSearchUrls.push(url);
+        return new Response(
+          JSON.stringify({
+            hits: [
+              { path: "b.md", title: "Beta", score: 0.9, fts_rank: 1, sem_rank: 2, hop_distance: 1 },
+              { path: "c.md", title: "Gamma", score: 0.4, fts_rank: 2, sem_rank: null, hop_distance: 2 },
+              // hit not in snap — must be filtered out
+              { path: "ghost.md", title: "Ghost", score: 0.3, fts_rank: 3, sem_rank: null, hop_distance: null },
+            ],
+          }),
+          { status: 200 },
+        );
+      }
+      return new Response("[]");
+    });
+
+    renderAt("/graph?focus=a.md");
+    await waitFor(() => expect(createCalls.length).toBeGreaterThan(0));
+    const call = createCalls[0]!;
+
+    // ?focus= triggers a setQuery(node.title) — wait for that to flush a search.
+    await waitFor(
+      () => {
+        expect(seenSearchUrls.length).toBeGreaterThan(0);
+      },
+      { timeout: 1500 },
+    );
+
+    const url = seenSearchUrls.at(-1)!;
+    expect(url).toContain("/api/graph/search?");
+    expect(url).toContain("q=");
+    expect(url).toContain("focus=a.md");
+
+    await waitFor(
+      () => {
+        const last = call.handle.updateQueryCalls.at(-1);
+        if (!last) throw new Error("no update yet");
+        expect(last.matches.has("b.md")).toBe(true);
+        expect(last.matches.has("c.md")).toBe(true);
+        expect(last.matches.has("ghost.md")).toBe(false);
+      },
+      { timeout: 1500 },
+    );
   });
 
   test("ETag round-trip — second snapshot fetch sends If-None-Match", async () => {

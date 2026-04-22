@@ -51,7 +51,7 @@ export function GraphView() {
       enableRadial: true,
       mode: { kind: "global" },
       width: rect.width,
-      height: rect.height - 60,
+      height: rect.height,
     });
     return () => {
       handleRef.current?.destroy();
@@ -75,9 +75,10 @@ export function GraphView() {
     handleRef.current.updateFilter(tier);
   }, [tier, snap]);
 
-  // Server-backed search. Hits FTS5 over note title + content so queries
-  // surface notes that *mention* the term in their body — not just the title.
-  // Debounced to avoid firing on every keystroke.
+  // Server-backed hybrid search: BM25 over the wide notes_fts index +
+  // embedding cosine, fused via Reciprocal Rank Fusion (k=60). When ?focus=
+  // is set in the URL, hits closer to the focused note are boosted via BFS
+  // hop distance over the snapshot's edge graph. Debounced.
   useEffect(() => {
     if (!snap || !handleRef.current) return;
     const handle = handleRef.current;
@@ -89,10 +90,12 @@ export function GraphView() {
     let cancelled = false;
     const timer = setTimeout(async () => {
       try {
-        const { paths } = await api.searchGraph(q);
+        const { hits } = await api.graphSearch(q, { focus: focusId });
         if (cancelled) return;
         const snapIds = new Set(snap.nodes.map((n) => n.id));
-        const matches = new Set(paths.filter((p) => snapIds.has(p)));
+        const matches = new Set(
+          hits.map((h) => h.path).filter((p) => snapIds.has(p)),
+        );
         const adjacency = new Map<string, Set<string>>();
         for (const e of snap.edges) {
           if (!adjacency.has(e.source)) adjacency.set(e.source, new Set());

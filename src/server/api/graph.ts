@@ -11,8 +11,11 @@ import type {
 import { RESERVED_NAMESPACES, type Tag } from "../../shared/types";
 import { parseTag } from "../parsers";
 import type { SnapshotScheduler } from "../graph/snapshot-scheduler";
-import { writeGraphSnapshot } from "../graph/snapshot";
+import { writeGraphSnapshot, buildGraphSnapshot } from "../graph/snapshot";
 import { getSimilarityThreshold } from "../graph/semantic-similarity";
+import { hybridSearch } from "../graph/hybrid-search";
+import type { EngineLike } from "../embeddings/service";
+import type { ChunkEmbeddingsRepo } from "../embeddings/chunks-repo";
 
 // Stale window > debounce so SWR converges before next request.
 const SNAPSHOT_STALE_MS = 10_000;
@@ -38,6 +41,8 @@ export function graphRoutes(
   db: Database,
   vaultDir: string,
   scheduler: SnapshotScheduler,
+  engine?: EngineLike,
+  embeddings?: ChunkEmbeddingsRepo,
 ): void {
   // SHA1 is non-trivial on multi-MB snapshots; recompute only on new builds.
   const etagCache: { etag: string | null; buildCount: number } = {
@@ -96,6 +101,45 @@ export function graphRoutes(
       lastError: scheduler.lastError?.message ?? null,
       buildCount: scheduler.buildCount,
     });
+  });
+
+  router.get("/api/graph/search", async (req) => {
+    const url = new URL(req.url);
+    const q = url.searchParams.get("q");
+    if (!q || q.trim() === "") {
+      return Response.json(
+        { error: "missing query parameter 'q'" },
+        { status: 400 },
+      );
+    }
+    const limitRaw = url.searchParams.get("limit");
+    const limit = limitRaw ? Math.max(1, Math.min(200, Number(limitRaw) | 0)) : 30;
+    const focus = url.searchParams.get("focus");
+    let snapshot = null;
+    if (focus) {
+      try {
+        snapshot = buildGraphSnapshot(db);
+      } catch {
+        snapshot = null;
+      }
+    }
+    try {
+      const hits = await hybridSearch(db, {
+        query: q,
+        limit,
+        focus,
+        snapshot,
+        engine,
+        embeddings,
+      });
+      return Response.json({ hits });
+    } catch (err) {
+      const e = err instanceof Error ? err : new Error(String(err));
+      return Response.json(
+        { error: "hybrid search failed", reason: e.message },
+        { status: 500 },
+      );
+    }
   });
 
   router.get("/api/graph", async () => {
