@@ -1,5 +1,5 @@
 import { useNavigate, useLocation } from "react-router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useStore } from "../store";
 import { api } from "../api";
 import { FolderTree } from "./FolderTree";
@@ -20,12 +20,17 @@ interface SidebarProps {
 export function Sidebar({ onNewNote }: SidebarProps = {}) {
   const navigate = useNavigate();
   const location = useLocation();
+  const notes = useStore((s) => s.notes);
   const setNotes = useStore((s) => s.setNotes);
   const collapsed = useStore((s) => s.sidebarCollapsed);
+  const [showAllTypes, setShowAllTypes] = useState(false);
 
   useEffect(() => {
-    api.notes.list().then(setNotes).catch(() => {});
-  }, []);
+    api.notes
+      .list()
+      .then(setNotes)
+      .catch(() => {});
+  }, [setNotes]);
 
   return (
     <nav
@@ -67,8 +72,26 @@ export function Sidebar({ onNewNote }: SidebarProps = {}) {
         </button>
       )}
 
+      <div className="mt-2 px-3 flex items-center justify-between text-[10px] uppercase tracking-widest text-[var(--text-muted)]">
+        <span>Projects</span>
+        <label className="flex items-center gap-1 normal-case tracking-normal cursor-pointer">
+          <input
+            type="checkbox"
+            checked={showAllTypes}
+            onChange={(e) => setShowAllTypes(e.target.checked)}
+            className="accent-[var(--text-secondary)]"
+          />
+          <span>Show all types</span>
+        </label>
+      </div>
+
       <div className="flex-1 overflow-y-auto px-2 py-1">
-        <FolderTree />
+        <FolderTree
+          notes={notes}
+          showAllTypes={showAllTypes}
+          currentPath={location.pathname}
+          onNoteClick={(p) => navigate(`/note/${p}`)}
+        />
       </div>
 
       <button

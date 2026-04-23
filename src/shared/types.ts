@@ -25,6 +25,28 @@ export interface NoteMeta {
   subdomain: string | null;
   identifierTags: Tag[];
   topicTags: string[];
+  // ingest-v3: first-class project/doc_type/thread from the denormalised DB
+  // columns (spec §6.2). Optional on the type so legacy fixtures / older
+  // server responses still typecheck.
+  project?: string | null;
+  doc_type?: string | null;
+  thread?: string | null;
+  slug?: string | null;
+  ingest?: IngestBlock | null;
+}
+
+export interface IngestBlock {
+  original_filename?: string | null;
+  original_path?: string | null;
+  source_mtime?: string | null;
+  ingested_at?: string | null;
+  model?: string | null;
+  // Debug-only — exposed by inspector when ?debug=1 is set (§6.1.1).
+  source_hash?: string | null;
+  source_size?: number | null;
+  tokens?: number | null;
+  cost_usd?: number | null;
+  ingest_version?: string | null;
 }
 
 export interface Note extends NoteMeta {
