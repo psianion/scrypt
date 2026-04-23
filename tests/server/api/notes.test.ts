@@ -60,6 +60,61 @@ describe("GET /api/notes/*path", () => {
     const res = await fetch(`${env.baseUrl}/api/notes/notes/nope.md`);
     expect(res.status).toBe(404);
   });
+
+  test("surfaces project/doc_type/thread and ingest at top level (ingest-v3)", async () => {
+    const fm = [
+      "---",
+      "title: VTT Scoping",
+      "slug: vtt-scoping",
+      "project: demo",
+      "doc_type: spec",
+      "thread: vtt-mvp",
+      "tags: [demo]",
+      "domain: demo",
+      "ingest:",
+      "  original_filename: vtt-scoping.md",
+      "  original_path: /ingest/vtt-scoping.md",
+      "  source_hash: sha256:deadbeef",
+      "  source_size: 42",
+      "  source_mtime: 2026-04-22T00:00:00Z",
+      "  ingested_at: 2026-04-23T00:00:00Z",
+      "  model: claude-opus-4-7",
+      "  tokens: 100",
+      "  cost_usd: 0.01",
+      "  ingest_version: 1",
+      "---",
+      "# VTT Scoping",
+      "",
+      "Body.",
+    ].join("\n");
+    await env.writeNote("projects/demo/spec/vtt-scoping.md", fm);
+    const res = await fetch(`${env.baseUrl}/api/notes/projects/demo/spec/vtt-scoping.md`);
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.project).toBe("demo");
+    expect(data.doc_type).toBe("spec");
+    expect(data.thread).toBe("vtt-mvp");
+    expect(data.ingest).toBeDefined();
+    expect(data.ingest.original_filename).toBe("vtt-scoping.md");
+    expect(data.ingest.model).toBe("claude-opus-4-7");
+    // gray-matter/js-yaml normalises ISO timestamps to include milliseconds,
+    // so assert the parsed Date equals the source rather than string match.
+    expect(new Date(data.ingest.ingested_at).toISOString()).toBe(
+      "2026-04-23T00:00:00.000Z",
+    );
+  });
+
+  test("top-level ingest is null when frontmatter has no ingest block", async () => {
+    await env.writeNote(
+      "notes/plain.md",
+      "---\ntitle: Plain\n---\nNo ingest metadata.",
+    );
+    const res = await fetch(`${env.baseUrl}/api/notes/notes/plain.md`);
+    const data = await res.json();
+    expect(data.ingest).toBeNull();
+    expect(data.project).toBeNull();
+    expect(data.thread).toBeNull();
+  });
 });
 
 describe("POST /api/notes", () => {
