@@ -22,6 +22,7 @@ import { Group as TweenGroup, Tween } from "@tweenjs/tween.js";
 import type { GraphSnapshot, SnapshotEdge } from "../../server/graph/snapshot";
 import type { Tier, TierFilter } from "./tierFilter";
 import { colorForProject, darken } from "./colors";
+import { edgeStyleFor, truncateLabel } from "./graphStyle";
 
 export type RenderMode =
   | { kind: "global" }
@@ -83,7 +84,23 @@ function hexToNumber(hex: string): number {
   return parseInt(hex.replace("#", ""), 16);
 }
 
-function tierStyle(tier: Tier, srcColor: number): { color: number; width: number; alpha: number } {
+function tierStyle(
+  tier: Tier,
+  reason: string | null,
+  srcColor: number,
+): { color: number; width: number; alpha: number } {
+  // Lineage reasons (`derives-from`/`implements`/`supersedes`) get the
+  // shared colour palette from graphStyle (§5.1). Non-lineage `connected`
+  // edges fall back to a per-project dark tint so clusters remain readable.
+  if (
+    tier === "connected" &&
+    (reason === "derives-from" ||
+      reason === "implements" ||
+      reason === "supersedes")
+  ) {
+    const style = edgeStyleFor(tier, reason);
+    return { color: hexToNumber(style.stroke), width: style.strokeWidth, alpha: 0.95 };
+  }
   if (tier === "connected") {
     return { color: hexToNumber(darken(numberToHex(srcColor), 0.2)), width: 1.2, alpha: 0.9 };
   }
@@ -162,7 +179,7 @@ export function createGraph(parent: HTMLElement, opts: RenderOpts): RenderHandle
     const tier: Tier = e.tier;
     const src = nodeDataById.get(e.source)!;
     const srcColor = hexToNumber(colorForProject(src.project));
-    const style = tierStyle(tier, srcColor);
+    const style = tierStyle(tier, e.reason, srcColor);
     links.push({
       source: src,
       target: nodeDataById.get(e.target)!,
@@ -354,8 +371,7 @@ export function createGraph(parent: HTMLElement, opts: RenderOpts): RenderHandle
         gfx.hitArea = new Circle(0, 0, Math.max(r + 3, 8));
         nodesContainer.addChild(gfx);
 
-        const shortTitle =
-          n.title.length > 40 ? `${n.title.slice(0, 38)}…` : n.title;
+        const shortTitle = truncateLabel(n.title);
         const label = new Text({
           text: shortTitle,
           alpha: 0,
