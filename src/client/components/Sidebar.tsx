@@ -1,8 +1,9 @@
 import { useNavigate, useLocation } from "react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useStore } from "../store";
 import { api } from "../api";
 import { FolderTree } from "./FolderTree";
+import { ThreadChips, deriveThreadsFromNotes } from "./ThreadChips";
 
 const NAV_ITEMS = [
   { label: "Notes", path: "/notes" },
@@ -24,6 +25,12 @@ export function Sidebar({ onNewNote }: SidebarProps = {}) {
   const setNotes = useStore((s) => s.setNotes);
   const collapsed = useStore((s) => s.sidebarCollapsed);
   const [showAllTypes, setShowAllTypes] = useState(false);
+  const [selectedThread, setSelectedThread] = useState<{
+    project: string;
+    thread: string;
+  } | null>(null);
+
+  const threads = useMemo(() => deriveThreadsFromNotes(notes), [notes]);
 
   useEffect(() => {
     api.notes
@@ -85,9 +92,16 @@ export function Sidebar({ onNewNote }: SidebarProps = {}) {
         </label>
       </div>
 
+      <ThreadChips
+        threads={threads}
+        selected={selectedThread}
+        onSelect={setSelectedThread}
+      />
+
       <div className="flex-1 overflow-y-auto px-2 py-1">
         <FolderTree
           notes={notes}
+          thread={selectedThread}
           showAllTypes={showAllTypes}
           currentPath={location.pathname}
           onNoteClick={(p) => navigate(`/note/${p}`)}
