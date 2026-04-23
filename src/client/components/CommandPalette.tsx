@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import { useStore } from "../store";
 import { api } from "../api";
 import type { SearchResult } from "../../shared/types";
@@ -7,13 +7,27 @@ import { DOC_TYPES } from "../../server/vocab/doc-types";
 import { deriveProjectDocType } from "./FolderTree.helpers";
 
 interface CommandPaletteProps {
-  /** Path of the currently active note. When omitted, falls back to
-   * `store.activeTab`. Drives availability of path-specific actions like
-   * "Move to project". */
+  /** Path of the currently active note. When omitted, falls back to the
+   * current /note/:path route, then to `store.activeTab`. Drives availability
+   * of path-specific actions like "Move to project". */
   currentPath?: string;
   /** Custom navigation hook — used by tests. Falls back to react-router's
    * `navigate(/note/<path>)`. */
   onNavigate?: (path: string) => void;
+}
+
+/** Extract the vault path from a /note/* location pathname, or null if the
+ * current route isn't a note page. */
+function notePathFromLocation(pathname: string): string | null {
+  const match = pathname.match(/^\/note\/(.+)$/);
+  if (!match) return null;
+  const raw = match[1];
+  if (!raw || raw.length === 0) return null;
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
 }
 
 export function CommandPalette({
@@ -21,6 +35,7 @@ export function CommandPalette({
   onNavigate,
 }: CommandPaletteProps = {}) {
   const navigate = useNavigate();
+  const location = useLocation();
   const inputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -31,7 +46,8 @@ export function CommandPalette({
   const togglePalette = useStore((s) => s.toggleCommandPalette);
   const openTab = useStore((s) => s.openTab);
 
-  const notePath = currentPath ?? activeTab ?? null;
+  const routePath = notePathFromLocation(location.pathname);
+  const notePath = currentPath ?? routePath ?? activeTab ?? null;
   const goTo = (p: string) => {
     if (onNavigate) onNavigate(p);
     else navigate(`/note/${p}`);

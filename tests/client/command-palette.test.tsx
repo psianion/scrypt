@@ -61,6 +61,17 @@ describe("CommandPalette — Move to project action", () => {
     expect(screen.getByText(/Move to project/i)).toBeDefined();
   });
 
+  test("falls back to /note/:path in the URL when currentPath is omitted", () => {
+    // App.tsx renders <CommandPalette /> without props, so the palette must
+    // pick up the current note from the route.
+    render(
+      <MemoryRouter initialEntries={["/note/projects/demo/spec/vtt.md"]}>
+        <CommandPalette />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText(/Move to project/i)).toBeDefined();
+  });
+
   test("Move action POSTs to /api/notes/<path>/move and calls onNavigate", async () => {
     const calls: Array<{ url: string; body: unknown }> = [];
     globalThis.fetch = (async (url: unknown, init?: RequestInit) => {
