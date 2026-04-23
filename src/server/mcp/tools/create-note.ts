@@ -9,6 +9,8 @@ import { dirname, resolve, relative, isAbsolute } from "node:path";
 import { McpError, MCP_ERROR } from "../errors";
 import { parseStructural } from "../../indexer/structural-parse";
 import { refreshNoteFts } from "../../indexer/fts-refresh";
+import { parseFrontmatter } from "../../parsers";
+import { validateProjectPath } from "../../path/validate-project-path";
 import type { ToolDef } from "../types";
 import type { Database } from "bun:sqlite";
 
@@ -21,6 +23,12 @@ interface Input {
   path: string;
   content: string;
   client_tag: string;
+  /**
+   * Escape hatch — skip the projects/<project>/<doc_type>/<slug>.md layout
+   * check. Used for internal callers (tests, plugin authors) that write to
+   * non-standard paths like `_inbox/stashed.md`. Defaults to false.
+   */
+  allow_nonstandard_path?: boolean;
 }
 
 interface Output {
@@ -78,6 +86,7 @@ export const createNoteTool: ToolDef<Input, Output> = {
       path: { type: "string" },
       content: { type: "string" },
       client_tag: { type: "string" },
+      allow_nonstandard_path: { type: "boolean" },
     },
     required: ["path", "content", "client_tag"],
   },
@@ -87,6 +96,22 @@ export const createNoteTool: ToolDef<Input, Output> = {
       input.client_tag,
       async () => {
         const abs = assertInsideVault(ctx.vaultDir, input.path);
+
+        // ingest-v3: enforce the projects/<project>/<doc_type>/<slug>.md
+        // layout unless the caller explicitly opts out. Parse the content's
+        // frontmatter first so we can cross-check path vs frontmatter.
+        const { frontmatter } = parseFrontmatter(input.content);
+        const allowNonstandard = input.allow_nonstandard_path === true;
+        const v = validateProjectPath(input.path, frontmatter, {
+          allowNonstandardPath: allowNonstandard,
+        });
+        if (!v.ok) {
+          throw new McpError(
+            MCP_ERROR.INVALID_PARAMS,
+            v.message ?? "invalid path",
+            { code: v.code },
+          );
+        }
 
         mkdirSync(dirname(abs), { recursive: true });
         writeFileSync(abs, input.content, "utf8");
@@ -128,6 +153,29 @@ export const createNoteTool: ToolDef<Input, Output> = {
           }
         }
         refreshNoteFts(ctx.db, input.path);
+
+        // ingest-v3: denormalize project / doc_type / thread into the notes
+        // row. UPSERT so this is self-sufficient in tests that don't wire a
+        // legacyIndexer; in prod the indexer writes the row first and this
+        // statement only refreshes the three denormalized columns.
+        const project =
+          typeof frontmatter.project === "string" ? frontmatter.project : null;
+        const docType =
+          typeof frontmatter.doc_type === "string"
+            ? frontmatter.doc_type
+            : null;
+        const thread =
+          typeof frontmatter.thread === "string" ? frontmatter.thread : null;
+        ctx.db
+          .query(
+            `INSERT INTO notes (path, title, project, doc_type, thread)
+             VALUES (?, ?, ?, ?, ?)
+             ON CONFLICT(path) DO UPDATE SET
+               project  = excluded.project,
+               doc_type = excluded.doc_type,
+               thread   = excluded.thread`,
+          )
+          .run(input.path, parsed.title, project, docType, thread);
 
         const result: Output = {
           note_path: input.path,

@@ -143,7 +143,7 @@ export function createApp(config: AppConfig) {
   const router = new Router();
 
   // Register API routes
-  notesRoutes(router, fm, indexer);
+  notesRoutes(router, fm, indexer, db, config.vaultPath);
   // graphRoutes must come before searchRoutes — searchRoutes registers a
   // catch-all /api/graph/*path that would otherwise swallow /api/graph/snapshot.
   graphRoutes(router, db, config.vaultPath, snapshotScheduler, wave8Engine, wave8Embeddings);

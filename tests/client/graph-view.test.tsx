@@ -338,3 +338,109 @@ describe("GraphView integration", () => {
     expect(seenIfNoneMatch[1]).toBe('"v1"');
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────
+// Presentational mode: <GraphView nodes={...} edges={...} />
+//
+// When nodes/edges are passed directly (no snapshot fetch, no router) the
+// component renders an SVG DOM layer used for unit tests AND as the
+// accessibility fallback. Spec §5.1 + §6.1.1.
+// ─────────────────────────────────────────────────────────────────────────
+
+describe("GraphView presentational (nodes/edges props)", () => {
+  const longTitle =
+    "A Very Long Title That Definitely Exceeds Forty Characters In Length";
+  const presentationalNodes = [
+    { id: "a", path: "projects/p/spec/a.md", title: longTitle, project: "p", doc_type: "spec" },
+    { id: "b", path: "projects/p/research/b.md", title: "B", project: "p", doc_type: "research" },
+    { id: "c", path: "projects/p/spec/c.md", title: "C", project: "p", doc_type: "spec" },
+    { id: "d", path: "projects/p/spec/d.md", title: "D", project: "p", doc_type: "spec" },
+  ];
+  const presentationalEdges = [
+    { source: "a", target: "b", tier: "connected" as const, reason: "derives-from" as const },
+    { source: "c", target: "d", tier: "connected" as const, reason: "supersedes" as const },
+    { source: "a", target: "c", tier: "semantically_related" as const, reason: null },
+  ];
+
+  test("graph node renders title truncated to ≤40 chars", () => {
+    const { container } = render(
+      <GraphView nodes={presentationalNodes} edges={[]} />,
+    );
+    const label = container.querySelector("[data-node-id='a'] .label")!;
+    expect(label).toBeDefined();
+    expect(label.textContent!.length).toBeLessThanOrEqual(40);
+    expect(label.getAttribute("title")).toBe(longTitle);
+  });
+
+  test("graph edge with reason='derives-from' renders with blue solid stroke", () => {
+    const { container } = render(
+      <GraphView
+        nodes={presentationalNodes}
+        edges={presentationalEdges}
+      />,
+    );
+    const edge = container.querySelector(
+      "[data-edge-source='a'][data-edge-target='b']",
+    ) as SVGElement;
+    expect(edge).toBeDefined();
+    expect(edge.getAttribute("stroke")).toBe("#3b82f6");
+    expect(edge.getAttribute("stroke-dasharray")).toBeNull();
+  });
+
+  test("graph edge with reason='implements' renders with green stroke", () => {
+    const nodes = [
+      { id: "x", title: "X" },
+      { id: "y", title: "Y" },
+    ];
+    const edges = [
+      { source: "x", target: "y", tier: "connected" as const, reason: "implements" as const },
+    ];
+    const { container } = render(<GraphView nodes={nodes} edges={edges} />);
+    const edge = container.querySelector(
+      "[data-edge-source='x'][data-edge-target='y']",
+    ) as SVGElement;
+    expect(edge.getAttribute("stroke")).toBe("#10b981");
+  });
+
+  test("graph edge with reason='supersedes' greys out source node", () => {
+    const { container } = render(
+      <GraphView
+        nodes={presentationalNodes}
+        edges={presentationalEdges}
+      />,
+    );
+    const sourceNode = container.querySelector(
+      "[data-node-id='c']",
+    ) as HTMLElement;
+    expect(Number(sourceNode.getAttribute("data-opacity"))).toBeLessThan(1);
+  });
+
+  test("semantically_related edge renders dashed (stroke-dasharray set)", () => {
+    const { container } = render(
+      <GraphView
+        nodes={presentationalNodes}
+        edges={presentationalEdges}
+      />,
+    );
+    const edge = container.querySelector(
+      "[data-edge-source='a'][data-edge-target='c']",
+    ) as SVGElement;
+    expect(edge.getAttribute("stroke-dasharray")).toBeTruthy();
+  });
+
+  test("mentions edge renders solid grey with no arrow", () => {
+    const nodes = [
+      { id: "m1", title: "M1" },
+      { id: "m2", title: "M2" },
+    ];
+    const edges = [
+      { source: "m1", target: "m2", tier: "mentions" as const, reason: null },
+    ];
+    const { container } = render(<GraphView nodes={nodes} edges={edges} />);
+    const edge = container.querySelector(
+      "[data-edge-source='m1'][data-edge-target='m2']",
+    ) as SVGElement;
+    expect(edge.getAttribute("stroke")).toBe("#9aa0aa");
+    expect(edge.getAttribute("stroke-dasharray")).toBeNull();
+  });
+});

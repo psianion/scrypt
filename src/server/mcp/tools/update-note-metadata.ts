@@ -7,6 +7,7 @@ import {
   type NoteMetadataPatch,
 } from "../../indexer/metadata-repo";
 import { refreshNoteFts } from "../../indexer/fts-refresh";
+import { validateIngestBlock } from "../../ingest/ingest-block";
 
 const SUMMARY_MAX = 1000;
 
@@ -17,6 +18,12 @@ interface Input {
   themes?: string[];
   doc_type?: DocType;
   summary?: string;
+  /** ingest-v3: move the note to a different project (rename `notes.project`). */
+  project?: string;
+  /** ingest-v3: stamp/clear the thread group this note belongs to. */
+  thread?: string | null;
+  /** ingest-v3: provenance block (frontmatter mirror); validated but not persisted to DB here. */
+  ingest?: unknown;
   client_tag: string;
 }
 
@@ -38,6 +45,13 @@ export const updateNoteMetadataTool: ToolDef<Input, Output> = {
       themes: { type: "array" },
       doc_type: { type: "string", enum: [...DOC_TYPES] },
       summary: { type: "string" },
+      thread: {
+        type: "string",
+        description:
+          "Thread group slug. Pass null to detach the note from its thread.",
+      },
+      project: { type: "string" },
+      ingest: { type: "object" },
       client_tag: { type: "string" },
     },
     required: ["path", "client_tag"],
@@ -61,6 +75,18 @@ export const updateNoteMetadataTool: ToolDef<Input, Output> = {
             MCP_ERROR.INVALID_PARAMS,
             `summary exceeds ${SUMMARY_MAX} chars (got ${input.summary.length})`,
           );
+        }
+        // ingest-v3: validate provenance block shape. We don't persist it to
+        // the DB here (frontmatter is the source of truth for ingest metadata);
+        // this is a shape gate so callers get early feedback.
+        if (input.ingest !== undefined) {
+          const v = validateIngestBlock(input.ingest);
+          if (!v.ok) {
+            throw new McpError(
+              MCP_ERROR.INVALID_PARAMS,
+              `ingest block invalid: ${v.reason}`,
+            );
+          }
         }
 
         const exists =
@@ -99,6 +125,29 @@ export const updateNoteMetadataTool: ToolDef<Input, Output> = {
           updated.push("summary");
         }
         ctx.metadata.upsert(input.path, patch);
+
+        // ingest-v3: denormalize project / thread into the notes row. We use
+        // COALESCE on project so callers that pass only thread don't clobber
+        // project; thread flips to NULL explicitly when the caller passes
+        // `thread: null` so notes can be detached from a thread.
+        if (input.project !== undefined) {
+          ctx.db.run(`UPDATE notes SET project = ? WHERE path = ?`, [
+            input.project,
+            input.path,
+          ]);
+          updated.push("project");
+        }
+        if (input.thread !== undefined) {
+          ctx.db.run(`UPDATE notes SET thread = ? WHERE path = ?`, [
+            input.thread,
+            input.path,
+          ]);
+          updated.push("thread");
+        }
+        if (input.ingest !== undefined) {
+          updated.push("ingest");
+        }
+
         refreshNoteFts(ctx.db, input.path);
         ctx.scheduleGraphRebuild();
         return { note_path: input.path, updated_fields: updated };

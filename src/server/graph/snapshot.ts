@@ -11,6 +11,11 @@ import {
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { parseTier, type Tier } from "../../shared/types";
+import {
+  isLineageReason,
+  checkLineageShape,
+} from "../vocab/lineage-reasons";
+import { isDocType } from "../vocab/doc-types";
 
 export interface SnapshotNode {
   id: string;
@@ -24,6 +29,10 @@ export interface SnapshotNode {
 export function projectOf(path: string): string {
   const parts = path.split("/");
   if (parts.length <= 1) return "root";
+  // ingest-v3: new layout `projects/<project>/<doc_type>/<slug>.md`.
+  if (parts[0] === "projects" && parts.length > 1 && parts[1]) return parts[1]!;
+  // Legacy layout `research/<domain>/<slug>.md` — kept until every vault
+  // is reingested; drop this branch once transition is complete.
   if (parts[0] === "research" && parts.length > 2 && parts[1]) return parts[1]!;
   return parts[0]!;
 }
@@ -108,10 +117,14 @@ export function buildGraphSnapshot(db: Database): GraphSnapshot {
 
     if (srcType === "plan" && tgtType === "plan") continue;
 
+    // ingest-v3: `sessionlog` replaces `changelog`. Accept both names for the
+    // transition window so pre-v3 vault snapshots still render correctly.
     if (
       srcType === "journal" ||
+      srcType === "sessionlog" ||
       srcType === "changelog" ||
       tgtType === "journal" ||
+      tgtType === "sessionlog" ||
       tgtType === "changelog"
     ) {
       if (tier === "connected") tier = "mentions";
@@ -122,6 +135,22 @@ export function buildGraphSnapshot(db: Database): GraphSnapshot {
       projectById.get(e.source) !== projectById.get(e.target)
     ) {
       continue;
+    }
+
+    // ingest-v3: typed lineage shapes at tier='connected'. Drop edges whose
+    // reason claims a lineage relationship but the doc_type combo violates
+    // the allow-list (see src/server/vocab/lineage-reasons.ts).
+    if (tier === "connected" && isLineageReason(e.reason)) {
+      const srcProj = projectById.get(e.source) ?? null;
+      const tgtProj = projectById.get(e.target) ?? null;
+      const shape = checkLineageShape(
+        e.reason,
+        isDocType(srcType) ? srcType : null,
+        isDocType(tgtType) ? tgtType : null,
+        srcProj,
+        tgtProj,
+      );
+      if (!shape.ok) continue;
     }
     edges.push({
       source: e.source,

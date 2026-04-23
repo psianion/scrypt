@@ -26,6 +26,9 @@ interface NoteRow {
   domain: string | null;
   subdomain: string | null;
   tags: string | null;
+  project: string | null;
+  doc_type: string | null;
+  thread: string | null;
 }
 
 const RESERVED_PREFIXES = [
@@ -115,6 +118,11 @@ export function graphRoutes(
     const limitRaw = url.searchParams.get("limit");
     const limit = limitRaw ? Math.max(1, Math.min(200, Number(limitRaw) | 0)) : 30;
     const focus = url.searchParams.get("focus");
+    // ingest-v3 filters: post-filter hits by project / doc_type / thread so
+    // search results match the sidebar's project-first layout.
+    const projectFilter = url.searchParams.get("project");
+    const docTypeFilter = url.searchParams.get("doc_type");
+    const threadFilter = url.searchParams.get("thread");
     let snapshot = null;
     if (focus) {
       try {
@@ -132,7 +140,34 @@ export function graphRoutes(
         engine,
         embeddings,
       });
-      return Response.json({ hits });
+      let filtered = hits;
+      if (projectFilter || docTypeFilter || threadFilter) {
+        const meta = db
+          .query<
+            {
+              path: string;
+              project: string | null;
+              doc_type: string | null;
+              thread: string | null;
+            },
+            []
+          >(
+            `SELECT path, project, doc_type, thread FROM notes`,
+          )
+          .all();
+        const byPath = new Map(meta.map((m) => [m.path, m]));
+        filtered = hits.filter((h) => {
+          const hitPath = (h as { path?: string }).path;
+          if (!hitPath) return false;
+          const row = byPath.get(hitPath);
+          if (!row) return false;
+          if (projectFilter && row.project !== projectFilter) return false;
+          if (docTypeFilter && row.doc_type !== docTypeFilter) return false;
+          if (threadFilter && row.thread !== threadFilter) return false;
+          return true;
+        });
+      }
+      return Response.json({ hits: filtered });
     } catch (err) {
       const e = err instanceof Error ? err : new Error(String(err));
       return Response.json(
@@ -142,16 +177,26 @@ export function graphRoutes(
     }
   });
 
-  router.get("/api/graph", async () => {
+  router.get("/api/graph", async (req) => {
+    const url = new URL(req.url);
+    const projectFilter = url.searchParams.get("project");
+    const docTypeFilter = url.searchParams.get("doc_type");
+    const threadFilter = url.searchParams.get("thread");
     const noteRows = db
       .query(
-        `SELECT path, title, domain, subdomain, tags FROM notes ORDER BY path`,
+        `SELECT path, title, domain, subdomain, tags, project, doc_type, thread
+           FROM notes
+          ORDER BY path`,
       )
       .all() as NoteRow[];
 
-    const visible = noteRows.filter(
-      (r) => !RESERVED_PREFIXES.some((p) => r.path.startsWith(p)),
-    );
+    const visible = noteRows.filter((r) => {
+      if (RESERVED_PREFIXES.some((p) => r.path.startsWith(p))) return false;
+      if (projectFilter && r.project !== projectFilter) return false;
+      if (docTypeFilter && r.doc_type !== docTypeFilter) return false;
+      if (threadFilter && r.thread !== threadFilter) return false;
+      return true;
+    });
 
     const nodes: GraphNode[] = visible.map((r) => ({
       id: r.path,
@@ -161,6 +206,9 @@ export function graphRoutes(
       subdomain: r.subdomain,
       tags: parseTagsField(r.tags),
       connectionCount: 0,
+      project: r.project,
+      doc_type: r.doc_type,
+      thread: r.thread,
     }));
 
     const visibleIds = new Set(nodes.map((n) => n.id));

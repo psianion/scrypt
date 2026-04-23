@@ -42,10 +42,22 @@ export const api = {
   searchTags: (q: string) => json<{ tag: string; count: number }[]>(`/api/search/tags?q=${encodeURIComponent(q)}`),
   searchGraph: (q: string) =>
     json<{ paths: string[] }>(`/api/search/graph?q=${encodeURIComponent(q)}`),
-  graphSearch: (q: string, opts?: { focus?: string | null; limit?: number }) => {
+  graphSearch: (
+    q: string,
+    opts?: {
+      focus?: string | null;
+      limit?: number;
+      project?: string | null;
+      doc_type?: string | null;
+      thread?: string | null;
+    },
+  ) => {
     const qs = new URLSearchParams({ q });
     if (opts?.focus) qs.set("focus", opts.focus);
     if (opts?.limit) qs.set("limit", String(opts.limit));
+    if (opts?.project) qs.set("project", opts.project);
+    if (opts?.doc_type) qs.set("doc_type", opts.doc_type);
+    if (opts?.thread) qs.set("thread", opts.thread);
     return json<{
       hits: Array<{
         path: string;

@@ -140,6 +140,7 @@ describe("MCP write tools trigger snapshot rebuild", () => {
         path: "n1.md",
         content: "# N1\n\nbody\n",
         client_tag: "create-1",
+        allow_nonstandard_path: true,
       },
       "corr-create",
     );
@@ -294,7 +295,12 @@ describe("MCP write tools trigger snapshot rebuild", () => {
       h.spy.reset();
       await batchIngestTool.handler(
         h.ctx,
-        { source_dir: sourceDir, domain: "test", target_prefix: "research" },
+        {
+          source_dir: sourceDir,
+          project: "test",
+          doc_type: "research",
+          client_tag: "batch-snap-1",
+        },
         "corr-batch",
       );
       expect(h.spy.scheduleCalls.length).toBeGreaterThanOrEqual(1);
@@ -309,7 +315,12 @@ describe("MCP write tools trigger snapshot rebuild", () => {
     h.spy.reset();
     await createNoteTool.handler(
       h.ctx,
-      { path: "flush.md", content: "# F\n", client_tag: "flush-1" },
+      {
+        path: "flush.md",
+        content: "# F\n",
+        client_tag: "flush-1",
+        allow_nonstandard_path: true,
+      },
       "corr-flush",
     );
     expect(h.spy.scheduleCalls.length).toBeGreaterThanOrEqual(1);

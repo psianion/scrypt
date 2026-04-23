@@ -17,6 +17,10 @@ export interface GraphNode {
   subdomain: string | null;
   tags: Tag[];
   connectionCount: number;
+  /** ingest-v3: project-first layout metadata. Nullable for legacy rows. */
+  project: string | null;
+  doc_type: string | null;
+  thread: string | null;
 }
 
 export interface GraphEdge {

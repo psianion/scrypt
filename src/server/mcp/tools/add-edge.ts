@@ -4,7 +4,13 @@ import type { ToolDef } from "../types";
 import type { Database } from "bun:sqlite";
 import { TIER_VALUES, isTier } from "../confidence";
 import type { Tier } from "../../../shared/types";
-import { projectOf } from "../../graph/snapshot";
+import { projectOf as projectOfPath, docTypeOf as docTypeOfPath } from "../../path/vault-path";
+import {
+  isLineageReason,
+  checkLineageShape,
+} from "../../vocab/lineage-reasons";
+import type { DocType } from "../../vocab/doc-types";
+import { isDocType } from "../../vocab/doc-types";
 import { refreshNoteFts } from "../../indexer/fts-refresh";
 
 interface Input {
@@ -113,28 +119,60 @@ export const addEdgeTool: ToolDef<Input, Output> = {
           "plan\u2194plan edges are filtered; would never render",
         );
       }
+      // ingest-v3: `sessionlog` replaces `changelog`. Accept both for the
+      // transition window.
       if (
         input.tier === "connected" &&
         (sourceType === "journal" ||
+          sourceType === "sessionlog" ||
           sourceType === "changelog" ||
           targetType === "journal" ||
+          targetType === "sessionlog" ||
           targetType === "changelog")
       ) {
         throw new McpError(
           MCP_ERROR.INVALID_PARAMS,
-          "journal/changelog edges cap at tier='mentions'; got 'connected'",
+          "journal/sessionlog edges cap at tier='mentions'; got 'connected'",
         );
       }
       if (
         input.tier === "semantically_related" &&
         sourcePath &&
         targetPath &&
-        projectOf(sourcePath) !== projectOf(targetPath)
+        projectOfPath(sourcePath) !== projectOfPath(targetPath)
       ) {
         throw new McpError(
           MCP_ERROR.INVALID_PARAMS,
           "semantically_related edges must be within the same project",
         );
+      }
+
+      // ingest-v3: typed lineage reasons at tier='connected'. Shape rules
+      // live in src/server/vocab/lineage-reasons.ts (derives-from:
+      // spec->research, implements: plan->{spec,architecture}, supersedes:
+      // matching doc_type). All require the same project on both ends.
+      if (input.tier === "connected" && isLineageReason(input.reason)) {
+        const srcFromPath = sourcePath ? docTypeOfPath(sourcePath) : null;
+        const tgtFromPath = targetPath ? docTypeOfPath(targetPath) : null;
+        const srcDoc: DocType | null =
+          srcFromPath ?? (isDocType(sourceType) ? sourceType : null);
+        const tgtDoc: DocType | null =
+          tgtFromPath ?? (isDocType(targetType) ? targetType : null);
+        const srcProject = sourcePath ? projectOfPath(sourcePath) : null;
+        const tgtProject = targetPath ? projectOfPath(targetPath) : null;
+        const shape = checkLineageShape(
+          input.reason,
+          srcDoc,
+          tgtDoc,
+          srcProject,
+          tgtProject,
+        );
+        if (!shape.ok) {
+          throw new McpError(
+            MCP_ERROR.INVALID_PARAMS,
+            `lineage_reason_invalid: ${shape.reason}`,
+          );
+        }
       }
 
       const res = ctx.db

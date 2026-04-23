@@ -3,7 +3,35 @@ import { watch, type FSWatcher } from "node:fs";
 import { mkdir, rename, readdir } from "node:fs/promises";
 import { join, relative, dirname } from "node:path";
 import { parseFrontmatter, stringifyFrontmatter, mergeServerTimestamps } from "./parsers";
-import type { Note, NoteMeta, FileEvent } from "../shared/types";
+import type { Note, NoteMeta, FileEvent, IngestBlock } from "../shared/types";
+
+function stringOrNull(v: unknown): string | null {
+  if (typeof v === "string") return v.length > 0 ? v : null;
+  // YAML parses ISO-8601 timestamps as Date objects; serialise back to ISO
+  // so API consumers see a stable string shape regardless of YAML flavour.
+  if (v instanceof Date && !Number.isNaN(v.getTime())) return v.toISOString();
+  return null;
+}
+
+function ingestFromFrontmatter(fm: Record<string, unknown>): IngestBlock | null {
+  const raw = fm.ingest;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const r = raw as Record<string, unknown>;
+  return {
+    original_filename: stringOrNull(r.original_filename),
+    original_path: stringOrNull(r.original_path),
+    source_mtime: stringOrNull(r.source_mtime),
+    ingested_at: stringOrNull(r.ingested_at),
+    model: stringOrNull(r.model),
+    source_hash: stringOrNull(r.source_hash),
+    source_size: typeof r.source_size === "number" ? r.source_size : null,
+    tokens: typeof r.tokens === "number" ? r.tokens : null,
+    cost_usd: typeof r.cost_usd === "number" ? r.cost_usd : null,
+    ingest_version: typeof r.ingest_version === "number"
+      ? String(r.ingest_version)
+      : stringOrNull(r.ingest_version),
+  };
+}
 
 export class FileManager {
   private watcher: FSWatcher | null = null;
@@ -32,6 +60,14 @@ export class FileManager {
       subdomain: meta.subdomain,
       identifierTags: meta.identifierTags,
       topicTags: meta.topicTags,
+      // ingest-v3: surface denormalised fields at top level so clients don't
+      // have to dig into `frontmatter.*`. Frontmatter stays populated for
+      // backwards-compatible callers.
+      project: stringOrNull(frontmatter.project),
+      doc_type: stringOrNull(frontmatter.doc_type),
+      thread: stringOrNull(frontmatter.thread),
+      slug: stringOrNull(frontmatter.slug),
+      ingest: ingestFromFrontmatter(frontmatter),
       content: body,
       frontmatter,
     };

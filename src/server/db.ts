@@ -2,6 +2,7 @@
 import { Database } from "bun:sqlite";
 import { applyWave8Migration } from "./migrations/wave8";
 import { applyWave9Migration } from "./migrations/wave9";
+import { applyWave10Migration } from "./migrations/wave10";
 
 export function createDatabase(dbPath: string): Database {
   const db = new Database(dbPath, { create: true });
@@ -18,7 +19,10 @@ export function initSchema(db: Database): void {
       title TEXT,
       content_hash TEXT,
       created TEXT,
-      modified TEXT
+      modified TEXT,
+      project TEXT,
+      doc_type TEXT,
+      thread TEXT
     )
   `);
 
@@ -222,4 +226,7 @@ export function initSchema(db: Database): void {
   // Wave 9: drop legacy tasks, recreate with full CRUD schema;
   // add doc_type + summary to note_metadata.
   applyWave9Migration(db);
+
+  // Wave 10: add project / doc_type / thread columns to notes + indexes.
+  applyWave10Migration(db);
 }
