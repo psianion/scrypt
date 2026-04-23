@@ -2,7 +2,9 @@
 
 > A personal second brain for the AI era. Markdown on disk, SQLite-indexed, with a browser UI, a REST API, and an MCP server that humans and LLMs both talk to.
 
-Every project, research thread, and half-baked idea lives as a `.md` file. Claude reads and writes into the same vault you do, so your knowledge base keeps its own context across sessions instead of starting from scratch every chat.
+Every project, research thread, and half-baked idea lives as a `.md` file under `projects/<project>/<doc_type>/<slug>.md`. Claude reads and writes into the same vault you do, so your knowledge base keeps its own context across sessions instead of starting from scratch every chat.
+
+Each ingested note carries a `ingest:` frontmatter block (source hash, tokens, cost, model) and an optional `thread:` that groups a workstream into research → spec → plan chains via typed lineage edges (`derives-from`, `implements`, `supersedes`).
 
 ![Editor with backlinks](assets/screenshots/editor.png)
 
@@ -75,6 +77,20 @@ Wave 8 embeddings (all optional, sensible defaults):
 | `SCRYPT_EMBED_DISABLE` | `0` — set `1` to skip embeddings entirely |
 
 Full catalog and three-layer flow (`.env → docker-compose → loadConfig`) in `docs/BUILD_AND_RUN.md`.
+
+## Fresh start (test vault)
+
+After any change to the ingest schema, the test vault is wiped and reingested — no migration tooling is maintained.
+
+1. `docker compose down`
+2. `rm -rf "$SCRYPT_VAULT_DIR"/* "$SCRYPT_VAULT_DIR"/.scrypt` (e.g. `/Users/admin/scrypt-dnd-test`)
+3. `docker compose up -d`
+4. For each project root on disk: `/scrypt-ingest <source-root> --project <name>`
+5. Verify via `mcp__scrypt__get_report({})` that `projects[]` and `threads[]` look correct.
+
+The ingest skill is idempotent: re-running it on the same source files is safe (hash-matched skips). If source content changed, the slug bumps to `-v2` and a `supersedes` edge is emitted from the new note to the prior one.
+
+Loose captures that don't fit an existing project route to the reserved `_inbox` project; promote them later via the graph UI's "Move to project" action.
 
 ## Docs
 
