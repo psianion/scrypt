@@ -1,4 +1,5 @@
 import React from "react";
+import { Search } from "lucide-react";
 import { useStore } from "../../store";
 import { Button } from "../../ui/Button";
 import { Input } from "../../ui/Input";
@@ -49,7 +50,7 @@ export function DesignSystem() {
             <Input placeholder="Default input" aria-label="default" />
           </div>
           <div className="ds-row" style={{ maxWidth: 360 }}>
-            <Input placeholder="With leading icon" aria-label="icon" icon={<span>🔎</span>} />
+            <Input placeholder="Search notes…" aria-label="search" icon={<Search size={14} aria-hidden />} />
           </div>
           <div className="ds-row" style={{ maxWidth: 360 }}>
             <Input defaultValue="invalid@" aria-label="err" error="Not a valid email" />
