@@ -2,6 +2,7 @@ import React from "react";
 import { useStore } from "../../store";
 import { Button } from "../../ui/Button";
 import { Input } from "../../ui/Input";
+import { Chip, Pill, Kbd, TierChip } from "../../ui/Chip";
 import { Toggle } from "../../ui/Toggle";
 import { Checkbox } from "../../ui/Checkbox";
 import { Segment } from "../../ui/Segment";
@@ -55,6 +56,37 @@ export function DesignSystem() {
           </div>
           <div className="ds-row" style={{ maxWidth: 360 }}>
             <Input placeholder="Disabled" aria-label="dis" disabled />
+          </div>
+        </section>
+
+        <section className="ds-section">
+          <h2 className="ds-section-title">Chips, Pills, Kbd, Tiers</h2>
+          <p className="ds-subsection-title">Chip variants</p>
+          <div className="ds-row">
+            <Chip>default</Chip>
+            <Chip variant="tag">#area/ops</Chip>
+            <Chip variant="status-done">done</Chip>
+            <Chip variant="status-review">review</Chip>
+            <Chip variant="status-blocked">blocked</Chip>
+            <Chip variant="status-ai">ai</Chip>
+            <Chip variant="tag" onRemove={() => {}}>removable</Chip>
+          </div>
+          <p className="ds-subsection-title">Pill</p>
+          <div className="ds-row">
+            <Pill>5 notes</Pill>
+            <Pill>12 tasks</Pill>
+          </div>
+          <p className="ds-subsection-title">Kbd</p>
+          <div className="ds-row">
+            <Kbd>⌘K</Kbd>
+            <Kbd>⌘N</Kbd>
+            <Kbd>Esc</Kbd>
+          </div>
+          <p className="ds-subsection-title">Tier chips</p>
+          <div className="ds-row">
+            <TierChip tier="connected">CONNECTED</TierChip>
+            <TierChip tier="mentions">MENTIONS</TierChip>
+            <TierChip tier="semantic">SEMANTIC</TierChip>
           </div>
         </section>
 

@@ -1,0 +1,86 @@
+/* Source: docs/pencils/02-base-components.md — Chips, Pills & Tags > CSS Rules */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  background: var(--surface-hover);
+  color: var(--text-muted);
+  border: 1px solid var(--border-subtle);
+  transition: background var(--dur-fast) var(--ease-standard);
+}
+
+.chip-tag {
+  background: rgba(158, 230, 207, 0.10);
+  color: var(--accent);
+  border-color: rgba(158, 230, 207, 0.20);
+}
+.chip-tag:hover { background: rgba(158, 230, 207, 0.18); }
+
+.chip-status-done    { background: rgba(127, 212, 176, 0.12); color: var(--success);    border-color: rgba(127, 212, 176, 0.20); }
+.chip-status-review  { background: rgba(245, 198, 120, 0.12); color: var(--warning);    border-color: rgba(245, 198, 120, 0.20); }
+.chip-status-blocked { background: rgba(232, 143, 160, 0.12); color: var(--danger);     border-color: rgba(232, 143, 160, 0.20); }
+.chip-status-ai      { background: rgba(164, 176, 255, 0.12); color: var(--accent-ai);  border-color: rgba(164, 176, 255, 0.20); }
+
+.chip-remove {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 2px;
+  opacity: 0.6;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  padding: 0;
+  font: inherit;
+}
+.chip-remove:hover { opacity: 1; }
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.kbd {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 6px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+  box-shadow: 0 1px 0 var(--border-strong);
+}
+
+.tier-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.tier-connected { background: rgba(127, 212, 176, 0.12); color: var(--success); }
+.tier-mentions  { background: rgba(245, 198, 120, 0.12); color: var(--warning); }
+.tier-semantic  { background: rgba(199, 155, 242, 0.12); color: var(--tier-semantic); }
