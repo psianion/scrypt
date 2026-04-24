@@ -1,4 +1,35 @@
 @import "tailwindcss";
+@import "./theme/tokens.css";
+@import "./theme/fonts.css";
+
+@theme {
+  /* Bridge CSS custom properties into Tailwind v4 so utility classes
+     like `bg-surface`, `text-muted`, `rounded-md` resolve to the
+     same tokens the component CSS files use. */
+  --color-bg:              var(--bg);
+  --color-surface:         var(--surface);
+  --color-surface-hover:   var(--surface-hover);
+  --color-surface-active:  var(--surface-active);
+  --color-border-subtle:   var(--border-subtle);
+  --color-border:          var(--border);
+  --color-border-strong:   var(--border-strong);
+  --color-text-strong:     var(--text-strong);
+  --color-text:            var(--text);
+  --color-text-muted:      var(--text-muted);
+  --color-text-subtle:     var(--text-subtle);
+  --color-accent:          var(--accent);
+  --color-accent-ai:       var(--accent-ai);
+  --color-success:         var(--success);
+  --color-warning:         var(--warning);
+  --color-danger:          var(--danger);
+
+  --radius-xs:   var(--radius-xs);
+  --radius-sm:   var(--radius-sm);
+  --radius-md:   var(--radius-md);
+  --radius-lg:   var(--radius-lg);
+  --radius-xl:   var(--radius-xl);
+  --radius-full: var(--radius-full);
+}
 
 /* Wave 8: pulse nodes whose note is currently being embedded. */
 circle.embedding-pulse {
@@ -8,38 +39,23 @@ circle.embedding-pulse {
 }
 
 @keyframes graph-embed-pulse {
-  0%, 100% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.08);
-  }
-}
-
-:root {
-  --bg-primary: #111111;
-  --bg-secondary: #1a1a1a;
-  --bg-tertiary: #222222;
-  --border: #333333;
-  --text-primary: #e0e0e0;
-  --text-secondary: #888888;
-  --text-muted: #555555;
-  --link: #999999;
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.08); }
 }
 
 body {
   margin: 0;
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  font-family: ui-monospace, "SF Mono", "Cascadia Code", monospace;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', sans-serif;
   font-size: 14px;
 }
 
 * { box-sizing: border-box; }
 
 ::selection {
-  background: #444;
-  color: #fff;
+  background: var(--surface-active);
+  color: var(--text-strong);
 }
 
 /* GraphView (Pixi renderer) */
