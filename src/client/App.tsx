@@ -15,9 +15,11 @@ import { DataExplorer } from "./views/DataExplorer";
 import { TagBrowser } from "./views/TagBrowser";
 import { Settings } from "./views/Settings";
 import { useStore } from "./store";
+import { useApplyTheme } from "./theme";
 import { connectWebSocket } from "./api";
 
 export function AppContent() {
+  useApplyTheme();
   const commandPaletteOpen = useStore((s) => s.commandPaletteOpen);
   const toggleCommandPalette = useStore((s) => s.toggleCommandPalette);
   const [newNoteOpen, setNewNoteOpen] = useState(false);
