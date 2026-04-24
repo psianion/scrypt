@@ -1,5 +1,17 @@
 import React from "react";
-import { Search, Command, ArrowBigUp, CornerDownLeft, ArrowUp } from "lucide-react";
+import {
+  Search,
+  Command,
+  ArrowBigUp,
+  CornerDownLeft,
+  ArrowUp,
+  Folder,
+  FileText,
+  Pencil,
+  Trash2,
+  Copy,
+  Share2,
+} from "lucide-react";
 import { useStore } from "../../store";
 import { Button } from "../../ui/Button";
 import { Input } from "../../ui/Input";
@@ -8,6 +20,10 @@ import { Toggle } from "../../ui/Toggle";
 import { Checkbox } from "../../ui/Checkbox";
 import { Segment } from "../../ui/Segment";
 import { Warning } from "../../ui/Warning";
+import { Modal } from "../../ui/Modal";
+import { ToastRegion, useToast } from "../../ui/Toast";
+import { ContextMenu, type ContextMenuEntry } from "../../ui/ContextMenu";
+import { Breadcrumb } from "../../ui/Breadcrumb";
 import "./DesignSystem.css";
 
 export function DesignSystem() {
@@ -118,8 +134,204 @@ export function DesignSystem() {
           </div>
         </section>
         {/* --- end primitives-b sections --- */}
+
+        {/* --- Wave 1 primitives (Modal / Toast / ContextMenu / Breadcrumb) --- */}
+        <section className="ds-section">
+          <h2 className="ds-section-title">Modal</h2>
+          <ModalShowcase />
+        </section>
+        <section className="ds-section">
+          <h2 className="ds-section-title">Toast</h2>
+          <ToastShowcase />
+        </section>
+        <section className="ds-section">
+          <h2 className="ds-section-title">Context menu</h2>
+          <ContextMenuShowcase />
+        </section>
+        <section className="ds-section">
+          <h2 className="ds-section-title">Breadcrumb</h2>
+          <BreadcrumbShowcase />
+        </section>
+        {/* --- end Wave 1 sections --- */}
       </main>
+      {/* Region portal-mounted to body; inspector-scoped toasts surface here. */}
+      <ToastRegion />
     </div>
+  );
+}
+
+function ModalShowcase() {
+  const [size, setSize] = React.useState<"sm" | "md" | "lg">("md");
+  const [open, setOpen] = React.useState(false);
+  const [confirmOpen, setConfirmOpen] = React.useState(false);
+  return (
+    <>
+      <p className="ds-subsection-title">Sizes</p>
+      <div className="ds-row">
+        <Button variant="secondary" onClick={() => { setSize("sm"); setOpen(true); }}>
+          Open sm
+        </Button>
+        <Button variant="secondary" onClick={() => { setSize("md"); setOpen(true); }}>
+          Open md
+        </Button>
+        <Button variant="secondary" onClick={() => { setSize("lg"); setOpen(true); }}>
+          Open lg
+        </Button>
+        <Button variant="destructive" onClick={() => setConfirmOpen(true)}>
+          Open confirm
+        </Button>
+      </div>
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title={`New note (${size})`}
+        size={size}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button variant="primary" onClick={() => setOpen(false)}>Create</Button>
+          </>
+        }
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+          <Input placeholder="Title" aria-label="modal-title-input" />
+          <Input placeholder="#area/ops" aria-label="modal-tags-input" />
+        </div>
+      </Modal>
+      <Modal
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        title="Delete note?"
+        size="sm"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setConfirmOpen(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={() => setConfirmOpen(false)}>Delete</Button>
+          </>
+        }
+      >
+        This will remove <strong>area/ops/sprint-plan.md</strong> and its embeddings. This action cannot be undone.
+      </Modal>
+    </>
+  );
+}
+
+function ToastShowcase() {
+  const toast = useToast();
+  return (
+    <>
+      <p className="ds-subsection-title">Variants</p>
+      <div className="ds-row">
+        <Button
+          variant="secondary"
+          onClick={() => toast.info("Reindex running", { message: "12 of 48 notes processed." })}
+        >
+          Info
+        </Button>
+        <Button
+          variant="secondary"
+          onClick={() => toast.success("Note saved", { message: "area/ops/sprint-plan.md" })}
+        >
+          Success
+        </Button>
+        <Button
+          variant="secondary"
+          onClick={() => toast.warn("Missing project", { message: "2 notes in #area/ops have no project." })}
+        >
+          Warn
+        </Button>
+        <Button
+          variant="secondary"
+          onClick={() =>
+            toast.error("Ingest failed", {
+              message: "Vault path is not writable.",
+              action: { label: "Retry", onClick: () => toast.success("Retried") },
+            })
+          }
+        >
+          Error + action
+        </Button>
+      </div>
+    </>
+  );
+}
+
+function ContextMenuShowcase() {
+  const folderItems: ContextMenuEntry[] = [
+    { label: "Rename", icon: <Pencil size={14} />, shortcut: "F2", onSelect: () => {} },
+    { label: "Duplicate", icon: <Copy size={14} />, shortcut: "⌘D", onSelect: () => {} },
+    { label: "Share", icon: <Share2 size={14} />, onSelect: () => {} },
+    { separator: true },
+    {
+      label: "Delete",
+      icon: <Trash2 size={14} />,
+      shortcut: "⌫",
+      variant: "destructive",
+      onSelect: () => {},
+    },
+  ];
+  return (
+    <>
+      <p className="ds-subsection-title">Right-click the folder row</p>
+      <ContextMenu
+        triggerOn="contextmenu"
+        aria-label="Folder actions"
+        items={folderItems}
+        trigger={
+          <div
+            className="ds-row"
+            style={{
+              gap: "var(--space-2)",
+              padding: "6px 10px",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius-md)",
+              background: "var(--surface)",
+              color: "var(--text)",
+              fontFamily: "'Inter', sans-serif",
+              fontSize: 13,
+              maxWidth: 260,
+              cursor: "context-menu",
+              userSelect: "none",
+            }}
+          >
+            <Folder size={14} aria-hidden />
+            area/ops
+          </div>
+        }
+      />
+    </>
+  );
+}
+
+function BreadcrumbShowcase() {
+  return (
+    <>
+      <p className="ds-subsection-title">Short path</p>
+      <div className="ds-row">
+        <Breadcrumb
+          items={[
+            { label: "vault", href: "/" },
+            { label: "area", href: "/folder/area" },
+            { label: "ops", href: "/folder/area/ops" },
+            { label: "sprint-plan.md", icon: <FileText size={12} aria-hidden /> },
+          ]}
+        />
+      </div>
+      <p className="ds-subsection-title">Long path (collapses middle)</p>
+      <div className="ds-row">
+        <Breadcrumb
+          items={[
+            { label: "vault", href: "/" },
+            { label: "project", href: "/" },
+            { label: "scrypt", href: "/" },
+            { label: "docs", href: "/" },
+            { label: "superpowers", href: "/" },
+            { label: "plans", href: "/" },
+            { label: "wave1-shell.md", icon: <FileText size={12} aria-hidden /> },
+          ]}
+        />
+      </div>
+    </>
   );
 }
 
