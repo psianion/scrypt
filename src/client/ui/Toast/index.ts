@@ -7,4 +7,4 @@ export type {
   ToastRecord,
   ToastVariant,
   ToastAction,
-} from "../../stores/toast";
+} from "@/client/stores/toast";

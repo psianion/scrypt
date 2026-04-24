@@ -9,7 +9,7 @@ import {
   useToastStore,
   type ToastAction,
   type ToastVariant,
-} from "../../stores/toast";
+} from "@/client/stores/toast";
 
 interface ToastOptions {
   message?: string;
