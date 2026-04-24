@@ -35,6 +35,18 @@ describe("Chip family", () => {
     expect(getByText("⌘K").classList.contains("kbd")).toBe(true);
   });
 
+  test("Kbd composes nested SVG icon + text child", () => {
+    const { container } = render(
+      <Kbd>
+        <svg data-testid="cmd-svg" />K
+      </Kbd>,
+    );
+    const kbd = container.querySelector(".kbd");
+    expect(kbd).not.toBeNull();
+    expect(kbd?.querySelector("[data-testid='cmd-svg']")).not.toBeNull();
+    expect(kbd?.textContent).toContain("K");
+  });
+
   test("TierChip renders tier variant class", () => {
     const { getByText } = render(<TierChip tier="semantic">SEMANTIC</TierChip>);
     const el = getByText("SEMANTIC");

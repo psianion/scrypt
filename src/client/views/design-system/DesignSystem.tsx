@@ -1,5 +1,5 @@
 import React from "react";
-import { Search } from "lucide-react";
+import { Search, Command, ArrowBigUp, CornerDownLeft, ArrowUp } from "lucide-react";
 import { useStore } from "../../store";
 import { Button } from "../../ui/Button";
 import { Input } from "../../ui/Input";
@@ -79,9 +79,15 @@ export function DesignSystem() {
           </div>
           <p className="ds-subsection-title">Kbd</p>
           <div className="ds-row">
-            <Kbd>⌘K</Kbd>
-            <Kbd>⌘N</Kbd>
+            <Kbd>K</Kbd>
+            <Kbd><Command size={14} aria-hidden />K</Kbd>
+            <Kbd><Command size={14} aria-hidden /><ArrowBigUp size={14} aria-hidden />P</Kbd>
+            <Kbd><CornerDownLeft size={14} aria-hidden /></Kbd>
             <Kbd>Esc</Kbd>
+            <Kbd><ArrowUp size={14} aria-hidden /></Kbd>
+          </div>
+          <div className="ds-row" style={{ fontFamily: "'Inter', sans-serif", fontSize: 13, color: "var(--text-muted)" }}>
+            Press&nbsp;<Kbd><Command size={14} aria-hidden />K</Kbd>&nbsp;to open the command palette.
           </div>
           <p className="ds-subsection-title">Tier chips</p>
           <div className="ds-row">
