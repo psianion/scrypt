@@ -1,8 +1,14 @@
+/* Mirrors the app's scroll convention (see .tasks-list in main.css):
+   the flex-row route outlet in App.tsx gives us its full height; we take
+   height: 100% and own the scroll so Sidebar / TabBar / StatusBar chrome
+   stays pinned. Do NOT use min-height: 100vh here — that breaks nested
+   scroll by forcing the document to scroll the whole app shell. */
 .ds-root {
   padding: var(--space-9);
   background: var(--bg);
   color: var(--text);
-  min-height: 100vh;
+  height: 100%;
+  overflow: auto;
 }
 .ds-header {
   display: flex;
