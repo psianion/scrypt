@@ -2,6 +2,7 @@ import React from "react";
 import { useStore } from "../../store";
 import { Button } from "../../ui/Button";
 import { Toggle } from "../../ui/Toggle";
+import { Checkbox } from "../../ui/Checkbox";
 import "./DesignSystem.css";
 
 export function DesignSystem() {
@@ -43,6 +44,10 @@ export function DesignSystem() {
           <h2 className="ds-section-title">Toggle</h2>
           <ToggleShowcase />
         </section>
+        <section className="ds-section">
+          <h2 className="ds-section-title">Checkbox</h2>
+          <CheckboxShowcase />
+        </section>
         {/* --- end primitives-b sections --- */}
       </main>
     </div>
@@ -57,6 +62,18 @@ function ToggleShowcase() {
       <Toggle checked aria-label="always-on" onChange={() => {}} />
       <Toggle checked={false} disabled aria-label="dis-off" onChange={() => {}} />
       <Toggle checked disabled aria-label="dis-on" onChange={() => {}} />
+    </div>
+  );
+}
+
+function CheckboxShowcase() {
+  const [on, setOn] = React.useState(false);
+  return (
+    <div className="ds-row">
+      <Checkbox checked={on} onChange={setOn} aria-label="demo" />
+      <Checkbox checked aria-label="on" onChange={() => {}} />
+      <Checkbox checked={false} disabled aria-label="dis-off" onChange={() => {}} />
+      <Checkbox checked disabled aria-label="dis-on" onChange={() => {}} />
     </div>
   );
 }
