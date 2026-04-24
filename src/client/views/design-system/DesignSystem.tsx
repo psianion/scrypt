@@ -1,4 +1,5 @@
 import { useStore } from "../../store";
+import { Button } from "../../ui/Button";
 import "./DesignSystem.css";
 
 export function DesignSystem() {
@@ -16,9 +17,23 @@ export function DesignSystem() {
         </button>
       </header>
       <main className="ds-main">
-        {/* Section slots get filled as primitives land. */}
         <section className="ds-section">
-          <h2 className="ds-section-title">Primitives will appear here.</h2>
+          <h2 className="ds-section-title">Buttons</h2>
+          <p className="ds-subsection-title">Variants</p>
+          <div className="ds-row">
+            <Button variant="primary">Primary</Button>
+            <Button variant="secondary">Secondary</Button>
+            <Button variant="ghost">Ghost</Button>
+            <Button variant="outline">Outline</Button>
+            <Button variant="destructive">Destructive</Button>
+            <Button variant="ai">AI</Button>
+          </div>
+          <p className="ds-subsection-title">States</p>
+          <div className="ds-row">
+            <Button>Default</Button>
+            <Button disabled>Disabled</Button>
+            <Button loading>Loading</Button>
+          </div>
         </section>
       </main>
     </div>
