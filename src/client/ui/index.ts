@@ -8,3 +8,4 @@ export * from "./Checkbox";
 export * from "./Segment";
 export * from "./Warning";
 export * from "./Modal";
+export * from "./ContextMenu";
