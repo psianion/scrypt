@@ -5,4 +5,4 @@ export {
   type ToastRecord,
   type ToastVariant,
   type ToastAction,
-} from "@/client/stores/toast";
+} from "../../stores/toast";

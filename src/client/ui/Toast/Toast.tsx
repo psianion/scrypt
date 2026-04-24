@@ -13,7 +13,7 @@ import {
   type ToastAction,
   type ToastRecord,
   type ToastVariant,
-} from "@/client/stores/toast";
+} from "../../stores/toast";
 import "./Toast.css";
 
 const VARIANT_ICON: Record<ToastVariant, LucideIcon> = {
