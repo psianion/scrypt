@@ -4,6 +4,7 @@ import { Button } from "../../ui/Button";
 import { Toggle } from "../../ui/Toggle";
 import { Checkbox } from "../../ui/Checkbox";
 import { Segment } from "../../ui/Segment";
+import { Warning } from "../../ui/Warning";
 import "./DesignSystem.css";
 
 export function DesignSystem() {
@@ -52,6 +53,13 @@ export function DesignSystem() {
         <section className="ds-section">
           <h2 className="ds-section-title">Segment control</h2>
           <SegmentShowcase />
+        </section>
+        <section className="ds-section">
+          <h2 className="ds-section-title">Warning block</h2>
+          <div className="ds-row" style={{ flexDirection: "column", alignItems: "stretch", maxWidth: 520 }}>
+            <Warning>Local embeddings are rebuilding — semantic search results may be incomplete.</Warning>
+            <Warning>Some notes in <strong>#area/ops</strong> are missing a <code>project</code> assignment.</Warning>
+          </div>
         </section>
         {/* --- end primitives-b sections --- */}
       </main>
