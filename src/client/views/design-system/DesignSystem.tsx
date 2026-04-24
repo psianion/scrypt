@@ -1,6 +1,7 @@
 import React from "react";
 import { useStore } from "../../store";
 import { Button } from "../../ui/Button";
+import { Input } from "../../ui/Input";
 import { Toggle } from "../../ui/Toggle";
 import { Checkbox } from "../../ui/Checkbox";
 import { Segment } from "../../ui/Segment";
@@ -38,6 +39,22 @@ export function DesignSystem() {
             <Button>Default</Button>
             <Button disabled>Disabled</Button>
             <Button loading>Loading</Button>
+          </div>
+        </section>
+
+        <section className="ds-section">
+          <h2 className="ds-section-title">Inputs</h2>
+          <div className="ds-row" style={{ maxWidth: 360 }}>
+            <Input placeholder="Default input" aria-label="default" />
+          </div>
+          <div className="ds-row" style={{ maxWidth: 360 }}>
+            <Input placeholder="With leading icon" aria-label="icon" icon={<span>🔎</span>} />
+          </div>
+          <div className="ds-row" style={{ maxWidth: 360 }}>
+            <Input defaultValue="invalid@" aria-label="err" error="Not a valid email" />
+          </div>
+          <div className="ds-row" style={{ maxWidth: 360 }}>
+            <Input placeholder="Disabled" aria-label="dis" disabled />
           </div>
         </section>
 
