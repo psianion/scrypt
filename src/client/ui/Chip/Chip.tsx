@@ -1,4 +1,5 @@
 import type { HTMLAttributes, MouseEvent, ReactNode } from "react";
+import { X } from "lucide-react";
 import "./Chip.css";
 
 export type ChipVariant = "default" | "tag" | "status-done" | "status-review" | "status-blocked" | "status-ai";
@@ -34,7 +35,7 @@ export function Chip({
           className="chip-remove"
           onClick={onRemoveClick}
         >
-          ×
+          <X size={12} aria-hidden />
         </button>
       ) : null}
     </span>
