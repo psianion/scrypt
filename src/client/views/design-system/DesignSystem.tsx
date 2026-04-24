@@ -1,5 +1,7 @@
+import React from "react";
 import { useStore } from "../../store";
 import { Button } from "../../ui/Button";
+import { Toggle } from "../../ui/Toggle";
 import "./DesignSystem.css";
 
 export function DesignSystem() {
@@ -35,7 +37,26 @@ export function DesignSystem() {
             <Button loading>Loading</Button>
           </div>
         </section>
+
+        {/* --- primitives-b sections (Toggle / Checkbox / Segment / Warning) --- */}
+        <section className="ds-section">
+          <h2 className="ds-section-title">Toggle</h2>
+          <ToggleShowcase />
+        </section>
+        {/* --- end primitives-b sections --- */}
       </main>
+    </div>
+  );
+}
+
+function ToggleShowcase() {
+  const [on, setOn] = React.useState(false);
+  return (
+    <div className="ds-row">
+      <Toggle checked={on} onChange={setOn} aria-label="demo" />
+      <Toggle checked aria-label="always-on" onChange={() => {}} />
+      <Toggle checked={false} disabled aria-label="dis-off" onChange={() => {}} />
+      <Toggle checked disabled aria-label="dis-on" onChange={() => {}} />
     </div>
   );
 }
