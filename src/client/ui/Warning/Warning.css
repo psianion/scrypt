@@ -15,4 +15,8 @@
 .warning-block-icon {
   flex-shrink: 0;
   margin-top: 2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: currentColor;
 }
