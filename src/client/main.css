@@ -306,7 +306,12 @@ body {
   color: var(--text-primary);
   text-decoration: underline;
 }
-.pill {
+/* Legacy pill used by TasksList for type/status badges with inline background.
+ * Renamed from `.pill` so it no longer shadows the design-system Chip family
+ * `.pill` rule in `src/client/ui/Chip/Chip.css`. Slated for migration to
+ * <Chip variant="status-*"> in a later wave.
+ */
+.legacy-pill {
   display: inline-block;
   padding: 2px 8px;
   border-radius: 10px;
