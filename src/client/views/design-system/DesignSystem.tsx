@@ -3,6 +3,7 @@ import { useStore } from "../../store";
 import { Button } from "../../ui/Button";
 import { Toggle } from "../../ui/Toggle";
 import { Checkbox } from "../../ui/Checkbox";
+import { Segment } from "../../ui/Segment";
 import "./DesignSystem.css";
 
 export function DesignSystem() {
@@ -48,6 +49,10 @@ export function DesignSystem() {
           <h2 className="ds-section-title">Checkbox</h2>
           <CheckboxShowcase />
         </section>
+        <section className="ds-section">
+          <h2 className="ds-section-title">Segment control</h2>
+          <SegmentShowcase />
+        </section>
         {/* --- end primitives-b sections --- */}
       </main>
     </div>
@@ -74,6 +79,24 @@ function CheckboxShowcase() {
       <Checkbox checked aria-label="on" onChange={() => {}} />
       <Checkbox checked={false} disabled aria-label="dis-off" onChange={() => {}} />
       <Checkbox checked disabled aria-label="dis-on" onChange={() => {}} />
+    </div>
+  );
+}
+
+function SegmentShowcase() {
+  const [v, setV] = React.useState<"list" | "grid" | "kanban">("list");
+  return (
+    <div className="ds-row">
+      <Segment
+        items={[
+          { value: "list", label: "List" },
+          { value: "grid", label: "Grid" },
+          { value: "kanban", label: "Kanban" },
+        ] as const}
+        value={v}
+        onChange={setV}
+        ariaLabel="view mode"
+      />
     </div>
   );
 }
