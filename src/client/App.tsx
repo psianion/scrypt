@@ -14,6 +14,7 @@ import { TasksList } from "./views/TasksList";
 import { DataExplorer } from "./views/DataExplorer";
 import { TagBrowser } from "./views/TagBrowser";
 import { Settings } from "./views/Settings";
+import { DesignSystem } from "./views/design-system/DesignSystem";
 import { useStore } from "./store";
 import { useApplyTheme } from "./theme";
 import { connectWebSocket } from "./api";
@@ -72,6 +73,7 @@ export function AppContent() {
                 <Route path="/tasks" element={<TasksList />} />
                 <Route path="/data" element={<DataExplorer />} />
                 <Route path="/tags" element={<TagBrowser />} />
+                <Route path="/design-system" element={<DesignSystem />} />
                 <Route path="/settings" element={<Settings />} />
               </Routes>
             </div>
