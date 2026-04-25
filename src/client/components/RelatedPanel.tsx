@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
+import "./RelatedPanel.css";
 
 interface RelatedItem {
   path: string;
@@ -12,6 +13,12 @@ interface RelatedData {
   draft_prompts: RelatedItem[];
 }
 
+/**
+ * RelatedPanel — right-rail listing of notes / memories / draft prompts that
+ * relate to the current day. Renders inside a scrollable host (JournalView's
+ * `<aside>`), so this component only owns row layout. Uses mono for vault
+ * paths and the standard sidebar micro-label for section headings.
+ */
 export function RelatedPanel() {
   const [data, setData] = useState<RelatedData | null>(null);
   const navigate = useNavigate();
@@ -34,17 +41,16 @@ export function RelatedPanel() {
   if (sections.length === 0) return null;
 
   return (
-    <div className="p-3 space-y-4 text-sm">
+    <div className="related-panel" data-testid="related-panel">
       {sections.map((s) => (
-        <div key={s.title}>
-          <div className="text-xs uppercase text-[var(--text-muted)] mb-1">
-            {s.title}
-          </div>
+        <div key={s.title} className="related-section">
+          <div className="related-section-label">{s.title}</div>
           {s.items.map((it) => (
             <button
               key={it.path}
+              type="button"
+              className="related-item"
               onClick={() => navigate(`/note/${it.path}`)}
-              className="block w-full text-left text-[var(--text-muted)] hover:text-[var(--text)] truncate"
               title={it.path}
             >
               {it.title ?? it.path}
