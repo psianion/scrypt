@@ -17,7 +17,6 @@ import { useStore } from "../store";
 import { api } from "../api";
 import { FolderTree } from "./FolderTree";
 import { topLevelProjects } from "./FolderTree.helpers";
-import { ThreadChips, deriveThreadsFromNotes } from "./ThreadChips";
 import { ContextMenu, type ContextMenuPosition } from "../ui";
 import "./Sidebar.css";
 
@@ -52,10 +51,6 @@ export function Sidebar({ onNewNote }: SidebarProps = {}) {
   const setNotes = useStore((s) => s.setNotes);
   const collapsed = useStore((s) => s.sidebarCollapsed);
   const [showAllTypes, setShowAllTypes] = useState(false);
-  const [selectedThread, setSelectedThread] = useState<{
-    project: string;
-    thread: string;
-  } | null>(null);
   // Project pill filter — when set, FolderTree narrows to that top-level
   // vault folder. Toggles off when the same chip is clicked again.
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
@@ -63,7 +58,6 @@ export function Sidebar({ onNewNote }: SidebarProps = {}) {
   // Bumped after "Collapse all" to force FolderTree to re-read localStorage.
   const [folderTreeKey, setFolderTreeKey] = useState(0);
 
-  const threads = useMemo(() => deriveThreadsFromNotes(notes), [notes]);
   // Project chips source from the user's top-level vault folders. See
   // `topLevelProjects` for the rules (housekeeping folders excluded, both
   // ingest-v3 `projects/<p>/...` and legacy `<top>/...` layouts supported).
@@ -195,12 +189,6 @@ export function Sidebar({ onNewNote }: SidebarProps = {}) {
           </div>
         ) : null}
 
-        <ThreadChips
-          threads={threads}
-          selected={selectedThread}
-          onSelect={setSelectedThread}
-        />
-
         <div
           className="sidebar-tree"
           data-testid="sidebar-tree"
@@ -212,7 +200,7 @@ export function Sidebar({ onNewNote }: SidebarProps = {}) {
           <FolderTree
             key={folderTreeKey}
             notes={notes}
-            thread={selectedThread}
+            thread={null}
             project={selectedProject}
             showAllTypes={showAllTypes}
             currentPath={location.pathname}
