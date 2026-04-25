@@ -1,11 +1,21 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
+import { Modal } from "@/client/ui/Modal";
+import { Input } from "@/client/ui/Input";
+import { Button } from "@/client/ui/Button";
+import "./NewNoteModal.css";
 
 interface NewNoteModalProps {
   open: boolean;
   onClose: () => void;
 }
 
+/**
+ * NewNoteModal — wraps the create-note form in the Wave 1 `<Modal>` primitive.
+ * Same prop contract as before (`open`, `onClose`) so callers don't need to
+ * change. Inputs use the Wave 0 `<Input>` primitive; actions use `<Button>`.
+ * Layout chrome lives in NewNoteModal.css using design tokens.
+ */
 export function NewNoteModal({ open, onClose }: NewNoteModalProps) {
   const [title, setTitle] = useState("");
   const [domain, setDomain] = useState("");
@@ -14,8 +24,6 @@ export function NewNoteModal({ open, onClose }: NewNoteModalProps) {
   const [content, setContent] = useState("");
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
-
-  if (!open) return null;
 
   const canSubmit = title.trim().length > 0;
 
@@ -49,70 +57,78 @@ export function NewNoteModal({ open, onClose }: NewNoteModalProps) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-      <div className="bg-[var(--bg-secondary)] border border-[var(--border)] rounded p-6 w-[480px] space-y-3 text-[var(--text-primary)]">
-        <h2 className="text-lg">New note</h2>
-        <label className="block">
-          <span className="text-xs uppercase text-[var(--text-muted)]">Title</span>
-          <input
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="New note"
+      size="md"
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            onClick={submit}
+            disabled={!canSubmit}
+          >
+            Create &amp; open
+          </Button>
+        </>
+      }
+    >
+      <div className="new-note-form">
+        <label className="new-note-field">
+          <span className="new-note-label">Title</span>
+          <Input
             aria-label="title"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="w-full bg-[var(--bg-primary)] border border-[var(--border)] rounded px-2 py-1"
           />
         </label>
-        <div className="grid grid-cols-2 gap-2">
-          <label className="block">
-            <span className="text-xs uppercase text-[var(--text-muted)]">Domain</span>
-            <input
+        <div className="new-note-grid">
+          <label className="new-note-field">
+            <span className="new-note-label">Domain</span>
+            <Input
               aria-label="domain"
               value={domain}
               onChange={(e) => setDomain(e.target.value)}
-              className="w-full bg-[var(--bg-primary)] border border-[var(--border)] rounded px-2 py-1"
             />
           </label>
-          <label className="block">
-            <span className="text-xs uppercase text-[var(--text-muted)]">Subdomain</span>
-            <input
+          <label className="new-note-field">
+            <span className="new-note-label">Subdomain</span>
+            <Input
               aria-label="subdomain"
               value={subdomain}
               onChange={(e) => setSubdomain(e.target.value)}
-              className="w-full bg-[var(--bg-primary)] border border-[var(--border)] rounded px-2 py-1"
             />
           </label>
         </div>
-        <label className="block">
-          <span className="text-xs uppercase text-[var(--text-muted)]">Tags (comma-separated)</span>
-          <input
+        <label className="new-note-field">
+          <span className="new-note-label">Tags (comma-separated)</span>
+          <Input
             aria-label="tags"
             value={tagsInput}
             onChange={(e) => setTagsInput(e.target.value)}
             placeholder="type:research, project:longrest, landing-page"
-            className="w-full bg-[var(--bg-primary)] border border-[var(--border)] rounded px-2 py-1"
           />
         </label>
-        <label className="block">
-          <span className="text-xs uppercase text-[var(--text-muted)]">Content (markdown)</span>
+        <label className="new-note-field">
+          <span className="new-note-label">Content (markdown)</span>
           <textarea
             aria-label="content"
             value={content}
             onChange={(e) => setContent(e.target.value)}
             rows={6}
-            className="w-full bg-[var(--bg-primary)] border border-[var(--border)] rounded px-2 py-1 font-mono text-sm"
+            className="new-note-textarea"
           />
         </label>
-        {error && <div className="text-red-400 text-sm">{error}</div>}
-        <div className="flex gap-2 justify-end">
-          <button onClick={onClose} className="px-3 py-1 text-sm">Cancel</button>
-          <button
-            onClick={submit}
-            disabled={!canSubmit}
-            className="px-3 py-1 text-sm bg-[var(--accent)] text-black disabled:opacity-50"
-          >
-            Create & open
-          </button>
-        </div>
+        {error ? (
+          <div className="new-note-error" role="alert">
+            {error}
+          </div>
+        ) : null}
       </div>
-    </div>
+    </Modal>
   );
 }

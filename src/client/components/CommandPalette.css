@@ -1,0 +1,236 @@
+/* src/client/components/CommandPalette.css
+ * Source of truth: docs/pencils/03-navigation-overlays.md §Command Palette.
+ * Rules in the "verbatim" block below are copied byte-for-byte from the pencil.
+ * Rules below "/* --- Supplementary ..." are scaffolding the pencil doesn't
+ * cover (Modal-shell overrides so our `<Modal>` wrapper hosts the palette
+ * without double-padding, the move-to-project mini-form, the empty-state
+ * row, and the search-icon spacing inside the Input primitive).
+ * Zero hard-coded hex — every colour reads from var(--*).
+ */
+
+/* ---------- VERBATIM from 03-navigation-overlays.md §Command Palette ---------- */
+
+.command-palette {
+  position:      fixed;
+  top:           20vh;
+  left:          50%;
+  transform:     translateX(-50%);
+  width:         560px;
+  background:    var(--surface);
+  border:        1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow:    var(--shadow-lg);
+  overflow:      hidden;
+  z-index:       1000;
+}
+.command-palette-input {
+  width:         100%;
+  padding:       14px 16px;
+  background:    transparent;
+  border:        none;
+  border-bottom: 1px solid var(--border-subtle);
+  font-family:   'Inter', sans-serif;
+  font-size:     15px;
+  color:         var(--text-strong);
+  outline:       none;
+}
+.command-palette-list {
+  max-height:    320px;
+  overflow-y:    auto;
+  padding:       4px;
+}
+.command-palette-item {
+  display:       flex;
+  align-items:   center;
+  gap:           10px;
+  padding:       8px 12px;
+  border-radius: var(--radius-sm);
+  font-family:   'Inter', sans-serif;
+  font-size:     13px;
+  color:         var(--text);
+  cursor:        pointer;
+}
+.command-palette-item[data-active] { background: var(--surface-active); color: var(--text-strong); }
+.command-palette-item:hover        { background: var(--surface-hover); }
+.command-palette-footer {
+  display:       flex;
+  align-items:   center;
+  gap:           var(--space-4);
+  padding:       8px 16px;
+  border-top:    1px solid var(--border-subtle);
+  font-family:   'JetBrains Mono', monospace;
+  font-size:     11px;
+  color:         var(--text-subtle);
+}
+
+/* ---------- Supplementary (scaffolding the pencil doesn't cover) ---------- */
+
+/* Modal-shell override: when our Modal wraps the palette, zero out the card
+ * padding/gap so the Input renders edge-to-edge per pencil, and pin the width
+ * to 560px (pencil) instead of the default modal-lg 640px. */
+.modal.command-palette-shell {
+  width:   560px;
+  padding: 0;
+  gap:     0;
+  overflow: hidden;
+}
+.modal.command-palette-shell > .modal-body {
+  padding: 0;
+  gap:     0;
+  overflow: hidden;
+}
+
+/* Move the modal-overlay's vertical alignment from center to top:20vh when a
+ * command-palette-shell is mounted. The selector is scoped to the overlay
+ * that actually contains our shell so other modals stay centered. */
+.modal-overlay:has(> .command-palette-shell) {
+  align-items: flex-start;
+  padding-top: 20vh;
+}
+
+/* The Wave 0 <Input> primitive renders into `.input-wrap > .input.input-icon-wrap`.
+ * The pencil's `.command-palette-input` rule targets the *bare* input we no longer
+ * use directly, so we re-state the same pencil values on the primitive's selectors
+ * when it's nested in the palette. Padding-left grows to make room for the lucide
+ * Search icon supplied via `Input icon=`.
+ *
+ * `.command-palette-input-wrap` is our outer container; the Input primitive
+ * renders its own `.input-wrap` inside, which we keep relative-positioned so the
+ * icon can absolute-anchor against it. */
+.command-palette-input-wrap {
+  width: 100%;
+}
+.command-palette-input-wrap .input-wrap {
+  position: relative;
+  width:    100%;
+}
+.command-palette-input-wrap .input {
+  width:         100%;
+  padding:       14px 16px 14px 40px;
+  background:    transparent;
+  border:        none;
+  border-bottom: 1px solid var(--border-subtle);
+  border-radius: 0;
+  font-family:   'Inter', sans-serif;
+  font-size:     15px;
+  color:         var(--text-strong);
+  outline:       none;
+  box-shadow:    none;
+}
+.command-palette-input-wrap .input:focus {
+  outline:    none;
+  box-shadow: none;
+  border-color: var(--border-subtle);
+}
+.command-palette-input-wrap .input-icon {
+  position:   absolute;
+  left:       14px;
+  top:        50%;
+  transform:  translateY(-50%);
+  color:      var(--text-muted);
+  display:    inline-flex;
+  pointer-events: none;
+}
+
+/* Empty-state row inside the list. Visually matches a result row but is not
+ * interactive — no hover/active states, muted color. */
+.command-palette-empty {
+  padding:       12px 16px;
+  font-family:   'Inter', sans-serif;
+  font-size:     13px;
+  color:         var(--text-muted);
+}
+
+/* Section header inside the list (e.g. "Actions" above Move-to-project). Uses
+ * the JetBrains Mono micro-label treatment so it reads as metadata. */
+.command-palette-section {
+  padding:        10px 12px 4px;
+  font-family:    'JetBrains Mono', monospace;
+  font-size:      10px;
+  font-weight:    500;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color:          var(--text-subtle);
+}
+
+/* Result-row inner layout: title on top, snippet (truncated) below. */
+.command-palette-item-content {
+  display:        flex;
+  flex-direction: column;
+  min-width:      0;
+  flex:           1;
+}
+.command-palette-item-title {
+  font-weight:   500;
+  color:         inherit;
+  overflow:      hidden;
+  text-overflow: ellipsis;
+  white-space:   nowrap;
+}
+.command-palette-item-snippet {
+  font-size:     11px;
+  color:         var(--text-muted);
+  overflow:      hidden;
+  text-overflow: ellipsis;
+  white-space:   nowrap;
+  margin-top:    2px;
+}
+
+/* Right-side keyboard shortcut cluster on a row. */
+.command-palette-item-kbds {
+  display:     inline-flex;
+  align-items: center;
+  gap:         var(--space-3);
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* Move-to-project mini-form. Lives in a card-like region above the list with
+ * its own border to separate it from search results. */
+.command-palette-move {
+  border-bottom: 1px solid var(--border-subtle);
+  padding:       12px 16px;
+  display:       flex;
+  flex-direction: column;
+  gap:           var(--space-3);
+  font-family:   'Inter', sans-serif;
+  font-size:     13px;
+  color:         var(--text);
+}
+.command-palette-move-title {
+  font-weight: 600;
+  color:       var(--text-strong);
+}
+.command-palette-move-row {
+  display:     flex;
+  align-items: center;
+  gap:         var(--space-4);
+}
+.command-palette-move-row label {
+  width: 80px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.command-palette-move-row .input,
+.command-palette-move-row select {
+  flex: 1;
+  background:    var(--surface-hover);
+  border:        1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color:         var(--text-strong);
+  padding:       6px 8px;
+  font-size:     13px;
+  outline:       none;
+}
+.command-palette-move-row select:focus,
+.command-palette-move-row .input:focus {
+  border-color: var(--accent);
+}
+.command-palette-move-error {
+  color:     var(--warning);
+  font-size: 12px;
+}
+.command-palette-move-actions {
+  display: flex;
+  gap:     var(--space-3);
+}
