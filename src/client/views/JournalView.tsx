@@ -2,12 +2,26 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
 import type { Note } from "../../shared/types";
-import { RelatedPanel } from "../components/RelatedPanel";
+import {
+  RelatedPanel,
+  relatedHasSections,
+  type RelatedData,
+} from "../components/RelatedPanel";
 import { ActivityStrip } from "../components/ActivityStrip";
+import { useEmbeddingProgress } from "../stores/embeddingProgress";
 
 export function JournalView() {
   const [note, setNote] = useState<Note | null>(null);
+  const [related, setRelated] = useState<RelatedData | null>(null);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
+
+  // Render the right-rail aside only when there's something in it.
+  // Otherwise an empty 260px column eats the journal's reading width.
+  const hasRelated = relatedHasSections(related);
+  const hasActivity = useEmbeddingProgress(
+    (s) => Object.keys(s.inFlight).length > 0,
+  );
+  const showAside = hasRelated || hasActivity;
 
   useEffect(() => {
     if (selectedDate === new Date().toISOString().split("T")[0]) {
@@ -15,6 +29,23 @@ export function JournalView() {
     } else {
       api.journal.get(selectedDate).then(setNote).catch(() => setNote(null));
     }
+  }, [selectedDate]);
+
+  // Hoisted from RelatedPanel so we can decide whether to render the aside
+  // before paint, and so we re-fetch when the user moves between days.
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/daily_context")
+      .then((r) => r.json())
+      .then((resp) => {
+        if (!cancelled) setRelated(resp.related ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setRelated(null);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [selectedDate]);
 
   return (
@@ -48,12 +79,17 @@ export function JournalView() {
           )}
         </div>
       </div>
-      <aside className="w-[260px] border-l border-[var(--border)] flex flex-col overflow-hidden">
-        <div className="flex-1 min-h-0 overflow-y-auto">
-          <RelatedPanel />
-        </div>
-        <ActivityStrip />
-      </aside>
+      {showAside ? (
+        <aside
+          data-testid="journal-aside"
+          className="w-[260px] border-l border-[var(--border-subtle)] flex flex-col overflow-hidden"
+        >
+          <div className="flex-1 min-h-0 overflow-y-auto">
+            <RelatedPanel data={related} />
+          </div>
+          <ActivityStrip />
+        </aside>
+      ) : null}
     </div>
   );
 }
