@@ -44,7 +44,7 @@ export function RelatedPanel() {
             <button
               key={it.path}
               onClick={() => navigate(`/note/${it.path}`)}
-              className="block w-full text-left text-[var(--text-secondary)] hover:text-[var(--text-primary)] truncate"
+              className="block w-full text-left text-[var(--text-muted)] hover:text-[var(--text)] truncate"
               title={it.path}
             >
               {it.title ?? it.path}

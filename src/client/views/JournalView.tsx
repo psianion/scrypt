@@ -25,11 +25,11 @@ export function JournalView() {
             type="date"
             value={selectedDate}
             onChange={(e) => setSelectedDate(e.target.value)}
-            className="px-2 py-1 text-sm bg-[var(--bg-secondary)] border border-[var(--border)] rounded text-[var(--text-primary)]"
+            className="px-2 py-1 text-sm bg-[var(--surface)] border border-[var(--border)] rounded text-[var(--text)]"
           />
           <button
             onClick={() => setSelectedDate(new Date().toISOString().split("T")[0])}
-            className="px-3 py-1 text-sm bg-[var(--bg-tertiary)] text-[var(--text-secondary)] rounded hover:text-[var(--text-primary)]"
+            className="px-3 py-1 text-sm bg-[var(--surface-hover)] text-[var(--text-muted)] rounded hover:text-[var(--text)]"
           >
             Today
           </button>
@@ -39,7 +39,7 @@ export function JournalView() {
         <div className="flex-1 overflow-y-auto">
           {note ? (
             <div className="prose prose-invert max-w-none">
-              <pre className="whitespace-pre-wrap text-sm text-[var(--text-primary)]">
+              <pre className="whitespace-pre-wrap text-sm text-[var(--text)]">
                 {note.content}
               </pre>
             </div>

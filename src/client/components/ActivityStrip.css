@@ -6,7 +6,7 @@
   font-size: 11px;
   font-family: var(--mono, monospace);
   border-top: 1px solid var(--border, #333);
-  background: var(--bg-alt, #0e0e11);
+  background: var(--surface, #0e0e11);
 }
 
 .activity-row {
