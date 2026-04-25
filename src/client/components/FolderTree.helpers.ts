@@ -45,6 +45,53 @@ export function deriveProjectDocType(path: string): {
 
 export interface BuildOpts {
   thread?: { project: string; thread: string } | null;
+  /** When set, restrict the tree to a single project (matches both
+   * ingest-v3 `note.project` and legacy first-path-segment layouts). */
+  project?: string | null;
+}
+
+/**
+ * Top-level vault folders that act as project namespaces.
+ *
+ * Project chips in the sidebar source from this list — the canonical reading
+ * is "the user's actual top-level folders in the vault" (e.g. `dnd`, `scrypt`).
+ *
+ * Two layouts are supported:
+ *   - ingest-v3:  `projects/<p>/<dt>/<slug>.md`  → project = `<p>`
+ *   - legacy:     `<top>/...`                   → project = `<top>`
+ *
+ * RESERVED_TOP_LEVEL entries (`journal`, `data`, etc.) are filtered out so
+ * housekeeping folders never surface as projects.
+ */
+export function topLevelProjects(notes: FolderTreeNote[]): string[] {
+  const set = new Set<string>();
+  for (const note of notes) {
+    const parts = note.path.split("/");
+    const top = parts[0] ?? "";
+    if (!top || RESERVED_TOP_LEVEL.has(top)) continue;
+
+    if (top === "projects") {
+      // ingest-v3 — projects/<p>/<dt>/<slug>.md
+      if (parts[1]) set.add(parts[1]);
+    } else {
+      // legacy / user-created top-level folder
+      set.add(top);
+    }
+  }
+  return [...set].sort((a, b) => {
+    if (a === "_inbox") return -1;
+    if (b === "_inbox") return 1;
+    return a.localeCompare(b);
+  });
+}
+
+/** True when `note` belongs to `project` under either layout. */
+function noteMatchesProject(note: FolderTreeNote, project: string): boolean {
+  if (note.project === project) return true;
+  const parts = note.path.split("/");
+  if (parts[0] === "projects" && parts[1] === project) return true;
+  if (parts[0] === project) return true;
+  return false;
 }
 
 export function buildProjectTree(
@@ -70,6 +117,10 @@ export function buildProjectTree(
       if (project !== opts.thread.project || note.thread !== opts.thread.thread) {
         continue;
       }
+    }
+
+    if (opts.project && !noteMatchesProject(note, opts.project)) {
+      continue;
     }
 
     if (!byProject.has(project)) byProject.set(project, new Map());

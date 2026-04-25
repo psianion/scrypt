@@ -144,10 +144,65 @@
   margin:       0;
 }
 
+.sidebar-projects {
+  display:      flex;
+  flex-wrap:    wrap;
+  gap:          var(--space-2);
+  padding:      0 var(--space-4) var(--space-3);
+  flex-shrink:  0;
+}
+
+.sidebar-project-chip {
+  display:        inline-flex;
+  align-items:    center;
+  height:         22px;
+  padding:        0 10px;
+  border-radius:  var(--radius-full);
+  background:     transparent;
+  border:         1px solid var(--border-subtle);
+  color:          var(--text-muted);
+  font-family:    'JetBrains Mono', monospace;
+  font-size:      11px;
+  font-weight:    500;
+  letter-spacing: 0.4px;
+  cursor:         pointer;
+  transition:     background var(--dur-fast),
+                  color var(--dur-fast),
+                  border-color var(--dur-fast);
+  appearance:     none;
+}
+.sidebar-project-chip:hover {
+  background:   var(--surface-hover);
+  color:        var(--text);
+  border-color: var(--border);
+}
+.sidebar-project-chip[data-active] {
+  background:   var(--surface-active);
+  color:        var(--text-strong);
+  border-color: var(--border);
+}
+.sidebar-project-chip:focus-visible {
+  outline:        2px solid var(--accent);
+  outline-offset: 1px;
+}
+
 .sidebar-tree {
-  flex:       1 1 auto;
-  overflow-y: auto;
-  padding:    var(--space-2) var(--space-2) var(--space-4);
+  flex:        1 1 auto;
+  min-height:  0;
+  overflow-y:  auto;
+  padding:     var(--space-2) var(--space-2) var(--space-4);
+  /* File/folder tree uses JetBrains Mono — chips above stay Inter, the
+   * micro-label header stays mono via .sidebar-label, but every row inside
+   * the tree (project headers, doc-type rows, note titles) reads as code. */
+  font-family: 'JetBrains Mono', monospace;
+  font-size:   12px;
+  line-height: 1.4;
+}
+/* Cascade JetBrains Mono into FolderTree's inline-styled rows. FolderTree
+ * uses Tailwind utilities (`text-sm`, `text-xs`) which only set size, not
+ * family — so we inherit family from the wrapper. */
+.sidebar-tree * {
+  font-family: inherit;
 }
 
 .sidebar-item--new {

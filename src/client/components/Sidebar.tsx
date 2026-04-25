@@ -16,6 +16,7 @@ import {
 import { useStore } from "../store";
 import { api } from "../api";
 import { FolderTree } from "./FolderTree";
+import { topLevelProjects } from "./FolderTree.helpers";
 import { ThreadChips, deriveThreadsFromNotes } from "./ThreadChips";
 import { ContextMenu, type ContextMenuPosition } from "../ui";
 import "./Sidebar.css";
@@ -55,11 +56,18 @@ export function Sidebar({ onNewNote }: SidebarProps = {}) {
     project: string;
     thread: string;
   } | null>(null);
+  // Project pill filter — when set, FolderTree narrows to that top-level
+  // vault folder. Toggles off when the same chip is clicked again.
+  const [selectedProject, setSelectedProject] = useState<string | null>(null);
   const [treeMenu, setTreeMenu] = useState<ContextMenuPosition | null>(null);
   // Bumped after "Collapse all" to force FolderTree to re-read localStorage.
   const [folderTreeKey, setFolderTreeKey] = useState(0);
 
   const threads = useMemo(() => deriveThreadsFromNotes(notes), [notes]);
+  // Project chips source from the user's top-level vault folders. See
+  // `topLevelProjects` for the rules (housekeeping folders excluded, both
+  // ingest-v3 `projects/<p>/...` and legacy `<top>/...` layouts supported).
+  const projects = useMemo(() => topLevelProjects(notes), [notes]);
 
   useEffect(() => {
     let cancelled = false;
@@ -158,6 +166,35 @@ export function Sidebar({ onNewNote }: SidebarProps = {}) {
           </label>
         </div>
 
+        {projects.length > 0 ? (
+          <div
+            className="sidebar-projects"
+            data-testid="sidebar-projects"
+            role="tablist"
+            aria-label="Project filter"
+          >
+            {projects.map((p) => {
+              const active = selectedProject === p;
+              return (
+                <button
+                  key={p}
+                  type="button"
+                  className="sidebar-project-chip"
+                  data-active={active ? "" : undefined}
+                  data-testid={`sidebar-project-${p}`}
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() =>
+                    setSelectedProject((cur) => (cur === p ? null : p))
+                  }
+                >
+                  {p}
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
+
         <ThreadChips
           threads={threads}
           selected={selectedThread}
@@ -176,6 +213,7 @@ export function Sidebar({ onNewNote }: SidebarProps = {}) {
             key={folderTreeKey}
             notes={notes}
             thread={selectedThread}
+            project={selectedProject}
             showAllTypes={showAllTypes}
             currentPath={location.pathname}
             onNoteClick={(p) => navigate(`/note/${p}`)}

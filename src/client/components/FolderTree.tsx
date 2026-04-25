@@ -31,6 +31,9 @@ function saveExpanded(expanded: Set<string>): void {
 export interface FolderTreeProps {
   notes: FolderTreeNote[];
   thread?: { project: string; thread: string } | null;
+  /** Restrict the tree to a single project (top-level folder). When set,
+   * only notes belonging to that project render. */
+  project?: string | null;
   showAllTypes?: boolean;
   currentPath?: string;
   onNoteClick?: (path: string) => void;
@@ -39,6 +42,7 @@ export interface FolderTreeProps {
 export function FolderTree({
   notes,
   thread = null,
+  project = null,
   showAllTypes = false,
   currentPath,
   onNoteClick,
@@ -46,8 +50,8 @@ export function FolderTree({
   const [expanded, setExpanded] = useState<Set<string>>(() => loadExpanded());
 
   const groups = useMemo(
-    () => buildProjectTree(notes, { thread }),
-    [notes, thread],
+    () => buildProjectTree(notes, { thread, project }),
+    [notes, thread, project],
   );
 
   if (groups.length === 0) {
