@@ -4,9 +4,9 @@
   gap: 4px;
   padding: 6px 10px;
   font-size: 11px;
-  font-family: var(--mono, monospace);
-  border-top: 1px solid var(--border, #333);
-  background: var(--surface, #0e0e11);
+  font-family: 'JetBrains Mono', monospace;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--surface);
 }
 
 .activity-row {
@@ -20,7 +20,7 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--accent, #5af);
+  background: var(--accent);
   animation: activity-pulse 1.2s ease-in-out infinite;
 }
 
@@ -50,7 +50,10 @@
 .activity-bar {
   width: 60px;
   height: 3px;
-  background: rgba(255, 255, 255, 0.08);
+  /* Theme-flipping translucent tint over the strip's surface — visible in
+   * both dark (light text on dark bg) and light (dark text on light bg) modes,
+   * unlike a hard-coded white alpha which disappears on light surfaces. */
+  background: color-mix(in srgb, var(--text) 8%, transparent);
   border-radius: 2px;
   overflow: hidden;
 }
@@ -58,6 +61,6 @@
 .activity-bar-fill {
   display: block;
   height: 100%;
-  background: var(--accent, #5af);
+  background: var(--accent);
   transition: width 150ms ease-out;
 }
