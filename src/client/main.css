@@ -43,9 +43,14 @@ circle.embedding-pulse {
   50%      { transform: scale(1.08); }
 }
 
-body {
+html, body, #root {
   margin: 0;
+  width: 100%;
+  min-height: 100dvh;
   background: var(--bg);
+}
+
+body {
   color: var(--text);
   font-family: 'Inter', sans-serif;
   font-size: 14px;
