@@ -60,6 +60,7 @@ export function Editor() {
           }
         }),
         embeddingOverlay(currentPathRef),
+        EditorView.lineWrapping,
         EditorView.theme({
           "&": { height: "100%", backgroundColor: "var(--bg)" },
           ".cm-content": { color: "var(--text)", fontFamily: "inherit", padding: "1rem" },
