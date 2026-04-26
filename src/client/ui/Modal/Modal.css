@@ -10,6 +10,10 @@
   display:         flex;
   align-items:     center;
   justify-content: center;
+  /* Padded backdrop is the centering frame: keeps the card off the viewport
+   * edges at any size and gives `max-width/max-height: calc(100v* - 2*pad)`
+   * a stable gutter to clamp against. */
+  padding:         var(--space-6);
   z-index:         900;
   backdrop-filter: blur(4px);
 }
@@ -19,19 +23,35 @@
   border:         1px solid var(--border);
   border-radius:  var(--radius-lg);
   box-shadow:     var(--shadow-lg);
-  max-width:      90vw;
-  max-height:     90vh;
+  /* Width clamps via per-size variants; height clamps to padded viewport so a
+   * tall modal can never exceed the screen — internal scroll lives in
+   * `.modal-body`. */
+  max-height:     calc(100vh - 2 * var(--space-6));
   padding:        24px;
   display:        flex;
   flex-direction: column;
   gap:            var(--space-5);
   outline:        none;
   overflow:       hidden;
+  /* Allow the card to shrink below its `width:` in narrow viewports. */
+  min-width:      0;
 }
 
-.modal-sm { width: 320px; }
-.modal-md { width: 480px; }
-.modal-lg { width: 640px; }
+/* Each size sets a preferred width AND clamps to the padded viewport so the
+ * card never overflows on small screens (e.g. 320×480). The `min()` resolves
+ * to whichever of (preferred, viewport - 2 * gutter) is smaller. */
+.modal-sm {
+  width:     320px;
+  max-width: min(320px, calc(100vw - 2 * var(--space-6)));
+}
+.modal-md {
+  width:     480px;
+  max-width: min(480px, calc(100vw - 2 * var(--space-6)));
+}
+.modal-lg {
+  width:     640px;
+  max-width: min(640px, calc(100vw - 2 * var(--space-6)));
+}
 
 .modal-header {
   display:         flex;

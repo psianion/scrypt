@@ -67,12 +67,17 @@
 
 /* Modal-shell override: when our Modal wraps the palette, zero out the card
  * padding/gap so the Input renders edge-to-edge per pencil, and pin the width
- * to 560px (pencil) instead of the default modal-lg 640px. */
+ * to 560px (pencil) — clamped to viewport so the card never overflows on
+ * narrow screens. */
 .modal.command-palette-shell {
-  width:   560px;
-  padding: 0;
-  gap:     0;
-  overflow: hidden;
+  width:     560px;
+  max-width: min(560px, calc(100vw - 2 * var(--space-6)));
+  padding:   0;
+  gap:       0;
+  overflow:  hidden;
+  /* Account for the larger top offset (clamp below) so the card height fits
+   * inside the remaining viewport even on short screens. */
+  max-height: calc(100vh - clamp(var(--space-6), 20vh, 25vh) - var(--space-6));
 }
 .modal.command-palette-shell > .modal-body {
   padding: 0;
@@ -80,12 +85,13 @@
   overflow: hidden;
 }
 
-/* Move the modal-overlay's vertical alignment from center to top:20vh when a
- * command-palette-shell is mounted. The selector is scoped to the overlay
- * that actually contains our shell so other modals stay centered. */
+/* Anchor the palette near the top of the viewport (~20vh) but never push it
+ * off-screen on a short window — `clamp` floors at the standard backdrop
+ * gutter so 320×480 still keeps the card fully visible. The selector is
+ * scoped to the overlay containing our shell so other modals stay centered. */
 .modal-overlay:has(> .command-palette-shell) {
   align-items: flex-start;
-  padding-top: 20vh;
+  padding-top: clamp(var(--space-6), 20vh, 25vh);
 }
 
 /* The Wave 0 <Input> primitive renders into `.input-wrap > .input.input-icon-wrap`.
