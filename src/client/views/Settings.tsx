@@ -1,4 +1,12 @@
 import { useEffect, useState } from "react";
+import { Segment } from "../ui/Segment";
+import { useStore } from "../store";
+
+const themeItems = [
+  { value: "light", label: "Light" },
+  { value: "dark", label: "Dark" },
+  { value: "auto", label: "Auto" },
+] as const;
 
 interface PluginInfo {
   id: string;
@@ -18,6 +26,8 @@ export function Settings() {
     editor: { fontSize: 14, tabSize: 2, autoSaveDelay: 2000 },
     vault: { trashRetentionDays: 30 },
   });
+  const theme = useStore((s) => s.theme);
+  const setTheme = useStore((s) => s.setTheme);
 
   useEffect(() => {
     fetch("/api/plugins")
@@ -36,6 +46,24 @@ export function Settings() {
   return (
     <div data-testid="settings" className="p-6 max-w-xl">
       <h2 className="text-lg text-[var(--text)] mb-4">Settings</h2>
+
+      <section className="mb-6" data-testid="appearance-section">
+        <h3 className="text-sm text-[var(--text-muted)] uppercase tracking-wide mb-2">
+          Appearance
+        </h3>
+        <label className="flex items-center justify-between py-1 text-sm">
+          <span className="text-[var(--text-muted)]">Theme</span>
+          <Segment
+            items={themeItems}
+            value={theme}
+            onChange={setTheme}
+            ariaLabel="Theme"
+          />
+        </label>
+        <p className="text-xs text-[var(--text-muted)] mt-2">
+          Toggle dark/light anywhere with <kbd className="px-1 py-0.5 bg-[var(--surface)] border border-[var(--border)] rounded text-[10px]">⌘⇧L</kbd>.
+        </p>
+      </section>
 
       <section className="mb-6">
         <h3 className="text-sm text-[var(--text-muted)] uppercase tracking-wide mb-2">

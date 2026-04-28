@@ -18,6 +18,7 @@ import { DesignSystem } from "./views/design-system/DesignSystem";
 import { useStore } from "./store";
 import { useApplyTheme } from "./theme";
 import { connectWebSocket } from "./api";
+import { ToastRegion } from "./ui/Toast";
 
 export function AppContent() {
   useApplyTheme();
@@ -42,6 +43,21 @@ export function AppContent() {
         e.preventDefault();
         setNewNoteOpen(true);
       }
+    };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, []);
+
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || !e.shiftKey) return;
+      if (e.key !== "l" && e.key !== "L") return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) {
+        return;
+      }
+      e.preventDefault();
+      useStore.getState().toggleTheme();
     };
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
@@ -83,6 +99,7 @@ export function AppContent() {
       </div>
       {commandPaletteOpen && <CommandPalette />}
       <NewNoteModal open={newNoteOpen} onClose={() => setNewNoteOpen(false)} />
+      <ToastRegion />
     </>
   );
 }

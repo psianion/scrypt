@@ -13,8 +13,8 @@ interface AppState {
   toggleSidebar: () => void;
 
   // Theme
-  theme: "dark" | "light";
-  setTheme: (t: "dark" | "light") => void;
+  theme: "dark" | "light" | "auto";
+  setTheme: (t: "dark" | "light" | "auto") => void;
   toggleTheme: () => void;
 
   // Notes list
@@ -54,16 +54,23 @@ export const useStore = create<AppState>((set) => ({
   toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
 
   theme: (typeof localStorage !== "undefined" &&
-    (localStorage.getItem("scrypt.theme") as "dark" | "light" | null)) || "dark",
+    (localStorage.getItem("scrypt.theme") as "dark" | "light" | "auto" | null)) || "dark",
   setTheme: (theme) => {
     if (typeof localStorage !== "undefined") localStorage.setItem("scrypt.theme", theme);
     set({ theme });
   },
   toggleTheme: () =>
     set((s) => {
-      const theme = s.theme === "dark" ? "light" : "dark";
-      if (typeof localStorage !== "undefined") localStorage.setItem("scrypt.theme", theme);
-      return { theme };
+      let next: "dark" | "light";
+      if (s.theme === "auto") {
+        const sysDark = typeof window !== "undefined" &&
+          window.matchMedia?.("(prefers-color-scheme: dark)").matches;
+        next = sysDark ? "light" : "dark";
+      } else {
+        next = s.theme === "dark" ? "light" : "dark";
+      }
+      if (typeof localStorage !== "undefined") localStorage.setItem("scrypt.theme", next);
+      return { theme: next };
     }),
 
   notes: [],

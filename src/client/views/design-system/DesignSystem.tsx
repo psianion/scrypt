@@ -12,7 +12,6 @@ import {
   Copy,
   Share2,
 } from "lucide-react";
-import { useStore } from "../../store";
 import { Button } from "../../ui/Button";
 import { Input } from "../../ui/Input";
 import { Chip, Pill, Kbd, TierChip } from "../../ui/Chip";
@@ -27,8 +26,6 @@ import { Breadcrumb } from "../../ui/Breadcrumb";
 import "./DesignSystem.css";
 
 export function DesignSystem() {
-  const theme = useStore((s) => s.theme);
-  const toggleTheme = useStore((s) => s.toggleTheme);
   return (
     <div className="ds-root">
       <header className="ds-header">
@@ -36,9 +33,6 @@ export function DesignSystem() {
           <h1 className="ds-title">Scrypt Design System</h1>
           <p className="ds-subtitle">Inspector for every primitive × variant × state × theme.</p>
         </div>
-        <button className="btn btn-secondary" onClick={toggleTheme} data-testid="ds-theme-toggle">
-          Theme: {theme}
-        </button>
       </header>
       <main className="ds-main">
         <section className="ds-section">
