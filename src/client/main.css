@@ -1,4 +1,35 @@
 @import "tailwindcss";
+@import "./theme/tokens.css";
+@import "./theme/fonts.css";
+
+@theme {
+  /* Bridge CSS custom properties into Tailwind v4 so utility classes
+     like `bg-surface`, `text-muted`, `rounded-md` resolve to the
+     same tokens the component CSS files use. */
+  --color-bg:              var(--bg);
+  --color-surface:         var(--surface);
+  --color-surface-hover:   var(--surface-hover);
+  --color-surface-active:  var(--surface-active);
+  --color-border-subtle:   var(--border-subtle);
+  --color-border:          var(--border);
+  --color-border-strong:   var(--border-strong);
+  --color-text-strong:     var(--text-strong);
+  --color-text:            var(--text);
+  --color-text-muted:      var(--text-muted);
+  --color-text-subtle:     var(--text-subtle);
+  --color-accent:          var(--accent);
+  --color-accent-ai:       var(--accent-ai);
+  --color-success:         var(--success);
+  --color-warning:         var(--warning);
+  --color-danger:          var(--danger);
+
+  --radius-xs:   var(--radius-xs);
+  --radius-sm:   var(--radius-sm);
+  --radius-md:   var(--radius-md);
+  --radius-lg:   var(--radius-lg);
+  --radius-xl:   var(--radius-xl);
+  --radius-full: var(--radius-full);
+}
 
 /* Wave 8: pulse nodes whose note is currently being embedded. */
 circle.embedding-pulse {
@@ -8,38 +39,28 @@ circle.embedding-pulse {
 }
 
 @keyframes graph-embed-pulse {
-  0%, 100% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.08);
-  }
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.08); }
 }
 
-:root {
-  --bg-primary: #111111;
-  --bg-secondary: #1a1a1a;
-  --bg-tertiary: #222222;
-  --border: #333333;
-  --text-primary: #e0e0e0;
-  --text-secondary: #888888;
-  --text-muted: #555555;
-  --link: #999999;
+html, body, #root {
+  margin: 0;
+  width: 100%;
+  min-height: 100dvh;
+  background: var(--bg);
 }
 
 body {
-  margin: 0;
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  font-family: ui-monospace, "SF Mono", "Cascadia Code", monospace;
+  color: var(--text);
+  font-family: 'Inter', sans-serif;
   font-size: 14px;
 }
 
 * { box-sizing: border-box; }
 
 ::selection {
-  background: #444;
-  color: #fff;
+  background: var(--surface-active);
+  color: var(--text-strong);
 }
 
 /* GraphView (Pixi renderer) */
@@ -56,27 +77,27 @@ body {
   height: 60px;
   padding: 0 16px;
   border-bottom: 1px solid var(--border);
-  background: var(--bg-secondary);
+  background: var(--surface);
   flex-shrink: 0;
 }
 .graph-view__search {
   flex: 1;
-  background: var(--bg-tertiary);
+  background: var(--surface-hover);
   border: 1px solid var(--border);
-  color: var(--text-primary);
+  color: var(--text);
   padding: 6px 10px;
   font: inherit;
   border-radius: 3px;
   outline: none;
 }
 .graph-view__search:focus {
-  border-color: var(--text-secondary);
+  border-color: var(--text-muted);
 }
 .graph-view__tiers {
   display: flex;
   align-items: center;
   gap: 12px;
-  color: var(--text-secondary);
+  color: var(--text-muted);
   font-size: 12px;
 }
 .graph-view__tiers label {
@@ -100,9 +121,9 @@ body {
   gap: 16px;
   padding: 12px;
   border-left: 1px solid var(--border);
-  background: var(--bg-secondary);
+  background: var(--surface);
   overflow-y: auto;
-  color: var(--text-primary);
+  color: var(--text);
   font-size: 13px;
 }
 .note-context h4 {
@@ -111,7 +132,7 @@ body {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--text-secondary);
+  color: var(--text-muted);
 }
 .note-context__graph {
   position: relative;
@@ -121,7 +142,7 @@ body {
   height: 260px;
   border: 1px solid var(--border);
   border-radius: 4px;
-  background: var(--bg-primary);
+  background: var(--bg);
   overflow: hidden;
 }
 .note-context__open-global {
@@ -129,8 +150,8 @@ body {
   top: 22px;
   right: 4px;
   padding: 2px 6px;
-  color: var(--text-secondary);
-  background: var(--bg-tertiary);
+  color: var(--text-muted);
+  background: var(--surface-hover);
   border: 1px solid var(--border);
   border-radius: 3px;
   text-decoration: none;
@@ -138,8 +159,8 @@ body {
   line-height: 1;
 }
 .note-context__open-global:hover {
-  color: var(--text-primary);
-  border-color: var(--text-secondary);
+  color: var(--text);
+  border-color: var(--text-muted);
 }
 .note-context__tags,
 .note-context__related {
@@ -158,16 +179,16 @@ body {
 .tag-chip {
   display: inline-block;
   padding: 2px 8px;
-  background: var(--bg-tertiary);
+  background: var(--surface-hover);
   border: 1px solid var(--border);
   border-radius: 999px;
-  color: var(--text-secondary);
+  color: var(--text-muted);
   font-size: 11px;
   text-decoration: none;
 }
 .tag-chip:hover {
-  color: var(--text-primary);
-  border-color: var(--text-secondary);
+  color: var(--text);
+  border-color: var(--text-muted);
 }
 .note-context__empty {
   font-size: 12px;
@@ -183,7 +204,7 @@ body {
   margin: 0 0 2px 0;
   font-size: 11px;
   font-weight: 600;
-  color: var(--text-secondary);
+  color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
@@ -192,7 +213,7 @@ body {
   user-select: none;
 }
 .tier-group__toggle:hover {
-  color: var(--text-primary);
+  color: var(--text);
 }
 .tier-row {
   display: block;
@@ -204,7 +225,7 @@ body {
   font-size: 12px;
 }
 .tier-row a:hover {
-  color: var(--text-primary);
+  color: var(--text);
 }
 .tier-row__reason {
   font-size: 11px;
@@ -215,7 +236,7 @@ body {
 /* Wave B: read-only TasksList */
 .tasks-list {
   padding: 20px 28px;
-  color: var(--text-primary);
+  color: var(--text);
   overflow: auto;
   height: 100%;
 }
@@ -236,7 +257,7 @@ body {
   align-items: center;
   gap: 6px;
   font-size: 13px;
-  color: var(--text-secondary);
+  color: var(--text-muted);
   cursor: pointer;
   user-select: none;
 }
@@ -244,7 +265,7 @@ body {
   margin-left: auto;
   font-size: 12px;
   color: var(--text-muted);
-  background: var(--bg-tertiary);
+  background: var(--surface-hover);
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 2px 10px;
@@ -269,7 +290,7 @@ body {
   color: var(--text-muted);
   padding: 8px 12px;
   border-bottom: 1px solid var(--border);
-  background: var(--bg-secondary);
+  background: var(--surface);
   position: sticky;
   top: 0;
   z-index: 1;
@@ -280,17 +301,22 @@ body {
   vertical-align: top;
 }
 .tasks-list__table tbody tr:hover {
-  background: var(--bg-secondary);
+  background: var(--surface);
 }
 .tasks-list__table a {
   color: var(--link);
   text-decoration: none;
 }
 .tasks-list__table a:hover {
-  color: var(--text-primary);
+  color: var(--text);
   text-decoration: underline;
 }
-.pill {
+/* Legacy pill used by TasksList for type/status badges with inline background.
+ * Renamed from `.pill` so it no longer shadows the design-system Chip family
+ * `.pill` rule in `src/client/ui/Chip/Chip.css`. Slated for migration to
+ * <Chip variant="status-*"> in a later wave.
+ */
+.legacy-pill {
   display: inline-block;
   padding: 2px 8px;
   border-radius: 10px;

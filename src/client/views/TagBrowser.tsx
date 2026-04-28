@@ -60,14 +60,14 @@ export function TagBrowser() {
                   ? toggle(tag.tag)
                   : navigate(`/search?tag=${tag.tag}`)
               }
-              className="flex items-center gap-2 w-full text-left px-2 py-1 text-sm rounded hover:bg-[var(--bg-tertiary)]"
+              className="flex items-center gap-2 w-full text-left px-2 py-1 text-sm rounded hover:bg-[var(--surface-hover)]"
             >
               {children.length > 0 && (
                 <span className="text-[var(--text-muted)]">
                   {expanded.has(tag.tag) ? "▼" : "▶"}
                 </span>
               )}
-              <span className="text-[var(--text-primary)]">{tag.tag}</span>
+              <span className="text-[var(--text)]">{tag.tag}</span>
               <span className="text-[var(--text-muted)] text-xs ml-auto">
                 {tag.count}
               </span>
@@ -77,7 +77,7 @@ export function TagBrowser() {
                 <button
                   key={child.tag}
                   onClick={() => navigate(`/search?tag=${child.tag}`)}
-                  className="flex items-center gap-2 w-full text-left pl-8 pr-2 py-0.5 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                  className="flex items-center gap-2 w-full text-left pl-8 pr-2 py-0.5 text-sm text-[var(--text-muted)] hover:text-[var(--text)]"
                 >
                   <span>{child.tag.split("/").pop()}</span>
                   <span className="text-[var(--text-muted)] text-xs ml-auto">

@@ -12,10 +12,11 @@ Each ingested note carries a `ingest:` frontmatter block (source hash, tokens, c
 
 | | |
 |---|---|
-| **Editor** | CodeMirror 6 markdown, auto-save, `[[wiki-links]]`, backlinks panel |
-| **Graph** | D3 force graph with 4 edge types (wiki-link, subdomain, domain, shared tag) |
-| **Search** | SQLite FTS5 keyword search + **semantic search** over local `bge-small-en-v1.5` embeddings |
-| **MCP server** | 12 tools over stdio + `POST /mcp` streamable-http (Wave 8). JSON-RPC 2.0, bearer auth, idempotent `client_tag`s |
+| **Editor** | CodeMirror 6 markdown, auto-save, line wrap, backlinks panel |
+| **Graph** | Pixi WebGL canvas with tiered lineage edges (`connected` / `mentions` / `semantic`) over typed `add_edge` + embedding similarity |
+| **Search** | SQLite FTS5 keyword search + **semantic search** over local `bge-small-en-v1.5` embeddings, hybrid RRF on `/api/graph/search` |
+| **MCP server** | 19 tools over stdio + `POST /mcp` streamable-http. JSON-RPC 2.0, bearer auth, idempotent `client_tag`s |
+| **Design system** | Token-driven UI (every color/space/radius routed through `theme/tokens.css`), light + dark with `prefers-color-scheme` auto, `⌘⇧L` to toggle, `/design-system` inspector for every primitive × variant × state |
 | **Live overlay** | Journal view ActivityStrip + CodeMirror `embed-pulse` + graph node pulse, all driven by a `vault:embedding` WebSocket channel |
 | **REST API** | Full read/write surface for notes, search, graph, tasks, threads, research runs, daily context |
 | **Kanban / Data / Tags** | Every `- [ ]` across the vault on one board; CSV/XLSX preview; hierarchical tag browser |
@@ -45,10 +46,12 @@ Register the Scrypt MCP server in Claude Code:
 ./scripts/install-scrypt-mcp.sh
 ```
 
-That installs the 12 tools over HTTP:
+That installs the 19 tools over HTTP:
 
-- **Reads** — `get_note`, `search_notes`, `semantic_search`, `find_similar`, `walk_graph`, `cluster_graph`, `get_report`
-- **Writes** — `create_note`, `update_note_metadata`, `add_section_summary`, `add_edge`, `remove_edge`
+- **Reads (7)** — `get_note`, `search_notes`, `semantic_search`, `find_similar`, `walk_graph`, `cluster_graph`, `get_report`
+- **Content writes (5)** — `create_note`, `update_note_metadata`, `add_section_summary`, `add_edge`, `remove_edge`
+- **Tasks (5)** — `create_task`, `get_task`, `list_tasks`, `update_task`, `delete_task`
+- **Maintenance (2)** — `batch_ingest`, `rescan_similarity`
 
 Every `create_note` runs the full chunking + embedding pipeline server-side and broadcasts live progress to the UI overlay.
 

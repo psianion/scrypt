@@ -22,8 +22,8 @@ export function DataExplorer() {
             onClick={() => setSelected(f.file)}
             className={`block w-full text-left px-2 py-1 text-sm rounded ${
               selected === f.file
-                ? "bg-[var(--bg-tertiary)] text-[var(--text-primary)]"
-                : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                ? "bg-[var(--surface-hover)] text-[var(--text)]"
+                : "text-[var(--text-muted)] hover:text-[var(--text)]"
             }`}
           >
             {f.file}

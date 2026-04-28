@@ -40,12 +40,12 @@ export function NotesList() {
           placeholder="Filter by tag"
           value={tagFilter}
           onChange={(e) => setTagFilter(e.target.value)}
-          className="px-2 py-1 text-sm bg-[var(--bg-secondary)] border border-[var(--border)] rounded text-[var(--text-primary)]"
+          className="px-2 py-1 text-sm bg-[var(--surface)] border border-[var(--border)] rounded text-[var(--text)]"
         />
         <select
           value={sort}
           onChange={(e) => setSort(e.target.value as SortKey)}
-          className="px-2 py-1 text-sm bg-[var(--bg-secondary)] border border-[var(--border)] rounded text-[var(--text-primary)]"
+          className="px-2 py-1 text-sm bg-[var(--surface)] border border-[var(--border)] rounded text-[var(--text)]"
         >
           <option value="modified">Modified</option>
           <option value="created">Created</option>
@@ -69,9 +69,9 @@ export function NotesList() {
               key={n.path}
               data-testid="note-row"
               onClick={() => navigate(`/note/${n.path}`)}
-              className="border-t border-[var(--border)] hover:bg-[var(--bg-tertiary)] cursor-pointer"
+              className="border-t border-[var(--border)] hover:bg-[var(--surface-hover)] cursor-pointer"
             >
-              <td className="py-1.5 text-[var(--text-primary)]">{n.title}</td>
+              <td className="py-1.5 text-[var(--text)]">{n.title}</td>
               <td className="py-1.5 text-[var(--text-muted)]">
                 {n.tags.map((t) => `#${t}`).join(" ")}
               </td>

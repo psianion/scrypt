@@ -31,6 +31,9 @@ function saveExpanded(expanded: Set<string>): void {
 export interface FolderTreeProps {
   notes: FolderTreeNote[];
   thread?: { project: string; thread: string } | null;
+  /** Restrict the tree to a single project (top-level folder). When set,
+   * only notes belonging to that project render. */
+  project?: string | null;
   showAllTypes?: boolean;
   currentPath?: string;
   onNoteClick?: (path: string) => void;
@@ -39,6 +42,7 @@ export interface FolderTreeProps {
 export function FolderTree({
   notes,
   thread = null,
+  project = null,
   showAllTypes = false,
   currentPath,
   onNoteClick,
@@ -46,8 +50,8 @@ export function FolderTree({
   const [expanded, setExpanded] = useState<Set<string>>(() => loadExpanded());
 
   const groups = useMemo(
-    () => buildProjectTree(notes, { thread }),
-    [notes, thread],
+    () => buildProjectTree(notes, { thread, project }),
+    [notes, thread, project],
   );
 
   if (groups.length === 0) {
@@ -81,8 +85,8 @@ export function FolderTree({
             <div
               className={`flex items-center gap-1 px-1 py-0.5 ${
                 isInbox
-                  ? "font-semibold text-[var(--text-primary)]"
-                  : "text-[var(--text-secondary)]"
+                  ? "font-semibold text-[var(--text)]"
+                  : "text-[var(--text-muted)]"
               }`}
             >
               <span className="flex-1 truncate" title={g.project}>
@@ -101,7 +105,7 @@ export function FolderTree({
                   <button
                     type="button"
                     onClick={() => toggle(key)}
-                    className="w-full text-left flex items-center gap-1 pl-3 pr-1 py-0.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                    className="w-full text-left flex items-center gap-1 pl-3 pr-1 py-0.5 text-[var(--text-muted)] hover:text-[var(--text)]"
                   >
                     <span className="inline-block w-3 text-[var(--text-muted)]">
                       {open ? "▾" : "▸"}
@@ -126,8 +130,8 @@ export function FolderTree({
                           title={`${n.title ?? ""}\n${n.path}`.trim()}
                           className={`block w-full text-left truncate pl-7 pr-2 py-0.5 ${
                             isActive
-                              ? "text-[var(--text-primary)] bg-[var(--bg-tertiary)]"
-                              : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                              ? "text-[var(--text)] bg-[var(--surface-hover)]"
+                              : "text-[var(--text-muted)] hover:text-[var(--text)]"
                           }`}
                         >
                           {label}

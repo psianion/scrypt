@@ -80,10 +80,11 @@ describe("App Shell", () => {
       </MemoryRouter>,
     );
     const sidebar = screen.getByTestId("sidebar");
-    const journalBtn = within(sidebar).getByText("Journal");
-    expect(
-      journalBtn.className.includes("bg-") ||
-        journalBtn.getAttribute("aria-current") === "page",
-    ).toBe(true);
+    // Post-Wave-1 the Journal label lives inside a <span> within the
+    // button — check the ancestor button for the active marker.
+    const journalBtn = within(sidebar)
+      .getByText("Journal")
+      .closest("button")!;
+    expect(journalBtn.getAttribute("aria-current")).toBe("page");
   });
 });

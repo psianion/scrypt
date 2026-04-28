@@ -56,9 +56,9 @@ export function TasksList() {
           <tbody>
             {tasks.map((t) => (
               <tr key={t.id}>
-                <td><span className="pill" style={{ background: TYPE_COLOR[t.type] ?? "#64748b" }}>{t.type}</span></td>
+                <td><span className="legacy-pill" style={{ background: TYPE_COLOR[t.type] ?? "#64748b" }}>{t.type}</span></td>
                 <td>{t.title}</td>
-                <td><span className="pill" style={{ background: STATUS_COLOR[t.status] ?? "#64748b" }}>{t.status}</span></td>
+                <td><span className="legacy-pill" style={{ background: STATUS_COLOR[t.status] ?? "#64748b" }}>{t.status}</span></td>
                 <td>{t.note_path ? <Link to={`/note/${t.note_path}`}>{t.note_path}</Link> : "—"}</td>
                 <td>{t.due_date ?? "—"}</td>
                 <td>{t.priority ?? 0}</td>

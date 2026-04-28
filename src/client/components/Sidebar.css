@@ -1,0 +1,226 @@
+/* src/client/components/Sidebar.css
+ * Source of truth: docs/pencils/03-navigation-overlays.md §Sidebar + §Folder Rows.
+ * Rules in the two "verbatim" blocks below are copied byte-for-byte from the pencil.
+ * Rules below "/* --- Supplementary ..." are Sidebar-specific scaffolding that the
+ * pencil doesn't cover (brand row, projects section, footer button, collapsed state).
+ * Zero hard-coded hex — every colour reads from var(--*).
+ */
+
+/* ---------- VERBATIM from 03-navigation-overlays.md §Sidebar ---------- */
+
+.sidebar {
+  width:        240px;
+  height:       100vh;
+  display:      flex;
+  flex-direction: column;
+  background:   var(--bg);
+  border-right: 1px solid var(--border-subtle);
+  overflow:     hidden;
+  flex-shrink:  0;
+}
+
+.sidebar-section {
+  padding: var(--space-5) var(--space-4);    /* 12px 8px */
+}
+
+.sidebar-label {
+  font-family:    'JetBrains Mono', monospace;
+  font-size:      10px;
+  font-weight:    500;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color:          var(--text-subtle);
+  padding:        0 var(--space-4) var(--space-2);
+}
+
+.sidebar-item {
+  display:       flex;
+  align-items:   center;
+  gap:           var(--space-3);    /* 6px */
+  padding:       6px var(--space-4);
+  border-radius: var(--radius-sm);
+  font-family:   'Inter', sans-serif;
+  font-size:     13px;
+  color:         var(--text-muted);
+  cursor:        pointer;
+  transition:    background var(--dur-fast), color var(--dur-fast);
+}
+.sidebar-item:hover {
+  background: var(--surface-hover);
+  color:      var(--text);
+}
+.sidebar-item[data-active] {
+  background: var(--surface-active);
+  color:      var(--text-strong);
+}
+
+/* ---------- VERBATIM from 03-navigation-overlays.md §Folder Rows ---------- */
+
+.folder-row {
+  display:       flex;
+  align-items:   center;
+  gap:           var(--space-2);
+  padding:       5px var(--space-4);
+  border-radius: var(--radius-sm);
+  font-family:   'Inter', sans-serif;
+  font-size:     13px;
+  cursor:        pointer;
+  color:         var(--text-muted);
+}
+.folder-row:hover    { background: var(--surface-hover); color: var(--text); }
+.folder-row.selected { background: var(--surface-active); color: var(--text-strong); }
+.folder-row.dirty .folder-name::after {
+  content: '•';
+  margin-left: 4px;
+  color: var(--warning);
+}
+
+/* ---------- Supplementary Sidebar scaffolding (not in pencil) ---------- */
+
+.sidebar-item {
+  width:      100%;
+  text-align: left;
+  background: transparent;
+  border:     none;
+  appearance: none;
+}
+
+.sidebar-item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.sidebar-item-label {
+  flex:         1 1 auto;
+  overflow:     hidden;
+  text-overflow: ellipsis;
+  white-space:  nowrap;
+}
+
+.sidebar-brand {
+  font-family:    'JetBrains Mono', monospace;
+  font-size:      11px;
+  font-weight:    600;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color:          var(--text-strong);
+  padding:        var(--space-6) var(--space-6) var(--space-4);
+}
+
+.sidebar-section--projects {
+  flex:           1 1 auto;
+  min-height:     0;
+  display:        flex;
+  flex-direction: column;
+  padding-bottom: var(--space-2);
+}
+
+.sidebar-projects-header {
+  display:         flex;
+  align-items:     center;
+  justify-content: space-between;
+  padding:         0 var(--space-4) var(--space-2);
+}
+
+.sidebar-projects-header .sidebar-label {
+  padding: 0;
+}
+
+.sidebar-show-all {
+  display:     inline-flex;
+  align-items: center;
+  gap:         var(--space-2);
+  font-family: 'Inter', sans-serif;
+  font-size:   11px;
+  color:       var(--text-muted);
+  cursor:      pointer;
+  user-select: none;
+}
+
+.sidebar-show-all input[type="checkbox"] {
+  accent-color: var(--accent);
+  width:        12px;
+  height:       12px;
+  margin:       0;
+}
+
+.sidebar-projects {
+  display:      flex;
+  flex-wrap:    wrap;
+  gap:          var(--space-2);
+  padding:      0 var(--space-4) var(--space-3);
+  flex-shrink:  0;
+}
+
+.sidebar-project-chip {
+  display:        inline-flex;
+  align-items:    center;
+  height:         22px;
+  padding:        0 10px;
+  border-radius:  var(--radius-full);
+  background:     transparent;
+  border:         1px solid var(--border-subtle);
+  color:          var(--text-muted);
+  font-family:    'JetBrains Mono', monospace;
+  font-size:      11px;
+  font-weight:    500;
+  letter-spacing: 0.4px;
+  cursor:         pointer;
+  transition:     background var(--dur-fast),
+                  color var(--dur-fast),
+                  border-color var(--dur-fast);
+  appearance:     none;
+}
+.sidebar-project-chip:hover {
+  background:   var(--surface-hover);
+  color:        var(--text);
+  border-color: var(--border);
+}
+.sidebar-project-chip[data-active] {
+  background:   var(--surface-active);
+  color:        var(--text-strong);
+  border-color: var(--border);
+}
+.sidebar-project-chip:focus-visible {
+  outline:        2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.sidebar-tree {
+  flex:        1 1 auto;
+  min-height:  0;
+  overflow-y:  auto;
+  padding:     var(--space-2) var(--space-2) var(--space-4);
+  /* File/folder tree uses JetBrains Mono — chips above stay Inter, the
+   * micro-label header stays mono via .sidebar-label, but every row inside
+   * the tree (project headers, doc-type rows, note titles) reads as code. */
+  font-family: 'JetBrains Mono', monospace;
+  font-size:   12px;
+  line-height: 1.4;
+}
+/* Cascade JetBrains Mono into FolderTree's inline-styled rows. FolderTree
+ * uses Tailwind utilities (`text-sm`, `text-xs`) which only set size, not
+ * family — so we inherit family from the wrapper. */
+.sidebar-tree * {
+  font-family: inherit;
+}
+
+.sidebar-item--new {
+  color: var(--text);
+}
+.sidebar-item--new:hover {
+  color: var(--text-strong);
+}
+
+.sidebar-item--footer {
+  border-top:    1px solid var(--border-subtle);
+  border-radius: 0;
+  margin:        0;
+  padding:       var(--space-4) var(--space-6);
+}
+
+.sidebar--collapsed {
+  width:        0;
+  border-right: none;
+  overflow:     hidden;
+}
