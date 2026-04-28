@@ -20,7 +20,7 @@ import { Checkbox } from "../../ui/Checkbox";
 import { Segment } from "../../ui/Segment";
 import { Warning } from "../../ui/Warning";
 import { Modal } from "../../ui/Modal";
-import { ToastRegion, useToast } from "../../ui/Toast";
+import { useToast } from "../../ui/Toast";
 import { ContextMenu, type ContextMenuEntry } from "../../ui/ContextMenu";
 import { Breadcrumb } from "../../ui/Breadcrumb";
 import "./DesignSystem.css";
@@ -148,8 +148,6 @@ export function DesignSystem() {
         </section>
         {/* --- end Wave 1 sections --- */}
       </main>
-      {/* Region portal-mounted to body; inspector-scoped toasts surface here. */}
-      <ToastRegion />
     </div>
   );
 }
