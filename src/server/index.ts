@@ -259,6 +259,13 @@ export function createApp(config: AppConfig) {
         return new Response("WebSocket upgrade failed", { status: 400 });
       }
 
+      // Liveness probe — outside auth gate so Docker/VPS healthchecks work
+      // in production without a token. Cheap and stable; do not bolt on
+      // dependency checks here (DB, embed worker) or restarts will cascade.
+      if (url.pathname === "/health") {
+        return Response.json({ ok: true });
+      }
+
       // Auth gate for /api/*
       const authResult = checkAuth(req, {
         isProduction: scryptConfig.isProduction,
