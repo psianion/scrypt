@@ -1,0 +1,47 @@
+# Scrypt — production VPS compose file.
+# Image is pulled from GHCR (built by .github/workflows/release.yml).
+# Run from /home/ubuntu/scrypt/ on the VPS.
+# Secrets sourced from /opt/secrets/scrypt.env (chmod 600, owner ubuntu).
+
+services:
+  scrypt:
+    image: ghcr.io/psianion/scrypt:latest
+    container_name: scrypt-vault
+    restart: unless-stopped
+
+    # Bind to localhost only — Tailscale handles cross-host access.
+    # Never change to 0.0.0.0 without an explicit security review.
+    ports:
+      - "127.0.0.1:3777:3777"
+
+    volumes:
+      - /home/ubuntu/para-raid/scrypt-vault:/vault
+      - scrypt-embed-cache:/data/embed-cache
+
+    env_file:
+      - /opt/secrets/scrypt.env
+
+    working_dir: /vault
+
+    security_opt:
+      - no-new-privileges:true
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3777/health > /dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+    labels:
+      sup.plane: "data"
+      sup.app: "scrypt"
+
+volumes:
+  scrypt-embed-cache:

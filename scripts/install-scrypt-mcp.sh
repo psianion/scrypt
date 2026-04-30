@@ -57,13 +57,26 @@ if [[ -f "$ENV_FILE" ]]; then
 fi
 
 echo ">> reachability check: $URL"
-HTTP_CODE="$(curl -sS -o /dev/null -w '%{http_code}' \
-  -X POST "$URL" \
-  -H 'content-type: application/json' \
-  -d '{"jsonrpc":"2.0","id":0,"method":"tools/list"}' || true)"
+curl_args=(
+  -sS
+  -o /dev/null
+  -w '%{http_code}'
+  -X POST "$URL"
+  -H 'content-type: application/json'
+  -d '{"jsonrpc":"2.0","id":0,"method":"tools/list"}'
+)
+if [[ -n "$TOKEN" ]]; then
+  curl_args+=(-H "Authorization: Bearer ${TOKEN}")
+fi
+HTTP_CODE="$(curl "${curl_args[@]}" || true)"
 if [[ "$HTTP_CODE" != "200" ]]; then
   echo "error: POST $URL returned HTTP $HTTP_CODE" >&2
-  echo "       is the scrypt container running on that port?" >&2
+  if [[ -n "$TOKEN" ]]; then
+    echo "       checked with Authorization: Bearer ****${TOKEN: -6}" >&2
+  else
+    echo "       no SCRYPT_AUTH_TOKEN found in $ENV_FILE for the probe" >&2
+  fi
+  echo "       is the scrypt container running on that port, and is the token correct?" >&2
   exit 1
 fi
 echo "   ok — POST $URL → 200"
