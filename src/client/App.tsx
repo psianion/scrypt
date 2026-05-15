@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router";
 import { Sidebar } from "./components/Sidebar";
 import { TabBar } from "./components/TabBar";
@@ -6,7 +6,9 @@ import { StatusBar } from "./components/StatusBar";
 import { CommandPalette } from "./components/CommandPalette";
 import { NewNoteModal } from "./components/NewNoteModal";
 import { Editor } from "./views/Editor";
-import { GraphView } from "./views/GraphView";
+const GraphView = lazy(() =>
+  import("./views/GraphView").then((m) => ({ default: m.GraphView })),
+);
 import { JournalView } from "./views/JournalView";
 import { NotesList } from "./views/NotesList";
 import { SearchView } from "./views/SearchView";
@@ -82,7 +84,23 @@ export function AppContent() {
               <Routes>
                 <Route path="/" element={<Navigate to="/journal" replace />} />
                 <Route path="/note/*" element={<Editor />} />
-                <Route path="/graph" element={<GraphView />} />
+                <Route
+                  path="/graph"
+                  element={
+                    <Suspense
+                      fallback={
+                        <div
+                          data-testid="graph-view-loading"
+                          className="flex h-full w-full items-center justify-center text-text-muted text-sm"
+                        >
+                          Loading graph…
+                        </div>
+                      }
+                    >
+                      <GraphView />
+                    </Suspense>
+                  }
+                />
                 <Route path="/journal" element={<JournalView />} />
                 <Route path="/notes" element={<NotesList />} />
                 <Route path="/search" element={<SearchView />} />
