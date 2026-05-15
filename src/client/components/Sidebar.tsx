@@ -1,18 +1,44 @@
 import { useNavigate, useLocation } from "react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ComponentType, type SVGProps } from "react";
+import {
+  ChevronsDownUp,
+  Database,
+  FileText,
+  Hash,
+  Home,
+  ListChecks,
+  Network,
+  Plus,
+  RotateCw,
+  Search,
+  Settings as SettingsIcon,
+} from "lucide-react";
 import { useStore } from "../store";
 import { api } from "../api";
 import { FolderTree } from "./FolderTree";
-import { ThreadChips, deriveThreadsFromNotes } from "./ThreadChips";
+import { topLevelProjects } from "./FolderTree.helpers";
+import { ContextMenu, type ContextMenuPosition } from "../ui";
+import "./Sidebar.css";
 
-const NAV_ITEMS = [
-  { label: "Notes", path: "/notes" },
-  { label: "Journal", path: "/journal" },
-  { label: "Tasks", path: "/tasks" },
-  { label: "Graph", path: "/graph" },
-  { label: "Data", path: "/data" },
-  { label: "Tags", path: "/tags" },
+type LucideIcon = ComponentType<SVGProps<SVGSVGElement> & { size?: number | string; strokeWidth?: number | string }>;
+
+interface NavItem {
+  label: string;
+  path: string;
+  icon: LucideIcon;
+}
+
+const NAV_ITEMS: NavItem[] = [
+  { label: "Journal", path: "/journal", icon: Home },
+  { label: "Notes", path: "/notes", icon: FileText },
+  { label: "Tasks", path: "/tasks", icon: ListChecks },
+  { label: "Search", path: "/search", icon: Search },
+  { label: "Graph", path: "/graph", icon: Network },
+  { label: "Data", path: "/data", icon: Database },
+  { label: "Tags", path: "/tags", icon: Hash },
 ];
+
+const FOLDER_TREE_EXPANDED_KEY = "scrypt.sidebar.expanded";
 
 interface SidebarProps {
   onNewNote?: () => void;
@@ -25,95 +51,209 @@ export function Sidebar({ onNewNote }: SidebarProps = {}) {
   const setNotes = useStore((s) => s.setNotes);
   const collapsed = useStore((s) => s.sidebarCollapsed);
   const [showAllTypes, setShowAllTypes] = useState(false);
-  const [selectedThread, setSelectedThread] = useState<{
-    project: string;
-    thread: string;
-  } | null>(null);
+  // Project pill filter — when set, FolderTree narrows to that top-level
+  // vault folder. Toggles off when the same chip is clicked again.
+  const [selectedProject, setSelectedProject] = useState<string | null>(null);
+  const [treeMenu, setTreeMenu] = useState<ContextMenuPosition | null>(null);
+  // Bumped after "Collapse all" to force FolderTree to re-read localStorage.
+  const [folderTreeKey, setFolderTreeKey] = useState(0);
 
-  const threads = useMemo(() => deriveThreadsFromNotes(notes), [notes]);
+  // Project chips source from the user's top-level vault folders. See
+  // `topLevelProjects` for the rules (housekeeping folders excluded, both
+  // ingest-v3 `projects/<p>/...` and legacy `<top>/...` layouts supported).
+  const projects = useMemo(() => topLevelProjects(notes), [notes]);
 
   useEffect(() => {
+    let cancelled = false;
+    api.notes
+      .list()
+      .then((list) => {
+        if (!cancelled) setNotes(list);
+      })
+      .catch(() => {
+        /* sidebar survives API errors — leave notes empty */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [setNotes]);
+
+  function reload(): void {
     api.notes
       .list()
       .then(setNotes)
       .catch(() => {});
-  }, [setNotes]);
+  }
+
+  function collapseAllFolders(): void {
+    try {
+      localStorage.removeItem(FOLDER_TREE_EXPANDED_KEY);
+    } catch {
+      /* storage disabled — ignore */
+    }
+    setFolderTreeKey((k) => k + 1);
+  }
+
+  if (collapsed) {
+    return (
+      <nav
+        data-testid="sidebar"
+        className="sidebar sidebar--collapsed"
+        aria-hidden="true"
+      />
+    );
+  }
+
+  const isJournalActive =
+    location.pathname === "/journal" || location.pathname === "/";
+  const isSettingsActive = location.pathname === "/settings";
 
   return (
-    <nav
-      data-testid="sidebar"
-      className={`flex flex-col border-r border-[var(--border)] bg-[var(--bg-secondary)] ${collapsed ? "w-0 overflow-hidden" : "w-56"} transition-all`}
-    >
-      <div className="p-3 text-xs tracking-widest uppercase text-[var(--text-muted)]">
-        Scrypt
-      </div>
+    <nav data-testid="sidebar" className="sidebar">
+      <div className="sidebar-brand">Scrypt</div>
 
-      <div className="flex flex-col gap-0.5 px-2">
+      <div className="sidebar-section">
+        <div className="sidebar-label">Navigate</div>
         {NAV_ITEMS.map((item) => {
+          const Icon = item.icon;
           const isActive =
-            location.pathname === item.path ||
-            (item.path === "/journal" && location.pathname === "/");
+            item.path === "/journal"
+              ? isJournalActive
+              : location.pathname === item.path;
           return (
             <button
               key={item.path}
-              onClick={() => navigate(item.path)}
+              type="button"
+              className="sidebar-item"
+              data-active={isActive ? "" : undefined}
               aria-current={isActive ? "page" : undefined}
-              className={`text-left px-2 py-1 text-sm rounded ${
-                isActive
-                  ? "bg-[var(--bg-tertiary)] text-[var(--text-primary)]"
-                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-              }`}
+              onClick={() => navigate(item.path)}
             >
-              {item.label}
+              <Icon size={16} strokeWidth={1.75} aria-hidden="true" />
+              <span className="sidebar-item-label">{item.label}</span>
             </button>
           );
         })}
+
+        {onNewNote && (
+          <button
+            type="button"
+            className="sidebar-item sidebar-item--new"
+            onClick={onNewNote}
+          >
+            <Plus size={16} strokeWidth={1.75} aria-hidden="true" />
+            <span className="sidebar-item-label">New note</span>
+          </button>
+        )}
       </div>
 
-      {onNewNote && (
-        <button
-          onClick={onNewNote}
-          className="mx-2 mt-2 px-3 py-1 text-left text-sm text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] rounded"
+      <div className="sidebar-section sidebar-section--projects">
+        <div className="sidebar-projects-header">
+          <span className="sidebar-label">Projects</span>
+          <label className="sidebar-show-all">
+            <input
+              type="checkbox"
+              checked={showAllTypes}
+              onChange={(e) => setShowAllTypes(e.target.checked)}
+            />
+            <span>Show all types</span>
+          </label>
+        </div>
+
+        {projects.length > 0 ? (
+          <div
+            className="sidebar-projects"
+            data-testid="sidebar-projects"
+            role="tablist"
+            aria-label="Project filter"
+          >
+            {projects.map((p) => {
+              const active = selectedProject === p;
+              return (
+                <button
+                  key={p}
+                  type="button"
+                  className="sidebar-project-chip"
+                  data-active={active ? "" : undefined}
+                  data-testid={`sidebar-project-${p}`}
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() =>
+                    setSelectedProject((cur) => (cur === p ? null : p))
+                  }
+                >
+                  {p}
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
+
+        <div
+          className="sidebar-tree"
+          data-testid="sidebar-tree"
+          onContextMenu={(ev) => {
+            ev.preventDefault();
+            setTreeMenu({ x: ev.clientX, y: ev.clientY });
+          }}
         >
-          + New note
-        </button>
-      )}
-
-      <div className="mt-2 px-3 flex items-center justify-between text-[10px] uppercase tracking-widest text-[var(--text-muted)]">
-        <span>Projects</span>
-        <label className="flex items-center gap-1 normal-case tracking-normal cursor-pointer">
-          <input
-            type="checkbox"
-            checked={showAllTypes}
-            onChange={(e) => setShowAllTypes(e.target.checked)}
-            className="accent-[var(--text-secondary)]"
+          <FolderTree
+            key={folderTreeKey}
+            notes={notes}
+            thread={null}
+            project={selectedProject}
+            showAllTypes={showAllTypes}
+            currentPath={location.pathname}
+            onNoteClick={(p) => navigate(`/note/${p}`)}
           />
-          <span>Show all types</span>
-        </label>
-      </div>
-
-      <ThreadChips
-        threads={threads}
-        selected={selectedThread}
-        onSelect={setSelectedThread}
-      />
-
-      <div className="flex-1 overflow-y-auto px-2 py-1">
-        <FolderTree
-          notes={notes}
-          thread={selectedThread}
-          showAllTypes={showAllTypes}
-          currentPath={location.pathname}
-          onNoteClick={(p) => navigate(`/note/${p}`)}
-        />
+        </div>
       </div>
 
       <button
+        type="button"
+        className="sidebar-item sidebar-item--footer"
+        data-active={isSettingsActive ? "" : undefined}
+        aria-current={isSettingsActive ? "page" : undefined}
         onClick={() => navigate("/settings")}
-        className="px-3 py-2 text-left text-sm text-[var(--text-muted)] hover:text-[var(--text-secondary)] border-t border-[var(--border)]"
       >
-        Settings
+        <SettingsIcon size={16} strokeWidth={1.75} aria-hidden="true" />
+        <span className="sidebar-item-label">Settings</span>
       </button>
+
+      {treeMenu && (
+        <ContextMenu
+          open
+          position={treeMenu}
+          aria-label="Project tree actions"
+          onClose={() => setTreeMenu(null)}
+          items={[
+            {
+              id: "refresh",
+              label: "Refresh",
+              icon: <RotateCw size={14} strokeWidth={1.75} aria-hidden="true" />,
+              onSelect: () => {
+                reload();
+                setTreeMenu(null);
+              },
+            },
+            {
+              id: "collapse-all",
+              label: "Collapse all",
+              icon: (
+                <ChevronsDownUp
+                  size={14}
+                  strokeWidth={1.75}
+                  aria-hidden="true"
+                />
+              ),
+              onSelect: () => {
+                collapseAllFolders();
+                setTreeMenu(null);
+              },
+            },
+          ]}
+        />
+      )}
     </nav>
   );
 }

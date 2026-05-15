@@ -1,0 +1,83 @@
+/* src/client/theme/tokens.css
+ * Source of truth: docs/pencils/01-foundations.md
+ * Dark is default. [data-theme="light"] overrides surface/text/accent only.
+ */
+
+:root {
+  /* --- Surfaces (dark) --- */
+  --bg:              #1A1C23;
+  --surface:         #202228;
+  --surface-hover:   #2A2D33;
+  --surface-active:  #30343B;
+  --border-subtle:   #262932;
+  --border:          #323742;
+  --border-strong:   #41475A;
+
+  /* --- Text (dark) --- */
+  --text-strong:     #F1F2F5;
+  --text:            #E5E6ED;
+  --text-muted:      #9B9EA8;
+  --text-subtle:     #6A6E7D;
+
+  /* --- Accent & semantic --- */
+  --accent:          #9EE6CF;
+  --accent-ai:       #A4B0FF;
+  --success:         #7FD4B0;
+  --warning:         #F5C678;
+  --danger:          #E88FA0;
+  --tier-semantic:   #C79BF2;
+
+  /* --- Spacing (8-point with half-steps) --- */
+  --space-1:  2px;
+  --space-2:  4px;
+  --space-3:  6px;
+  --space-4:  8px;
+  --space-5:  12px;
+  --space-6:  16px;
+  --space-7:  20px;
+  --space-8:  24px;
+  --space-9:  32px;
+  --space-10: 40px;
+  --space-11: 48px;
+  --space-12: 64px;
+
+  /* --- Radius --- */
+  --radius-xs:   3px;
+  --radius-sm:   6px;
+  --radius-md:   8px;
+  --radius-lg:   12px;
+  --radius-xl:   16px;
+  --radius-full: 9999px;
+
+  /* --- Shadows (max 10% alpha per project convention) --- */
+  --shadow-xs: 0 1px 4px  rgba(23, 25, 33, 0.10);
+  --shadow-sm: 0 2px 8px  rgba(22, 24, 31, 0.10);
+  --shadow-md: 0 6px 16px rgba(20, 22, 29, 0.10);
+  --shadow-lg: 0 12px 28px rgba(19, 21, 27, 0.10);
+
+  /* --- Motion --- */
+  --dur-instant:    75ms;
+  --dur-fast:       150ms;
+  --dur-base:       200ms;
+  --dur-slow:       300ms;
+  --dur-deliberate: 450ms;
+  --ease-standard:   cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-decelerate: cubic-bezier(0, 0, 0.2, 1);
+  --ease-accelerate: cubic-bezier(0.4, 0, 1, 1);
+}
+
+[data-theme="light"] {
+  --bg:              #FAFAF7;
+  --surface:         #FFFFFF;
+  --surface-hover:   #F1EFED;
+  --surface-active:  #E8E5E1;
+  --border-subtle:   #EDECEA;
+  --border:          #E2DFD8;
+  --border-strong:   #D4D0C8;
+  --text-strong:     #1C1D22;
+  --text:            #37352F;
+  --text-muted:      #787774;
+  --text-subtle:     #9B9A97;
+  --accent:          #80CFB8;
+  --accent-ai:       #6670D9;
+}

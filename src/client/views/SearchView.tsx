@@ -100,7 +100,7 @@ export function SearchView({ defaultFilters }: SearchViewProps = {}) {
         placeholder="Search notes..."
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        className="w-full px-3 py-2 mb-2 text-sm bg-[var(--bg-secondary)] border border-[var(--border)] rounded text-[var(--text-primary)] outline-none"
+        className="w-full px-3 py-2 mb-2 text-sm bg-[var(--surface)] border border-[var(--border)] rounded text-[var(--text)] outline-none"
       />
 
       {activeChips.length > 0 && (
@@ -110,7 +110,7 @@ export function SearchView({ defaultFilters }: SearchViewProps = {}) {
               key={c.key}
               type="button"
               onClick={() => clearFilter(c.key)}
-              className="text-[11px] px-2 py-0.5 rounded-full border bg-[var(--bg-tertiary)] text-[var(--text-primary)] border-[var(--border)] hover:text-[var(--text-muted)]"
+              className="text-[11px] px-2 py-0.5 rounded-full border bg-[var(--surface-hover)] text-[var(--text)] border-[var(--border)] hover:text-[var(--text-muted)]"
               title={`Remove ${c.key} filter`}
             >
               <span>{c.label}</span>
@@ -129,9 +129,9 @@ export function SearchView({ defaultFilters }: SearchViewProps = {}) {
               useStore.getState().openTab(r.path, r.title);
               navigate(`/note/${r.path}`);
             }}
-            className="block w-full text-left p-3 mb-1 rounded hover:bg-[var(--bg-tertiary)]"
+            className="block w-full text-left p-3 mb-1 rounded hover:bg-[var(--surface-hover)]"
           >
-            <div className="text-sm text-[var(--text-primary)]">{r.title}</div>
+            <div className="text-sm text-[var(--text)]">{r.title}</div>
             <div
               data-slug=""
               className="text-xs text-[var(--text-muted)] mt-0.5"

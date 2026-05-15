@@ -12,6 +12,11 @@ interface AppState {
   sidebarCollapsed: boolean;
   toggleSidebar: () => void;
 
+  // Theme
+  theme: "dark" | "light" | "auto";
+  setTheme: (t: "dark" | "light" | "auto") => void;
+  toggleTheme: () => void;
+
   // Notes list
   notes: NoteMeta[];
   setNotes: (notes: NoteMeta[]) => void;
@@ -47,6 +52,26 @@ interface AppState {
 export const useStore = create<AppState>((set) => ({
   sidebarCollapsed: false,
   toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
+
+  theme: (typeof localStorage !== "undefined" &&
+    (localStorage.getItem("scrypt.theme") as "dark" | "light" | "auto" | null)) || "dark",
+  setTheme: (theme) => {
+    if (typeof localStorage !== "undefined") localStorage.setItem("scrypt.theme", theme);
+    set({ theme });
+  },
+  toggleTheme: () =>
+    set((s) => {
+      let next: "dark" | "light";
+      if (s.theme === "auto") {
+        const sysDark = typeof window !== "undefined" &&
+          window.matchMedia?.("(prefers-color-scheme: dark)").matches;
+        next = sysDark ? "light" : "dark";
+      } else {
+        next = s.theme === "dark" ? "light" : "dark";
+      }
+      if (typeof localStorage !== "undefined") localStorage.setItem("scrypt.theme", next);
+      return { theme: next };
+    }),
 
   notes: [],
   setNotes: (notes) => set({ notes }),

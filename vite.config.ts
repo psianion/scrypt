@@ -1,3 +1,4 @@
+import { fileURLToPath, URL } from "node:url";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
@@ -5,6 +6,15 @@ import tailwindcss from "@tailwindcss/vite";
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   root: ".",
+  // Mirror the tsconfig paths entry so `@/foo` resolves identically in Vite,
+  // bun:test, and the TypeScript compiler. Without this alias Vite throws
+  // `[plugin:vite:import-analysis]` on any `@/...` import at runtime even
+  // though unit tests pass (bun:test honors tsconfig paths on its own).
+  resolve: {
+    alias: {
+      "@": fileURLToPath(new URL("./src", import.meta.url)),
+    },
+  },
   build: {
     outDir: "dist",
     rollupOptions: {

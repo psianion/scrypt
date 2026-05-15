@@ -1,10 +1,16 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useLocation, useNavigate } from "react-router";
+import { Search } from "lucide-react";
+import { Modal } from "@/client/ui/Modal";
+import { Input } from "@/client/ui/Input";
+import { Button } from "@/client/ui/Button";
+import { Chip, Kbd } from "@/client/ui/Chip";
 import { useStore } from "../store";
 import { api } from "../api";
 import type { SearchResult } from "../../shared/types";
 import { DOC_TYPES } from "../../server/vocab/doc-types";
 import { deriveProjectDocType } from "./FolderTree.helpers";
+import "./CommandPalette.css";
 
 interface CommandPaletteProps {
   /** Path of the currently active note. When omitted, falls back to the
@@ -30,6 +36,19 @@ function notePathFromLocation(pathname: string): string | null {
   }
 }
 
+/**
+ * CommandPalette — Wave 1 rewrite.
+ *
+ * Wraps the palette in the Wave 1 `<Modal>` primitive (portal, focus trap,
+ * Escape + backdrop dismiss). Inner chrome follows
+ * `docs/pencils/03-navigation-overlays.md §Command Palette` verbatim. The
+ * `<Input>` primitive (Wave 0) hosts the search field with a leading lucide
+ * `Search` icon; result rows expose `data-active` for the keyboard-selected
+ * item; the footer surfaces `<Kbd>` shortcuts.
+ *
+ * Keyboard contract: ArrowDown/ArrowUp move selection, Enter opens the
+ * highlighted result, Escape closes (delegated to Modal).
+ */
 export function CommandPalette({
   currentPath,
   onNavigate,
@@ -79,49 +98,67 @@ export function CommandPalette({
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
-    if (e.key === "Escape") {
-      togglePalette();
-    } else if (e.key === "ArrowDown") {
+    // Escape is handled by Modal's dismissOnEscape — no need to duplicate.
+    if (e.key === "ArrowDown") {
       e.preventDefault();
-      setSelected((s) => Math.min(s + 1, results.length - 1));
+      setSelected((s) => Math.min(s + 1, Math.max(results.length - 1, 0)));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       setSelected((s) => Math.max(s - 1, 0));
     } else if (e.key === "Enter" && results[selected]) {
+      e.preventDefault();
       selectResult(results[selected]);
     }
   }
 
   return (
-    <div
-      data-testid="command-palette"
-      className="fixed inset-0 z-50 flex items-start justify-center pt-[20vh] bg-black/60"
-      onClick={() => togglePalette()}
+    <Modal
+      open
+      onClose={togglePalette}
+      ariaLabel="Command palette"
+      size="lg"
+      hideCloseButton
+      dismissOnBackdrop
+      className="command-palette-shell"
     >
-      <div
-        className="w-[560px] bg-[var(--bg-secondary)] border border-[var(--border)] rounded-lg shadow-2xl overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <input
-          ref={inputRef}
-          type="text"
-          placeholder="Search notes..."
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={handleKeyDown}
-          className="w-full px-4 py-3 bg-transparent text-[var(--text-primary)] text-sm outline-none border-b border-[var(--border)]"
-        />
+      <div data-testid="command-palette" onKeyDown={handleKeyDown}>
+        <div className="command-palette-input-wrap">
+          <Input
+            ref={inputRef}
+            type="text"
+            value={query}
+            placeholder="Search notes..."
+            onChange={(e) => setQuery(e.target.value)}
+            icon={<Search size={16} aria-hidden />}
+            aria-label="Search notes"
+            className="command-palette-input"
+          />
+        </div>
 
         {notePath && (
-          <div className="border-b border-[var(--border)]">
+          <div role="group" aria-label="Note actions">
             {!moveOpen ? (
-              <button
-                type="button"
-                onClick={() => setMoveOpen(true)}
-                className="w-full text-left px-4 py-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]"
-              >
-                Move to project…
-              </button>
+              <div className="command-palette-list" style={{ paddingBottom: 0 }}>
+                <div className="command-palette-section">Actions</div>
+                <div
+                  className="command-palette-item"
+                  role="button"
+                  tabIndex={0}
+                  data-testid="action-move-to-project"
+                  onClick={() => setMoveOpen(true)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setMoveOpen(true);
+                    }
+                  }}
+                >
+                  <Chip variant="tag">Move</Chip>
+                  <span className="command-palette-item-title">
+                    Move to project…
+                  </span>
+                </div>
+              </div>
             ) : (
               <MoveToProjectForm
                 currentPath={notePath}
@@ -136,31 +173,68 @@ export function CommandPalette({
           </div>
         )}
 
-        <div className="max-h-80 overflow-y-auto">
-          {results.map((result, i) => (
-            <button
-              key={result.path}
-              onClick={() => selectResult(result)}
-              className={`w-full text-left px-4 py-2 text-sm ${
-                i === selected
-                  ? "bg-[var(--bg-tertiary)] text-[var(--text-primary)]"
-                  : "text-[var(--text-secondary)]"
-              }`}
-            >
-              <div className="font-medium">{result.title}</div>
-              {result.snippet && (
-                <div className="text-xs text-[var(--text-muted)] truncate mt-0.5">
-                  {result.snippet}
-                </div>
-              )}
-            </button>
-          ))}
-          {results.length === 0 && query && (
-            <div className="px-4 py-3 text-sm text-[var(--text-muted)]">No results</div>
-          )}
+        <div
+          className="command-palette-list"
+          role="listbox"
+          aria-label="Search results"
+        >
+          {results.length > 0 ? (
+            <>
+              <div className="command-palette-section">Notes</div>
+              {results.map((result, i) => {
+                const isActive = i === selected;
+                return (
+                  <div
+                    key={result.path}
+                    className="command-palette-item"
+                    role="option"
+                    tabIndex={-1}
+                    aria-selected={isActive}
+                    data-active={isActive ? "" : undefined}
+                    data-testid={`result-${result.path}`}
+                    onClick={() => selectResult(result)}
+                    onMouseEnter={() => setSelected(i)}
+                  >
+                    <div className="command-palette-item-content">
+                      <span className="command-palette-item-title">
+                        {result.title}
+                      </span>
+                      {result.snippet ? (
+                        <span className="command-palette-item-snippet">
+                          {result.snippet}
+                        </span>
+                      ) : null}
+                    </div>
+                    {isActive ? (
+                      <span className="command-palette-item-kbds">
+                        <Kbd>↵</Kbd>
+                      </span>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </>
+          ) : query ? (
+            <div className="command-palette-empty" data-testid="result-empty">
+              No results
+            </div>
+          ) : null}
+        </div>
+
+        <div className="command-palette-footer">
+          <span>
+            <Kbd>↑</Kbd>
+            <Kbd>↓</Kbd> navigate
+          </span>
+          <span>
+            <Kbd>↵</Kbd> open
+          </span>
+          <span>
+            <Kbd>Esc</Kbd> close
+          </span>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -220,60 +294,47 @@ function MoveToProjectForm({
   }
 
   return (
-    <div className="px-4 py-3 text-sm">
-      <div className="text-[var(--text-primary)] font-medium mb-2">
-        Move to project
+    <div className="command-palette-move">
+      <div className="command-palette-move-title">Move to project</div>
+      <div className="command-palette-move-row">
+        <label htmlFor="cp-move-project">Project</label>
+        <input
+          id="cp-move-project"
+          aria-label="Project"
+          type="text"
+          value={project}
+          onChange={(e) => setProject(e.target.value)}
+          placeholder="project-slug"
+          className="input"
+        />
       </div>
-      <div className="flex flex-col gap-2">
-        <label className="flex items-center gap-2">
-          <span className="w-20 text-xs text-[var(--text-muted)]">Project</span>
-          <input
-            aria-label="Project"
-            type="text"
-            value={project}
-            onChange={(e) => setProject(e.target.value)}
-            placeholder="project-slug"
-            className="flex-1 px-2 py-1 text-sm bg-[var(--bg-primary)] border border-[var(--border)] rounded text-[var(--text-primary)] outline-none"
-          />
-        </label>
-        <label className="flex items-center gap-2">
-          <span className="w-20 text-xs text-[var(--text-muted)]">Doc type</span>
-          <select
-            aria-label="Doc type"
-            value={docType}
-            onChange={(e) => setDocType(e.target.value)}
-            className="flex-1 px-2 py-1 text-sm bg-[var(--bg-primary)] border border-[var(--border)] rounded text-[var(--text-primary)] outline-none"
-          >
-            {DOC_TYPES.map((dt) => (
-              <option key={dt} value={dt}>
-                {dt}
-              </option>
-            ))}
-          </select>
-        </label>
+      <div className="command-palette-move-row">
+        <label htmlFor="cp-move-doctype">Doc type</label>
+        <select
+          id="cp-move-doctype"
+          aria-label="Doc type"
+          value={docType}
+          onChange={(e) => setDocType(e.target.value)}
+        >
+          {DOC_TYPES.map((dt) => (
+            <option key={dt} value={dt}>
+              {dt}
+            </option>
+          ))}
+        </select>
       </div>
-      {error && (
-        <div className="mt-2 text-xs text-red-400" role="alert">
+      {error ? (
+        <div className="command-palette-move-error" role="alert">
           {error}
         </div>
-      )}
-      <div className="mt-3 flex gap-2">
-        <button
-          type="button"
-          onClick={submit}
-          disabled={busy}
-          className="px-3 py-1 text-sm rounded bg-[var(--bg-tertiary)] text-[var(--text-primary)] hover:bg-[var(--border)] disabled:opacity-50"
-        >
+      ) : null}
+      <div className="command-palette-move-actions">
+        <Button variant="primary" onClick={submit} disabled={busy}>
           Move
-        </button>
-        <button
-          type="button"
-          onClick={onCancel}
-          disabled={busy}
-          className="px-3 py-1 text-sm rounded text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-        >
+        </Button>
+        <Button variant="ghost" onClick={onCancel} disabled={busy}>
           Cancel
-        </button>
+        </Button>
       </div>
     </div>
   );

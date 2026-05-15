@@ -60,11 +60,12 @@ export function Editor() {
           }
         }),
         embeddingOverlay(currentPathRef),
+        EditorView.lineWrapping,
         EditorView.theme({
-          "&": { height: "100%", backgroundColor: "var(--bg-primary)" },
-          ".cm-content": { color: "var(--text-primary)", fontFamily: "inherit", padding: "1rem" },
-          ".cm-gutters": { backgroundColor: "var(--bg-secondary)", borderRight: "1px solid var(--border)" },
-          ".cm-cursor": { borderLeftColor: "var(--text-primary)" },
+          "&": { height: "100%", backgroundColor: "var(--bg)" },
+          ".cm-content": { color: "var(--text)", fontFamily: "inherit", padding: "1rem" },
+          ".cm-gutters": { backgroundColor: "var(--surface)", borderRight: "1px solid var(--border)" },
+          ".cm-cursor": { borderLeftColor: "var(--text)" },
           "&.cm-focused .cm-selectionBackground, ::selection": { backgroundColor: "#444" },
         }),
       ],

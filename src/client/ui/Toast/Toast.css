@@ -1,0 +1,124 @@
+/* Source: docs/pencils/03-navigation-overlays.md — Toasts > CSS Rules.
+ * Overlay exemption applies (shadow-sm token).
+ * Any change must land here AND in the spec doc.
+ */
+
+.toast {
+  display:       flex;
+  align-items:   flex-start;
+  gap:           var(--space-3);
+  padding:       12px 14px;
+  background:    var(--surface);
+  border:        1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow:    var(--shadow-sm);
+  min-width:     280px;
+  max-width:     400px;
+  font-family:   'Inter', sans-serif;
+  font-size:     13px;
+  line-height:   20px;
+  color:         var(--text);
+  pointer-events: auto;
+  animation:     toast-in var(--dur-base, 160ms) var(--ease-standard, ease-out);
+}
+
+.toast-icon {
+  flex-shrink: 0;
+  margin-top:  2px;
+  display:     inline-flex;
+  align-items: center;
+}
+
+.toast-info    { border-left: 3px solid var(--accent-ai); }
+.toast-info    .toast-icon { color: var(--accent-ai); }
+.toast-success { border-left: 3px solid var(--success);  }
+.toast-success .toast-icon { color: var(--success); }
+.toast-warning { border-left: 3px solid var(--warning);  }
+.toast-warning .toast-icon { color: var(--warning); }
+.toast-error   { border-left: 3px solid var(--danger);   }
+.toast-error   .toast-icon { color: var(--danger); }
+
+.toast-content {
+  flex:           1 1 auto;
+  min-width:      0;
+  display:        flex;
+  flex-direction: column;
+  gap:            2px;
+}
+
+.toast-title {
+  font-weight: 600;
+  color:       var(--text-strong);
+}
+.toast-body {
+  margin-top: 2px;
+  color:      var(--text-muted);
+}
+
+.toast-action {
+  flex-shrink:   0;
+  background:    transparent;
+  border:        1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding:       4px 10px;
+  font-family:   'Inter', sans-serif;
+  font-size:     12px;
+  font-weight:   500;
+  color:         var(--accent);
+  cursor:        pointer;
+  transition:    background var(--dur-fast) var(--ease-standard),
+                 color var(--dur-fast) var(--ease-standard);
+}
+.toast-action:hover {
+  background: var(--surface-hover);
+}
+.toast-action:focus-visible {
+  outline:        2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.toast-dismiss {
+  flex-shrink:     0;
+  display:         inline-flex;
+  align-items:     center;
+  justify-content: center;
+  width:           22px;
+  height:          22px;
+  border-radius:   var(--radius-sm);
+  background:      transparent;
+  border:          1px solid transparent;
+  color:           var(--text-subtle);
+  cursor:          pointer;
+  transition:      background var(--dur-fast) var(--ease-standard),
+                   color var(--dur-fast) var(--ease-standard);
+}
+.toast-dismiss:hover {
+  background: var(--surface-hover);
+  color:      var(--text);
+}
+.toast-dismiss:focus-visible {
+  outline:        2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.toast-container {
+  position:       fixed;
+  bottom:         24px;
+  right:          24px;
+  display:        flex;
+  flex-direction: column;
+  gap:            var(--space-3);
+  z-index:        2000;
+  pointer-events: none;
+}
+
+@keyframes toast-in {
+  from {
+    opacity:   0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity:   1;
+    transform: translateY(0);
+  }
+}

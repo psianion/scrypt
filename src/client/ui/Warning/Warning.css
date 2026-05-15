@@ -1,0 +1,22 @@
+/* Source: docs/pencils/02-base-components.md — Warning Block */
+
+.warning-block {
+  display: flex;
+  gap: var(--space-3);
+  padding: 10px 12px;
+  background: rgba(245, 198, 120, 0.08);
+  border: 1px solid rgba(245, 198, 120, 0.20);
+  border-radius: var(--radius-md);
+  color: var(--warning);
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  line-height: 20px;
+}
+.warning-block-icon {
+  flex-shrink: 0;
+  margin-top: 2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: currentColor;
+}

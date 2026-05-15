@@ -14,10 +14,14 @@ import { TasksList } from "./views/TasksList";
 import { DataExplorer } from "./views/DataExplorer";
 import { TagBrowser } from "./views/TagBrowser";
 import { Settings } from "./views/Settings";
+import { DesignSystem } from "./views/design-system/DesignSystem";
 import { useStore } from "./store";
+import { useApplyTheme } from "./theme";
 import { connectWebSocket } from "./api";
+import { ToastRegion } from "./ui/Toast";
 
 export function AppContent() {
+  useApplyTheme();
   const commandPaletteOpen = useStore((s) => s.commandPaletteOpen);
   const toggleCommandPalette = useStore((s) => s.toggleCommandPalette);
   const [newNoteOpen, setNewNoteOpen] = useState(false);
@@ -39,6 +43,21 @@ export function AppContent() {
         e.preventDefault();
         setNewNoteOpen(true);
       }
+    };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, []);
+
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || !e.shiftKey) return;
+      if (e.key !== "l" && e.key !== "L") return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) {
+        return;
+      }
+      e.preventDefault();
+      useStore.getState().toggleTheme();
     };
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
@@ -70,6 +89,7 @@ export function AppContent() {
                 <Route path="/tasks" element={<TasksList />} />
                 <Route path="/data" element={<DataExplorer />} />
                 <Route path="/tags" element={<TagBrowser />} />
+                <Route path="/design-system" element={<DesignSystem />} />
                 <Route path="/settings" element={<Settings />} />
               </Routes>
             </div>
@@ -79,6 +99,7 @@ export function AppContent() {
       </div>
       {commandPaletteOpen && <CommandPalette />}
       <NewNoteModal open={newNoteOpen} onClose={() => setNewNoteOpen(false)} />
+      <ToastRegion />
     </>
   );
 }

@@ -1,0 +1,127 @@
+/* src/client/components/TabBar.css
+ * Source of truth: docs/pencils/03-navigation-overlays.md §Tab Bar.
+ * Rules in the "verbatim" block below are copied byte-for-byte from the pencil.
+ * Rules below "/* --- Supplementary ..." are TabBar-specific scaffolding the
+ * pencil doesn't cover (overflow fade-mask, close-button reset, tab-name span,
+ * focus ring, scrollbar suppression on WebKit).
+ * Zero hard-coded hex — every colour reads from var(--*).
+ */
+
+/* ---------- VERBATIM from 03-navigation-overlays.md §Tab Bar ---------- */
+
+.tab-bar {
+  display:       flex;
+  align-items:   center;
+  height:        36px;
+  background:    var(--surface);
+  border-bottom: 1px solid var(--border-subtle);
+  overflow-x:    auto;
+  scrollbar-width: none;
+  gap:           2px;
+  padding:       0 var(--space-2);
+}
+
+.tab {
+  display:       flex;
+  align-items:   center;
+  gap:           var(--space-2);
+  height:        28px;
+  padding:       0 10px;
+  border-radius: var(--radius-sm);
+  font-family:   'Inter', sans-serif;
+  font-size:     12px;
+  white-space:   nowrap;
+  cursor:        pointer;
+  color:         var(--text-muted);
+  border:        1px solid transparent;
+  transition:    background var(--dur-fast), color var(--dur-fast);
+  flex-shrink:   0;
+}
+.tab:hover      { background: var(--surface-hover); color: var(--text); }
+.tab[data-active] {
+  background:  var(--surface-active);
+  color:       var(--text-strong);
+  border-color: var(--border-subtle);
+}
+.tab[data-dirty] .tab-name::after {
+  content:     '·';
+  margin-left: 3px;
+  color:       var(--warning);
+}
+.tab-close {
+  opacity:    0;
+  transition: opacity var(--dur-fast);
+}
+.tab:hover .tab-close { opacity: 1; }
+
+/* ---------- Supplementary (scaffolding the pencil doesn't cover) ---------- */
+
+/* Hide WebKit scrollbar — pencil already specifies `scrollbar-width: none` for FF. */
+.tab-bar::-webkit-scrollbar { display: none; }
+
+/* Fade-mask edges when the tab strip overflows. Both sides masked so scrolling
+ * to the middle keeps the cue on whichever edge has off-screen content. */
+.tab-bar {
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    #000 var(--space-3),
+    #000 calc(100% - var(--space-3)),
+    transparent 100%
+  );
+          mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    #000 var(--space-3),
+    #000 calc(100% - var(--space-3)),
+    transparent 100%
+  );
+}
+
+/* Empty tab-bar — keep the strip in flow but skip the divider so a blank
+ * editor surface doesn't show a stray hairline. */
+.tab-bar:empty {
+  border-bottom: none;
+  height: 0;
+  padding: 0;
+}
+
+.tab-name {
+  display:      inline-block;
+  max-width:    180px;
+  overflow:     hidden;
+  text-overflow: ellipsis;
+  white-space:  nowrap;
+}
+
+/* Close button reset — strip browser button chrome so only the icon shows. */
+.tab-close {
+  display:        inline-flex;
+  align-items:    center;
+  justify-content: center;
+  width:          16px;
+  height:         16px;
+  padding:        0;
+  margin:         0;
+  background:     transparent;
+  border:         0;
+  border-radius:  var(--radius-sm);
+  color:          var(--text-muted);
+  cursor:         pointer;
+  flex-shrink:    0;
+}
+.tab-close:hover {
+  background: var(--surface-hover);
+  color:      var(--text-strong);
+}
+
+/* Keyboard focus rings — pencils don't draw them but they're required for a11y. */
+.tab:focus-visible,
+.tab-close:focus-visible {
+  outline:        2px solid var(--accent, var(--text-strong));
+  outline-offset: 1px;
+}
+
+/* Active close button stays visible so the user can always close the focused tab,
+ * not just on hover. */
+.tab[data-active] .tab-close { opacity: 1; }

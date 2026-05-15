@@ -1,0 +1,59 @@
+/* Mirrors the app's scroll convention (see .tasks-list in main.css):
+   the flex-row route outlet in App.tsx gives us its full height; we take
+   height: 100% and own the scroll so Sidebar / TabBar / StatusBar chrome
+   stays pinned. Do NOT use min-height: 100vh here — that breaks nested
+   scroll by forcing the document to scroll the whole app shell. */
+.ds-root {
+  padding: var(--space-9);
+  background: var(--bg);
+  color: var(--text);
+  height: 100%;
+  overflow: auto;
+}
+.ds-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: var(--space-8);
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: var(--space-9);
+}
+.ds-title {
+  font-family: 'Poppins', sans-serif;
+  font-size: 32px;
+  font-weight: 600;
+  color: var(--text-strong);
+  margin: 0;
+}
+.ds-subtitle {
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  color: var(--text-muted);
+  margin: 4px 0 0;
+}
+.ds-section {
+  margin-bottom: var(--space-11);
+}
+.ds-section-title {
+  font-family: 'Poppins', sans-serif;
+  font-size: 20px;
+  font-weight: 500;
+  color: var(--text-strong);
+  margin: 0 0 var(--space-7);
+}
+.ds-subsection-title {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--text-subtle);
+  margin: 0 0 var(--space-5);
+}
+.ds-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-5);
+  align-items: center;
+  margin-bottom: var(--space-7);
+}

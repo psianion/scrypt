@@ -30,12 +30,12 @@ export function CsvEmbed({ file }: { file: string }) {
     <div className="border border-[var(--border)] rounded overflow-hidden my-2">
       <table className="w-full text-sm">
         <thead>
-          <tr className="bg-[var(--bg-secondary)]">
+          <tr className="bg-[var(--surface)]">
             {headers.map((h) => (
               <th
                 key={h}
                 onClick={() => toggleSort(h)}
-                className="px-2 py-1 text-left text-[var(--text-muted)] cursor-pointer hover:text-[var(--text-primary)]"
+                className="px-2 py-1 text-left text-[var(--text-muted)] cursor-pointer hover:text-[var(--text)]"
               >
                 {h} {sortCol === h ? (sortAsc ? "↑" : "↓") : ""}
               </th>
@@ -46,7 +46,7 @@ export function CsvEmbed({ file }: { file: string }) {
           {sorted.map((row, i) => (
             <tr key={i} className="border-t border-[var(--border)]">
               {headers.map((h) => (
-                <td key={h} className="px-2 py-1 text-[var(--text-primary)]">
+                <td key={h} className="px-2 py-1 text-[var(--text)]">
                   {row[h]}
                 </td>
               ))}
@@ -54,7 +54,7 @@ export function CsvEmbed({ file }: { file: string }) {
           ))}
         </tbody>
       </table>
-      <div className="px-2 py-1 text-xs text-[var(--text-muted)] bg-[var(--bg-secondary)]">
+      <div className="px-2 py-1 text-xs text-[var(--text-muted)] bg-[var(--surface)]">
         {rows.length} rows
       </div>
     </div>

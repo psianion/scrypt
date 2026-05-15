@@ -1,0 +1,88 @@
+/* src/client/components/StatusBar.css
+ * Source of truth: docs/pencils/03-navigation-overlays.md §Status Bar & Activity Strip.
+ * Rules in the "verbatim" block below are copied byte-for-byte from the pencil.
+ * Rules below "/* --- Supplementary ..." are scaffolding the pencil doesn't
+ * cover (left/middle/right slots, brand pill, indicator chrome).
+ * Zero hard-coded hex — every colour reads from var(--*).
+ */
+
+/* ---------- VERBATIM from 03-navigation-overlays.md §Status Bar & Activity Strip ---------- */
+
+.status-bar {
+  display:        flex;
+  align-items:    center;
+  height:         24px;
+  padding:        0 var(--space-5);
+  background:     var(--bg);
+  border-top:     1px solid var(--border-subtle);
+  font-family:    'JetBrains Mono', monospace;
+  font-size:      11px;
+  color:          var(--text-subtle);
+  gap:            var(--space-5);
+  flex-shrink:    0;
+}
+.status-bar-dot {
+  width:          6px;
+  height:         6px;
+  border-radius:  var(--radius-full);
+  background:     var(--success);
+}
+
+/* ---------- Supplementary (scaffolding the pencil doesn't cover) ---------- */
+
+/* Three-slot layout: left grows to fill remaining space, middle hugs content,
+ * right stays anchored to the trailing edge. */
+.status-bar-slot {
+  display:     flex;
+  align-items: center;
+  gap:         var(--space-4);
+  min-width:   0;             /* let the breadcrumb truncate */
+}
+.status-bar-slot--left   { flex: 1 1 auto; min-width: 0; }
+.status-bar-slot--middle { flex: 0 0 auto; }
+.status-bar-slot--right  { flex: 0 0 auto; margin-left: auto; }
+
+.status-bar-indicator {
+  display:      inline-flex;
+  align-items:  center;
+  gap:          var(--space-3);
+  color:        var(--text-subtle);
+  font-family:  'JetBrains Mono', monospace;
+  font-size:    11px;
+  white-space:  nowrap;
+}
+
+.status-bar-brand {
+  display:        inline-flex;
+  align-items:    center;
+  gap:            var(--space-3);
+  height:         18px;
+  padding:        0 var(--space-4);
+  border-radius:  var(--radius-full);
+  background:     var(--surface-active);
+  color:          var(--text-strong);
+  font-family:    'Poppins', sans-serif;
+  font-size:      10px;
+  font-weight:    600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+/* When the breadcrumb is the only thing in the left slot, give it room to
+ * shrink without overflowing the bar. */
+.status-bar .breadcrumb {
+  font-size:    11px;
+  font-family:  'JetBrains Mono', monospace;
+  color:        var(--text-subtle);
+  min-width:    0;
+}
+.status-bar .breadcrumb-item__label {
+  font-family:  inherit;
+}
+
+/* Empty-left fallback — render the brand path so the bar is never blank. */
+.status-bar-empty {
+  color:        var(--text-subtle);
+  font-family:  'JetBrains Mono', monospace;
+  font-size:    11px;
+}

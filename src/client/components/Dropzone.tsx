@@ -65,8 +65,8 @@ export function Dropzone({ children, onFilesDropped }: DropzoneProps) {
     >
       {children}
       {isOver && (
-        <div className="absolute inset-0 flex items-center justify-center bg-[var(--bg-primary)]/90 border-2 border-dashed border-[var(--text-primary)] pointer-events-none">
-          <div className="text-lg text-[var(--text-primary)]">
+        <div className="absolute inset-0 flex items-center justify-center bg-[var(--bg)]/90 border-2 border-dashed border-[var(--text)] pointer-events-none">
+          <div className="text-lg text-[var(--text)]">
             Drop to add notes — will be routed by frontmatter
           </div>
         </div>

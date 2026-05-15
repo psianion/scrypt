@@ -1,0 +1,100 @@
+/* Source: docs/pencils/03-navigation-overlays.md — Modals > CSS Rules.
+ * Overlay exemption applies here: drop-shadow via --shadow-lg token is allowed.
+ * Any change must land here AND in the spec doc.
+ */
+
+.modal-overlay {
+  position:        fixed;
+  inset:           0;
+  background:      rgba(10, 11, 14, 0.7);
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  /* Padded backdrop is the centering frame: keeps the card off the viewport
+   * edges at any size and gives `max-width/max-height: calc(100v* - 2*pad)`
+   * a stable gutter to clamp against. */
+  padding:         var(--space-6);
+  z-index:         900;
+  backdrop-filter: blur(4px);
+}
+
+.modal {
+  background:     var(--surface);
+  border:         1px solid var(--border);
+  border-radius:  var(--radius-lg);
+  box-shadow:     var(--shadow-lg);
+  /* Width: fluid — fills the overlay's padded inner box up to the per-size
+   * max-width. Height: fluid — never exceeds the overlay's padded inner box,
+   * with internal scroll in `.modal-body` for tall content.
+   * No absolute viewport math; the parent overlay's `padding` already gutters. */
+  width:          100%;
+  max-height:     100%;
+  padding:        24px;
+  display:        flex;
+  flex-direction: column;
+  gap:            var(--space-5);
+  outline:        none;
+  overflow:       hidden;
+  min-width:      0;
+  min-height:     0;
+}
+
+/* Per-size cap. No fixed `width` — the card grows from intrinsic content up
+ * to this max, then stops. Smaller viewports naturally clamp via the parent
+ * overlay's flex layout + padding (no calc() needed). */
+.modal-sm { max-width: 420px; }
+.modal-md { max-width: 560px; }
+.modal-lg { max-width: 720px; }
+
+.modal-header {
+  display:         flex;
+  align-items:     center;
+  justify-content: space-between;
+  gap:             var(--space-3);
+}
+
+.modal-title {
+  font-family: 'Poppins', sans-serif;
+  font-size:   18px;
+  font-weight: 600;
+  color:       var(--text-strong);
+  margin:      0;
+}
+
+.modal-close {
+  display:         inline-flex;
+  align-items:     center;
+  justify-content: center;
+  width:           28px;
+  height:          28px;
+  border-radius:   var(--radius-sm);
+  background:      transparent;
+  color:           var(--text-muted);
+  border:          1px solid transparent;
+  cursor:          pointer;
+  transition:      background var(--dur-fast) var(--ease-standard),
+                   color var(--dur-fast) var(--ease-standard);
+}
+.modal-close:hover {
+  background: var(--surface-hover);
+  color:      var(--text);
+}
+.modal-close:focus-visible {
+  outline:        2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.modal-body {
+  display:        flex;
+  flex-direction: column;
+  gap:            var(--space-4);
+  overflow:       auto;
+  min-height:     0;
+}
+
+.modal-actions {
+  display:         flex;
+  justify-content: flex-end;
+  gap:             var(--space-3);
+  margin-top:      var(--space-3);
+}
