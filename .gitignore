@@ -36,6 +36,14 @@ test-screenshots/
 *.png
 !assets/screenshots/*.png
 
+# Test scratch dirs — mkdtemp output occasionally lands in repo root (some
+# runs override TMPDIR / cwd-relative). Ignore so they don't pollute git
+# status. Root cause tracked separately.
+/scrypt-*/
+/vault-e2e-*/
+/wave8-scenario-*/
+/node-compile-cache/
+
 # Editor / IDE
 .cursor/
 .vscode/
