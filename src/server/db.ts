@@ -220,6 +220,14 @@ export function initSchema(db: Database): void {
     db.run("ALTER TABLE notes ADD COLUMN subdomain TEXT");
   if (!have.has("tags")) db.run("ALTER TABLE notes ADD COLUMN tags TEXT");
 
+  db.run(`
+    CREATE TABLE IF NOT EXISTS sync_state (
+      note_path TEXT PRIMARY KEY,
+      base_hash TEXT NOT NULL,
+      synced_at INTEGER NOT NULL
+    )
+  `);
+
   // Wave 8: note_metadata, note_sections, note_chunk_embeddings, mcp_dedup.
   applyWave8Migration(db);
 
