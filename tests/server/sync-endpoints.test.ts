@@ -59,3 +59,10 @@ test("note rejects path traversal", async () => {
   )!;
   expect(res.status).toBe(400);
 });
+
+test("note rejects an absolute path", async () => {
+  const res = await router.handle(
+    new Request("http://localhost/api/sync/note?path=/etc/passwd"),
+  )!;
+  expect(res.status).toBe(400);
+});

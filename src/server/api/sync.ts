@@ -5,7 +5,7 @@
 // for remote callers and bypasses for localhost.
 import type { Router } from "../router";
 import type { Database } from "bun:sqlite";
-import { join, normalize } from "node:path";
+import { resolve, sep } from "node:path";
 
 export function syncRoutes(
   router: Router,
@@ -29,12 +29,14 @@ export function syncRoutes(
     const url = new URL(req.url);
     const rel = url.searchParams.get("path");
     if (!rel) return Response.json({ error: "missing path" }, { status: 400 });
-    // Reject traversal: normalized path must stay inside the vault.
-    const normalized = normalize(rel);
-    if (normalized.startsWith("..") || normalized.includes(`..${"/"}`)) {
+    // Resolve against the vault root and require the result to stay inside
+    // it. Rejects "../" traversal and absolute paths (e.g. /etc/passwd) alike.
+    const root = resolve(vaultPath);
+    const abs = resolve(root, rel);
+    if (!abs.startsWith(root + sep)) {
       return Response.json({ error: "invalid path" }, { status: 400 });
     }
-    const file = Bun.file(join(vaultPath, normalized));
+    const file = Bun.file(abs);
     if (!(await file.exists())) {
       return Response.json({ error: "not found" }, { status: 404 });
     }
