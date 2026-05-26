@@ -12,7 +12,7 @@ services:
     # Bind to localhost only — Tailscale handles cross-host access.
     # Never change to 0.0.0.0 without an explicit security review.
     ports:
-      - "127.0.0.1:3777:3777"
+      - "${SCRYPT_BIND_ADDR:-127.0.0.1}:3777:3777"
 
     volumes:
       - /home/ubuntu/para-raid/scrypt-vault:/vault
