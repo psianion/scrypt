@@ -6,6 +6,7 @@
 import type { Router } from "../router";
 import type { Database } from "bun:sqlite";
 import { resolve, sep } from "node:path";
+import { realpathSync } from "node:fs";
 
 export function syncRoutes(
   router: Router,
@@ -39,6 +40,12 @@ export function syncRoutes(
     const file = Bun.file(abs);
     if (!(await file.exists())) {
       return Response.json({ error: "not found" }, { status: 404 });
+    }
+    // Symlink guard: canonicalize and re-check the real target stays in-vault.
+    const realRoot = realpathSync(root);
+    const realAbs = realpathSync(abs);
+    if (realAbs !== realRoot && !realAbs.startsWith(realRoot + sep)) {
+      return Response.json({ error: "invalid path" }, { status: 400 });
     }
     return new Response(await file.text(), {
       headers: { "content-type": "text/markdown; charset=utf-8" },

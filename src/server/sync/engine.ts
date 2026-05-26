@@ -73,6 +73,13 @@ export async function runPush(deps: SyncDeps): Promise<RunResult> {
       result.failed.push({ path: item.path, error: String(err) });
     }
   }
+  if (result.pushed.length > 0) {
+    try {
+      await deps.remote.rescanSimilarity(`sync-rescan-${Date.now()}`);
+    } catch (err) {
+      console.warn(`[sync] post-push rescan_similarity failed (non-fatal): ${String(err)}`);
+    }
+  }
   return result;
 }
 
@@ -94,6 +101,13 @@ export async function runPull(deps: SyncDeps): Promise<RunResult> {
       result.pulled.push(item.path);
     } catch (err) {
       result.failed.push({ path: item.path, error: String(err) });
+    }
+  }
+  if (result.pulled.length > 0) {
+    try {
+      await deps.local.rescanSimilarity(`sync-rescan-${Date.now()}`);
+    } catch (err) {
+      console.warn(`[sync] post-pull rescan_similarity failed (non-fatal): ${String(err)}`);
     }
   }
   return result;

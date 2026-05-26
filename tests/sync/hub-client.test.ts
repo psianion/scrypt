@@ -78,3 +78,9 @@ test("createNote throws when the tool returns isError", async () => {
     new HubClient(base).createNote("fail.md", "x", "tag-fail"),
   ).rejects.toThrow(/vault full/);
 });
+
+test("rescanSimilarity posts a tools/call rescan_similarity request", async () => {
+  await new HubClient(base).rescanSimilarity("t1");
+  expect(lastCreate.method).toBe("tools/call");
+  expect(lastCreate.params.name).toBe("rescan_similarity");
+});

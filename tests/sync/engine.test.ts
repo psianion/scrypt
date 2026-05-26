@@ -26,6 +26,7 @@ function hashRaw(raw: string): string {
 function fakeHub(store: Map<string, string>) {
   return {
     created: [] as { path: string; content: string; tag: string }[],
+    rescans: [] as string[],
     async getManifest() {
       const map = new Map<string, string>();
       for (const [p, raw] of store) map.set(p, hashRaw(raw));
@@ -37,6 +38,9 @@ function fakeHub(store: Map<string, string>) {
     async createNote(p: string, content: string, tag: string) {
       store.set(p, content);
       this.created.push({ path: p, content, tag });
+    },
+    async rescanSimilarity(tag: string) {
+      this.rescans.push(tag);
     },
   };
 }
@@ -127,4 +131,21 @@ test("a per-note push failure is recorded in failed and does not abort other not
   expect(result.pushed).toContain("ok.md");
   expect(result.failed.map((f) => f.path)).toContain("bad.md");
   expect(result.failed.find((f) => f.path === "bad.md")!.error).toMatch(/server rejected/);
+});
+
+test("push triggers a remote rescan_similarity", async () => {
+  writeNote("a.md", "hello");
+  const remote = fakeHub(new Map());
+  const local = fakeHub(new Map());
+  const deps: SyncDeps = { db, fm, vaultPath: vaultDir, remote: remote as any, local: local as any };
+  await runPush(deps);
+  expect(remote.rescans.length).toBe(1);
+});
+
+test("pull triggers a local rescan_similarity", async () => {
+  const remote = fakeHub(new Map([["b.md", "remote-body"]]));
+  const local = fakeHub(new Map());
+  const deps: SyncDeps = { db, fm, vaultPath: vaultDir, remote: remote as any, local: local as any };
+  await runPull(deps);
+  expect(local.rescans.length).toBe(1);
 });

@@ -66,3 +66,14 @@ test("note rejects an absolute path", async () => {
   )!;
   expect(res.status).toBe(400);
 });
+
+test("note rejects a symlink that escapes the vault", async () => {
+  const { symlinkSync, writeFileSync: wf } = await import("node:fs");
+  const outside = join(tmpdir(), `sync-outside-${Date.now()}.txt`);
+  wf(outside, "secret");
+  symlinkSync(outside, join(vaultDir, "escape.md"));
+  const res = await router.handle(
+    new Request("http://localhost/api/sync/note?path=escape.md"),
+  )!;
+  expect(res.status).toBe(400);
+});

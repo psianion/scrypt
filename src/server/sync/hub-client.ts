@@ -105,4 +105,34 @@ export class HubClient {
       );
     }
   }
+
+  async rescanSimilarity(clientTag: string): Promise<void> {
+    let res: Response;
+    try {
+      res = await fetch(`${this.baseUrl}/mcp`, {
+        method: "POST",
+        headers: this.headers(true),
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "tools/call",
+          params: {
+            name: "rescan_similarity",
+            arguments: { client_tag: clientTag },
+          },
+        }),
+      });
+    } catch (err) {
+      throw new Error(`vault unreachable at ${this.baseUrl} — is it running? (${String(err)})`);
+    }
+    if (!res.ok) throw new SyncHttpError("rescan_similarity", res.status, this.baseUrl);
+    const body = (await res.json()) as {
+      result?: { isError?: boolean; content?: { text: string }[] };
+      error?: { message: string };
+    };
+    if (body.error) throw new Error(`rescan_similarity failed: ${body.error.message}`);
+    if (body.result?.isError) {
+      throw new Error(`rescan_similarity tool error: ${body.result.content?.[0]?.text ?? "unknown"}`);
+    }
+  }
 }
