@@ -16,6 +16,7 @@ import {
 import { useStore } from "../store";
 import { api } from "../api";
 import { FolderTree } from "./FolderTree";
+import { SyncBar } from "./SyncBar";
 import { topLevelProjects } from "./FolderTree.helpers";
 import { ContextMenu, type ContextMenuPosition } from "../ui";
 import "./Sidebar.css";
@@ -208,6 +209,8 @@ export function Sidebar({ onNewNote }: SidebarProps = {}) {
           />
         </div>
       </div>
+
+      <SyncBar />
 
       <button
         type="button"
