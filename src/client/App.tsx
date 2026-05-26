@@ -21,12 +21,19 @@ import { useStore } from "./store";
 import { useApplyTheme } from "./theme";
 import { connectWebSocket } from "./api";
 import { ToastRegion } from "./ui/Toast";
+import { useSyncStatus } from "./stores/syncStatus";
 
 export function AppContent() {
   useApplyTheme();
   const commandPaletteOpen = useStore((s) => s.commandPaletteOpen);
   const toggleCommandPalette = useStore((s) => s.toggleCommandPalette);
   const [newNoteOpen, setNewNoteOpen] = useState(false);
+
+  useEffect(() => {
+    const s = useSyncStatus.getState();
+    void s.refreshLocal();
+    void s.refreshHub();
+  }, []);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {

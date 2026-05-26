@@ -10,6 +10,8 @@ import type { Note } from "../../shared/types";
 import { embeddingOverlay } from "./editor/embeddingOverlay";
 import "./editor/embedding-overlay.css";
 import { NoteContextPanel } from "../graph/NoteContextPanel";
+import { useSyncStatus, syncDotState } from "../stores/syncStatus";
+import { ClashResolver } from "./ClashResolver";
 
 export function Editor() {
   const location = useLocation();
@@ -19,14 +21,20 @@ export function Editor() {
   const currentPathRef = useRef<string | null>(null);
   const [note, setNote] = useState<(Note & { backlinks: any[] }) | null>(null);
   const setCurrentNote = useStore((s) => s.setCurrentNote);
+  const notPushed = useSyncStatus((s) => s.notPushed);
+  const clashes = useSyncStatus((s) => s.clashes);
+  const [resolving, setResolving] = useState(false);
 
   const notePath = location.pathname.replace("/note/", "");
   currentPathRef.current = notePath || null;
+
+  const isClash = notePath ? syncDotState(notePath, notPushed, clashes) === "clash" : false;
 
   const saveNote = useCallback(async () => {
     if (!viewRef.current || !notePath) return;
     const content = viewRef.current.state.doc.toString();
     await api.notes.update(notePath, { content });
+    void useSyncStatus.getState().refreshLocal();
   }, [notePath]);
 
   useEffect(() => {
@@ -91,10 +99,22 @@ export function Editor() {
     return () => document.removeEventListener("keydown", handler);
   }, [saveNote]);
 
+  if (resolving && notePath) {
+    return <ClashResolver path={notePath} onDone={() => setResolving(false)} />;
+  }
+
   return (
-    <div data-testid="editor" className="flex flex-1 h-full overflow-hidden">
-      <div ref={editorRef} className="flex-1 h-full min-w-0" />
-      {notePath && <NoteContextPanel path={notePath} />}
+    <div data-testid="editor" className="flex flex-col flex-1 h-full overflow-hidden">
+      {isClash && (
+        <div className="editor-clash-banner">
+          ⚠ This note clashes with the hub.
+          <button type="button" onClick={() => setResolving(true)}>Resolve</button>
+        </div>
+      )}
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+        <div ref={editorRef} className="flex-1 h-full min-w-0" />
+        {notePath && <NoteContextPanel path={notePath} />}
+      </div>
     </div>
   );
 }

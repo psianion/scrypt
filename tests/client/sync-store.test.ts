@@ -46,3 +46,11 @@ test("refreshHub on hub_unreachable sets hubReachable false and keeps last clash
   expect(useSyncStatus.getState().hubReachable).toBe(false);
   expect([...useSyncStatus.getState().clashes]).toEqual(["x.md"]); // preserved
 });
+
+import { useSyncStatus as store2 } from "../../src/client/stores/syncStatus";
+
+test("refreshLocal is callable and updates the store (used by Editor post-save + App load)", async () => {
+  globalThis.fetch = (async () => new Response(JSON.stringify({ notPushed: ["z.md"] }), { status: 200 })) as typeof fetch;
+  await store2.getState().refreshLocal();
+  expect([...store2.getState().notPushed]).toContain("z.md");
+});
