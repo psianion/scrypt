@@ -7,6 +7,7 @@ import {
   extractTags,
 } from "./parsers";
 import { parseStructural } from "./indexer/structural-parse";
+import { computeContentHash } from "./sync/content-hash";
 import type { SectionsRepo } from "./indexer/sections-repo";
 import type { EmbedderLike } from "./embeddings/service";
 import type {
@@ -82,8 +83,7 @@ export class Indexer {
     const note = await this.fm.readNote(path);
     if (!note) return;
 
-    const raw = `${JSON.stringify(note.frontmatter)}${note.content}`;
-    const contentHash = Bun.hash(raw).toString(16);
+    const contentHash = computeContentHash(note.frontmatter, note.content);
 
     const existing = this.db
       .query("SELECT id, content_hash FROM notes WHERE path = ?")
