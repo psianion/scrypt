@@ -28,7 +28,7 @@ export interface RunResult {
   failed: { path: string; error: string }[];
 }
 
-async function localHashes(fm: FileManager): Promise<Map<string, string>> {
+export async function localHashes(fm: FileManager): Promise<Map<string, string>> {
   const metas = await fm.listNotes();
   const map = new Map<string, string>();
   for (const meta of metas) {
@@ -111,4 +111,53 @@ export async function runPull(deps: SyncDeps): Promise<RunResult> {
     }
   }
   return result;
+}
+
+export async function runLocalStatus(
+  db: Database,
+  fm: FileManager,
+): Promise<{ notPushed: string[] }> {
+  const local = await localHashes(fm);
+  const base = loadBase(db);
+  const notPushed: string[] = [];
+  for (const [path, hash] of local) {
+    if (base.get(path) !== hash) notPushed.push(path); // changed since last sync, or never synced
+  }
+  return { notPushed };
+}
+
+export async function runSync(deps: SyncDeps): Promise<RunResult> {
+  const local = await localHashes(deps.fm);
+  const remoteManifest = await deps.remote.getManifest();
+  const plan = classify(local, remoteManifest, loadBase(deps.db));
+  const result: RunResult = { pushed: [], pulled: [], clashes: plan.clashes.map((c) => c.path), skipped: plan.skipped.map((s) => s.path), failed: [] };
+
+  for (const item of plan.toPush) {
+    try {
+      const raw = await Bun.file(join(deps.vaultPath, item.path)).text();
+      await deps.remote.createNote(item.path, raw, `sync-${local.get(item.path)}`);
+      setBase(deps.db, item.path, local.get(item.path)!, raw);
+      result.pushed.push(item.path);
+    } catch (e) { result.failed.push({ path: item.path, error: String(e) }); }
+  }
+  for (const item of plan.toPull) {
+    try {
+      const raw = await deps.remote.getNoteContent(item.path);
+      await deps.local.createNote(item.path, raw, `sync-${remoteManifest.get(item.path)}`);
+      setBase(deps.db, item.path, remoteManifest.get(item.path)!, raw);
+      result.pulled.push(item.path);
+    } catch (e) { result.failed.push({ path: item.path, error: String(e) }); }
+  }
+  if (result.pushed.length) { try { await deps.remote.rescanSimilarity(`sync-rescan-${Date.now()}`); } catch (e) { console.warn("remote rescan failed", e); } }
+  if (result.pulled.length) { try { await deps.local.rescanSimilarity(`sync-rescan-${Date.now()}`); } catch (e) { console.warn("local rescan failed", e); } }
+  return result;
+}
+
+export async function resolveClash(deps: SyncDeps, path: string, merged: string): Promise<void> {
+  await deps.local.createNote(path, merged, `resolve-${Date.now()}`);   // 1. write + reindex locally
+  await deps.remote.createNote(path, merged, `resolve-${Date.now()}`);  // 2. push merged to hub
+  const note = await deps.fm.readNote(path);                            // 3. canonical local hash
+  const hash = note ? computeContentHash(note.frontmatter, note.content) : computeContentHash({}, merged);
+  setBase(deps.db, path, hash, merged);                                 // 4. base = merged
+  try { await deps.remote.rescanSimilarity(`resolve-rescan-${Date.now()}`); } catch (e) { console.warn("resolve rescan failed", e); }
 }

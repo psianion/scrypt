@@ -11,14 +11,23 @@ export function loadBase(db: Database): Map<string, string> {
   return new Map(rows.map((r) => [r.note_path, r.base_hash]));
 }
 
-export function setBase(db: Database, notePath: string, hash: string): void {
+export function setBase(db: Database, notePath: string, hash: string, content?: string): void {
   db.run(
-    `INSERT INTO sync_state (note_path, base_hash, synced_at)
-     VALUES (?, ?, ?)
+    `INSERT INTO sync_state (note_path, base_hash, base_content, synced_at)
+     VALUES (?, ?, ?, ?)
      ON CONFLICT(note_path)
-       DO UPDATE SET base_hash = excluded.base_hash, synced_at = excluded.synced_at`,
-    [notePath, hash, Date.now()],
+       DO UPDATE SET base_hash = excluded.base_hash,
+                     base_content = excluded.base_content,
+                     synced_at = excluded.synced_at`,
+    [notePath, hash, content ?? null, Date.now()],
   );
+}
+
+export function getBase(db: Database, notePath: string): { hash: string; content: string | null } | null {
+  const row = db
+    .query("SELECT base_hash, base_content FROM sync_state WHERE note_path = ?")
+    .get(notePath) as { base_hash: string; base_content: string | null } | null;
+  return row ? { hash: row.base_hash, content: row.base_content } : null;
 }
 
 export function clearBase(db: Database, notePath: string): void {

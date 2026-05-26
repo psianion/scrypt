@@ -228,6 +228,13 @@ export function initSchema(db: Database): void {
     )
   `);
 
+  // Additive migration: base_content was added for 3-way clash merge support.
+  // PRAGMA-guarded so it's safe to run on both fresh and legacy sync_state tables.
+  const syncCols = db.query("PRAGMA table_info(sync_state)").all() as { name: string }[];
+  if (!syncCols.some((c) => c.name === "base_content")) {
+    db.run("ALTER TABLE sync_state ADD COLUMN base_content TEXT");
+  }
+
   // Wave 8: note_metadata, note_sections, note_chunk_embeddings, mcp_dedup.
   applyWave8Migration(db);
 
