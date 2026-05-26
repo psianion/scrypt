@@ -9,7 +9,7 @@ afterEach(() => { cleanup(); useSyncStatus.setState({ notPushed: new Set(), clas
 test("NotesList shows a clash dot in the title cell", async () => {
   useSyncStatus.setState({ clashes: new Set(["projects/dnd/npcs/volga.md"]) });
   // NotesList loads via api.notes.list — stub fetch to return one note:
-  globalThis.fetch = (async () => new Response(JSON.stringify([{ path: "projects/dnd/npcs/volga.md", title: "Volga", tags: [], modified: "2026-05-26" }]), { status: 200 })) as typeof fetch;
+  globalThis.fetch = (async () => new Response(JSON.stringify([{ path: "projects/dnd/npcs/volga.md", title: "Volga", tags: [], modified: "2026-05-26" }]), { status: 200 })) as unknown as typeof fetch;
   render(<MemoryRouter><NotesList /></MemoryRouter>);
   expect(await screen.findByTitle("Clash")).toBeDefined();
 });

@@ -15,14 +15,14 @@ export function threeWayMerge(base: string | null, local: string, remote: string
   const o = base.split("\n");
   const b = remote.split("\n");
   const regions = diff3Merge(a, o, b);
-  return regions.map((r): MergeRegion =>
-    "ok" in r
-      ? { type: "clean", text: r.ok.join("\n") }
-      : {
-          type: "conflict",
-          local: r.conflict.a.join("\n"),
-          remote: r.conflict.b.join("\n"),
-          base: r.conflict.o.join("\n"),
-        },
-  );
+  return regions.map((r): MergeRegion => {
+    if (r.ok) return { type: "clean", text: r.ok.join("\n") };
+    const c = r.conflict!;
+    return {
+      type: "conflict",
+      local: c.a.join("\n"),
+      remote: c.b.join("\n"),
+      base: c.o.join("\n"),
+    };
+  });
 }
