@@ -9,8 +9,10 @@ services:
     container_name: scrypt-vault
     restart: unless-stopped
 
-    # Bind to localhost only — Tailscale handles cross-host access.
-    # Never change to 0.0.0.0 without an explicit security review.
+    # Bind address is env-driven (SCRYPT_BIND_ADDR), defaulting to 127.0.0.1
+    # (localhost-only). Set it to the VPS's Tailscale IP (100.x.y.z) to allow
+    # tailnet devices to reach the app for vault sync — see runbook §11.
+    # NEVER set it to 0.0.0.0 without an explicit security review.
     ports:
       - "${SCRYPT_BIND_ADDR:-127.0.0.1}:3777:3777"
 
