@@ -49,3 +49,15 @@ test("removed_locally: remote-only with a base is skipped, not pulled", () => {
   expect(p.skipped).toEqual([{ path: "a.md", reason: "removed_locally" }]);
   expect(p.toPull).toEqual([]);
 });
+
+test("in_sync when local and remote converged to the same content despite a different base", () => {
+  const p = classify(m({ "a.md": "X" }), m({ "a.md": "X" }), m({ "a.md": "Y" }));
+  expect(p.inSync).toEqual([{ path: "a.md", reason: "in_sync" }]);
+  expect(p.clashes).toEqual([]);
+});
+
+test("removed_on_hub keeps local even if local changed after the base (never auto-delete)", () => {
+  const p = classify(m({ "a.md": "L2" }), m({}), m({ "a.md": "L1" }));
+  expect(p.skipped).toEqual([{ path: "a.md", reason: "removed_on_hub" }]);
+  expect(p.toPush).toEqual([]);
+});

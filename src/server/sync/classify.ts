@@ -54,10 +54,11 @@ export function classify(
       }
       const localChanged = l !== b;
       const remoteChanged = r !== b;
+      // l !== r is guaranteed here (the l === r case returned above), so at
+      // least one side differs from base — the "neither changed" case cannot occur.
       if (localChanged && remoteChanged) plan.clashes.push({ path, reason: "clash" });
       else if (localChanged) plan.toPush.push({ path, reason: "push_update" });
-      else if (remoteChanged) plan.toPull.push({ path, reason: "pull_update" });
-      else plan.inSync.push({ path, reason: "in_sync" });
+      else plan.toPull.push({ path, reason: "pull_update" });
       continue;
     }
 
