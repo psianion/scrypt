@@ -33,6 +33,7 @@ import { EmbeddingEngine } from "./embeddings/engine";
 import { EmbedClient, type WorkerLike } from "./embeddings/client";
 import { recoverPendingEmbeds } from "./embeddings/recovery";
 import { embedHealthRoutes } from "./api/health";
+import { syncRoutes } from "./api/sync";
 import { ProgressBus } from "./embeddings/progress";
 import { Worker } from "node:worker_threads";
 import { fileURLToPath } from "node:url";
@@ -166,6 +167,7 @@ export function createApp(config: AppConfig) {
     activity,
   });
   ingestRoutes(router, ingestRouter);
+  syncRoutes(router, db, config.vaultPath);
   threadRoutes(router, fm, config.vaultPath, activity);
   researchRoutes(router, db, ingestRouter);
   memoryRoutes(router, fm);
