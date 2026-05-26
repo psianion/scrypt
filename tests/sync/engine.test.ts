@@ -104,3 +104,27 @@ test("clash is reported and neither side is written", async () => {
   expect(push.pushed).toEqual([]);
   expect(remote.created).toEqual([]);
 });
+
+test("a per-note push failure is recorded in failed and does not abort other notes", async () => {
+  writeNote("ok.md", "fine");
+  writeNote("bad.md", "boom");
+  const remote = {
+    created: [] as { path: string; content: string; tag: string }[],
+    async getManifest() {
+      return new Map<string, string>();
+    },
+    async getNoteContent() {
+      return "";
+    },
+    async createNote(p: string, content: string, tag: string) {
+      if (p === "bad.md") throw new Error("server rejected");
+      this.created.push({ path: p, content, tag });
+    },
+  };
+  const local = fakeHub(new Map());
+  const deps: SyncDeps = { db, fm, vaultPath: vaultDir, remote: remote as any, local: local as any };
+  const result = await runPush(deps);
+  expect(result.pushed).toContain("ok.md");
+  expect(result.failed.map((f) => f.path)).toContain("bad.md");
+  expect(result.failed.find((f) => f.path === "bad.md")!.error).toMatch(/server rejected/);
+});
