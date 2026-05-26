@@ -167,7 +167,7 @@ export function createApp(config: AppConfig) {
     activity,
   });
   ingestRoutes(router, ingestRouter);
-  syncRoutes(router, db, config.vaultPath);
+  syncRoutes(router, db, config.vaultPath, fm);
   threadRoutes(router, fm, config.vaultPath, activity);
   researchRoutes(router, db, ingestRouter);
   memoryRoutes(router, fm);

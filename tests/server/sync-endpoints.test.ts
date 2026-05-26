@@ -6,6 +6,7 @@ import { Database } from "bun:sqlite";
 import { initSchema } from "../../src/server/db";
 import { Router } from "../../src/server/router";
 import { syncRoutes } from "../../src/server/api/sync";
+import { FileManager } from "../../src/server/file-manager";
 
 let vaultDir: string;
 let db: Database;
@@ -16,7 +17,8 @@ beforeEach(() => {
   db = new Database(":memory:");
   initSchema(db);
   router = new Router();
-  syncRoutes(router, db, vaultDir);
+  const fm = new FileManager(vaultDir, join(vaultDir, ".scrypt"));
+  syncRoutes(router, db, vaultDir, fm);
 });
 
 afterEach(() => {
