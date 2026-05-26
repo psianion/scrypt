@@ -26,6 +26,7 @@ export function Editor() {
   const [resolving, setResolving] = useState(false);
 
   const notePath = location.pathname.replace("/note/", "");
+  useEffect(() => { setResolving(false); }, [notePath]);
   currentPathRef.current = notePath || null;
 
   const isClash = notePath ? syncDotState(notePath, notPushed, clashes) === "clash" : false;

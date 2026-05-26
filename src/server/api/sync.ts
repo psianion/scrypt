@@ -66,6 +66,12 @@ export function syncRoutes(
     const root = resolve(vaultPath);
     const abs = resolve(root, rel);
     if (!abs.startsWith(root + sep)) return { error: Response.json({ error: "invalid path" }, { status: 400 }) };
+    try {
+      const realRoot = realpathSync(root);
+      const realAbs = realpathSync(abs);
+      if (realAbs !== realRoot && !realAbs.startsWith(realRoot + sep))
+        return { error: Response.json({ error: "invalid path" }, { status: 400 }) };
+    } catch { /* file may not exist yet; string check above already blocked traversal */ }
     return { abs };
   };
 
@@ -88,7 +94,7 @@ export function syncRoutes(
       const plan = await runStatus(deps);
       const notPushed = plan.toPush.map((i) => i.path);
       const clashes = plan.clashes.map((i) => i.path);
-      const toPull = plan.toPull.map((i) => i.path);
+      const toPull = plan.toPull.map((i) => ({ path: i.path, reason: i.reason }));
       const removedOnHub = plan.skipped.filter((i) => i.reason === "removed_on_hub").map((i) => i.path);
       return Response.json({ ok: true, checkedAt: Date.now(), counts: { push: notPushed.length, pull: toPull.length, clash: clashes.length }, notPushed, clashes, toPull, removedOnHub });
     } catch { return Response.json({ ok: false, error: "hub_unreachable" }); }
