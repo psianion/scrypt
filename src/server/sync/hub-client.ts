@@ -48,8 +48,11 @@ export class HubClient {
   async getManifest(): Promise<Map<string, string>> {
     const res = await this.get("/api/sync/manifest");
     const body = (await res.json()) as {
-      notes: { path: string; content_hash: string }[];
+      notes?: { path: string; content_hash: string }[];
     };
+    if (!Array.isArray(body.notes)) {
+      throw new Error(`Unexpected manifest shape from ${this.baseUrl}/api/sync/manifest`);
+    }
     return new Map(body.notes.map((n) => [n.path, n.content_hash]));
   }
 

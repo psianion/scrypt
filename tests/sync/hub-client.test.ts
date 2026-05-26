@@ -18,6 +18,13 @@ beforeAll(() => {
       }
       if (url.pathname === "/mcp") {
         lastCreate = await req.json();
+        if (lastCreate?.params?.arguments?.path === "fail.md") {
+          return Response.json({
+            jsonrpc: "2.0",
+            id: 1,
+            result: { isError: true, content: [{ type: "text", text: "vault full" }] },
+          });
+        }
         return Response.json({
           jsonrpc: "2.0",
           id: 1,
@@ -64,4 +71,10 @@ test("a 401 raises a SyncHttpError mentioning the token", async () => {
 test("an unreachable host raises a clear error", async () => {
   const client = new HubClient("http://127.0.0.1:1", "tok"); // nothing listening
   await expect(client.getManifest()).rejects.toThrow(/unreachable/i);
+});
+
+test("createNote throws when the tool returns isError", async () => {
+  await expect(
+    new HubClient(base).createNote("fail.md", "x", "tag-fail"),
+  ).rejects.toThrow(/vault full/);
 });
