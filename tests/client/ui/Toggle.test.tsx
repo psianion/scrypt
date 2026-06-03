@@ -21,7 +21,7 @@ describe("Toggle", () => {
       <Toggle checked={false} onChange={(v) => { next = v; }} aria-label="t" />,
     );
     fireEvent.click(getByRole("switch"));
-    expect(next).toBe(true);
+    expect(next as boolean | null).toBe(true);
   });
 
   test("disabled blocks onChange", () => {

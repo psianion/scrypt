@@ -40,6 +40,7 @@ test-screenshots/
 # runs override TMPDIR / cwd-relative). Ignore so they don't pollute git
 # status. Root cause tracked separately.
 /scrypt-*/
+/bunx-*/
 /vault-e2e-*/
 /wave8-scenario-*/
 /node-compile-cache/

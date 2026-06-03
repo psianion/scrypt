@@ -150,7 +150,7 @@ describe("Breadcrumb", () => {
     expect(getByText("C")).toBeTruthy();
     // Click one → fires underlying onClick.
     fireEvent.click(getByText("C"));
-    expect(clickedLabel).toBe("C");
+    expect(clickedLabel as string | null).toBe("C");
   });
 
   test("collapse can be disabled", () => {

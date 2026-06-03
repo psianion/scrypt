@@ -25,6 +25,6 @@ describe("Segment", () => {
       <Segment items={items} value="a" onChange={(v) => { next = v; }} />,
     );
     fireEvent.click(getByText("B"));
-    expect(next).toBe("b");
+    expect(next as string | null).toBe("b");
   });
 });
