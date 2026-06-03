@@ -11,6 +11,15 @@ interface AuthResult {
 
 const LOCALHOST_HOSTS = new Set(["127.0.0.1", "localhost", "::1"]);
 
+/**
+ * True when the request's Host is a loopback alias (127.0.0.1 / localhost /
+ * ::1). Shared by the /api/* gate (checkAuth) and the /mcp write path so both
+ * apply the same loopback-or-token rule. (F5)
+ */
+export function isLoopbackHost(req: Request): boolean {
+  return LOCALHOST_HOSTS.has(new URL(req.url).hostname);
+}
+
 export function checkAuth(req: Request, state: AuthState): AuthResult {
   const url = new URL(req.url);
 
@@ -23,8 +32,7 @@ export function checkAuth(req: Request, state: AuthState): AuthResult {
   // localhost / 127.0.0.1 / ::1) are always allowed through — in
   // production too. Remote callers still need the token because their
   // Host header is the tailnet / public hostname, not a loopback alias.
-  const isLocalhost = LOCALHOST_HOSTS.has(url.hostname);
-  if (isLocalhost) {
+  if (isLoopbackHost(req)) {
     return { ok: true };
   }
 

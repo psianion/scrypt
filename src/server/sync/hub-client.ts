@@ -18,6 +18,11 @@ export class SyncHttpError extends Error {
   }
 }
 
+// Cap on note bytes accepted over the pull path, mirroring the read endpoint's
+// guard in api/sync.ts. Keeps a single accidentally-huge note (renamed binary,
+// pasted blob) from OOMing a small VPS container during sync. (F13)
+const MAX_NOTE_BYTES = 25 * 1024 * 1024; // 25 MiB
+
 export class HubClient {
   private baseUrl: string;
   constructor(baseUrl: string, private token?: string) {
@@ -60,6 +65,15 @@ export class HubClient {
     const res = await this.get(
       `/api/sync/note?path=${encodeURIComponent(notePath)}`,
     );
+    // Reject an oversized note before buffering it into memory. The hub's read
+    // endpoint already 413s on file.size, but a non-scrypt upstream might not,
+    // so guard here too via Content-Length. (F13)
+    const len = Number(res.headers.get("content-length"));
+    if (Number.isFinite(len) && len > MAX_NOTE_BYTES) {
+      throw new Error(
+        `note ${notePath} is ${len} bytes, over the ${MAX_NOTE_BYTES}-byte sync cap`,
+      );
+    }
     return res.text();
   }
 

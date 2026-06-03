@@ -45,7 +45,7 @@ import type { ToolContext } from "./mcp/types";
 import { IngestRouter } from "./ingest/router";
 import { ActivityLog } from "./activity";
 import { loadConfig, type ScryptConfig } from "./config";
-import { checkAuth, unauthorizedResponse } from "./auth";
+import { checkAuth, isLoopbackHost, unauthorizedResponse } from "./auth";
 import {
   initRepo,
   startAutocommitLoop,
@@ -66,6 +66,7 @@ export function createApp(config: AppConfig) {
     vaultPath: config.vaultPath,
     staticDir: config.staticDir,
     port: 3777,
+    bindAddr: "127.0.0.1",
     authToken: config.authToken,
     isProduction: config.isProduction ?? false,
     gitAutocommit: config.gitAutocommit ?? false,
@@ -203,11 +204,15 @@ export function createApp(config: AppConfig) {
     ws.broadcastChannel(channel, payload),
   );
   mcpRoutes(router, mcpRegistry, mcpCtx, async (req) => {
-    // Reuse scrypt's existing bearer token; returns a synthetic user id
-    // when the token matches, null otherwise. Local stdio is the only
-    // path for un-tokened access.
+    // Same loopback-or-token rule as the /api/* gate (checkAuth): a loopback
+    // caller (Host 127.0.0.1 / localhost / ::1) is trusted — the local browser
+    // and stdio bridge can't attach a bearer header. Any non-loopback caller
+    // (tailnet / public Host) MUST present the configured token; when no token
+    // is configured we fail CLOSED for them instead of returning "local" for
+    // everyone. (F5)
+    if (isLoopbackHost(req)) return "local";
+    if (!scryptConfig.authToken) return null;
     const token = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
-    if (!scryptConfig.authToken) return "local";
     return token === scryptConfig.authToken ? "local" : null;
   });
 
