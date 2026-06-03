@@ -71,6 +71,11 @@ export function classify(
 
     // remote only
     if (b === undefined) plan.toPull.push({ path, reason: "pull_new" });
+    // Deleted locally but the hub has since changed it (r !== b): a genuine
+    // upstream update must be able to resurrect the note, otherwise it stays
+    // skipped forever. Only treat it as a settled local delete when the hub
+    // copy still matches our base (nothing new upstream).
+    else if (r !== b) plan.toPull.push({ path, reason: "pull_new" });
     else plan.skipped.push({ path, reason: "removed_locally" });
   }
   return plan;

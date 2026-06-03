@@ -67,7 +67,7 @@ export async function runPush(deps: SyncDeps): Promise<RunResult> {
       const raw = await Bun.file(join(deps.vaultPath, item.path)).text();
       const hash = local.get(item.path)!;
       await deps.remote.createNote(item.path, raw, `sync-${hash}`);
-      setBase(deps.db, item.path, hash);
+      setBase(deps.db, item.path, hash, raw); // store base_content for 3-way clash merge
       result.pushed.push(item.path);
     } catch (err) {
       result.failed.push({ path: item.path, error: String(err) });
@@ -97,7 +97,7 @@ export async function runPull(deps: SyncDeps): Promise<RunResult> {
       const raw = await deps.remote.getNoteContent(item.path);
       const hash = remote.get(item.path)!;
       await deps.local.createNote(item.path, raw, `sync-${hash}`);
-      setBase(deps.db, item.path, hash);
+      setBase(deps.db, item.path, hash, raw); // store base_content for 3-way clash merge
       result.pulled.push(item.path);
     } catch (err) {
       result.failed.push({ path: item.path, error: String(err) });
