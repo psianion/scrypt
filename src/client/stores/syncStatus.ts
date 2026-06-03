@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { api } from "../api";
+import { useToastStore } from "./toast";
 
 export type DotState = "clash" | "not_pushed" | "in_sync";
 
@@ -17,7 +18,7 @@ interface SyncStatusStore {
   checkedAt: number | null;
   syncing: boolean;
   refreshLocal: () => Promise<void>;
-  refreshHub: () => Promise<void>;
+  refreshHub: (opts?: { interactive?: boolean }) => Promise<void>;
   runSync: () => Promise<void>;
 }
 
@@ -36,16 +37,33 @@ export const useSyncStatus = create<SyncStatusStore>((set, get) => ({
     } catch { /* local-status never needs the hub; ignore transient errors */ }
   },
 
-  refreshHub: async () => {
-    const res = await api.sync.status();
-    if (!res.ok) { set({ hubReachable: false }); return; }
-    set({
-      hubReachable: true,
-      clashes: new Set(res.clashes),
-      toPull: res.toPull,
-      checkedAt: res.checkedAt,
-      notPushed: new Set(res.notPushed),
-    });
+  refreshHub: async (opts) => {
+    // A thrown 500/network error from /api/sync/status (api.json throws on
+    // non-2xx) used to be an unhandled rejection that left stale state with no
+    // signal. Catch it, mark the hub unreachable, and surface a toast when the
+    // user triggered the check themselves. (F10)
+    try {
+      const res = await api.sync.status();
+      if (!res.ok) {
+        set({ hubReachable: false });
+        if (opts?.interactive) useToastStore.getState().enqueue({ variant: "warn", title: "Hub offline", message: "Couldn't reach the sync hub." });
+        return;
+      }
+      // Coerce every field to its store invariant. A 2xx body from the real hub
+      // always carries these, but a partial/malformed payload must never write
+      // `undefined` into `toPull` — the SyncBar reads `toPull.length` on every
+      // render and would otherwise crash the whole sidebar. (F10)
+      set({
+        hubReachable: true,
+        clashes: new Set(res.clashes ?? []),
+        toPull: Array.isArray(res.toPull) ? res.toPull : [],
+        checkedAt: res.checkedAt ?? null,
+        notPushed: new Set(res.notPushed ?? []),
+      });
+    } catch {
+      set({ hubReachable: false });
+      if (opts?.interactive) useToastStore.getState().enqueue({ variant: "error", title: "Hub check failed", message: "The sync hub returned an error." });
+    }
   },
 
   runSync: async () => {
