@@ -89,6 +89,22 @@ export class Indexer {
       .query("SELECT id, content_hash FROM notes WHERE path = ?")
       .get(path) as { id: number; content_hash: string } | null;
 
+    // Wave 8 / F3: mirror the note into graph_nodes so the TEXT-keyed graph
+    // layer (walked by /api/graph, Louvain, semantic edges) and the sync
+    // hub manifest always have a row carrying the engine's computeContentHash.
+    // This runs BEFORE the unchanged-content early-return below so a re-create
+    // of byte-identical content can never leave graph_nodes.content_hash stale
+    // (e.g. a wrong sha256 written by an upstream create_note upsert).
+    this.db
+      .query(
+        `INSERT INTO graph_nodes (id, kind, note_path, label, content_hash)
+         VALUES (?, 'note', ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET
+           label = excluded.label,
+           content_hash = excluded.content_hash`,
+      )
+      .run(path, path, note.title ?? "", contentHash);
+
     if (existing && existing.content_hash === contentHash) return;
 
     const tagsJson = JSON.stringify(note.tags ?? []);
@@ -129,19 +145,6 @@ export class Indexer {
         (this.db.query("SELECT last_insert_rowid() as id").get() as any).id
       );
     }
-
-    // Wave 8: mirror the note into graph_nodes so the TEXT-keyed graph
-    // layer (walked by /api/graph, /api/graph/*path, Louvain, semantic
-    // edges) always has a row for every note.
-    this.db
-      .query(
-        `INSERT INTO graph_nodes (id, kind, note_path, label, content_hash)
-         VALUES (?, 'note', ?, ?, ?)
-         ON CONFLICT(id) DO UPDATE SET
-           label = excluded.label,
-           content_hash = excluded.content_hash`,
-      )
-      .run(path, path, note.title ?? "", contentHash);
 
     // FTS5 — body is the legacy indexer's responsibility. Metadata + edge
     // reasons get filled in by refreshNoteFts (called from MCP write tools).
