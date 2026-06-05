@@ -12,12 +12,14 @@ import {
 import type { DocType } from "../../vocab/doc-types";
 import { isDocType } from "../../vocab/doc-types";
 import { refreshNoteFts } from "../../indexer/fts-refresh";
+import { isRelType, REL_TYPES } from "../../vocab/rel-types";
 
 interface Input {
   source: string;
   target: string;
   tier: Tier;
   reason?: string;
+  rel_type?: string;
   client_tag: string;
 }
 
@@ -81,6 +83,7 @@ export const addEdgeTool: ToolDef<Input, Output> = {
         enum: [...TIER_VALUES],
       },
       reason: { type: "string" },
+      rel_type: { type: "string", enum: [...REL_TYPES] },
       client_tag: { type: "string" },
     },
     required: ["source", "target", "tier", "client_tag"],
@@ -91,6 +94,12 @@ export const addEdgeTool: ToolDef<Input, Output> = {
         throw new McpError(
           MCP_ERROR.INVALID_PARAMS,
           `invalid tier: ${String(input.tier)}. Allowed: ${TIER_VALUES.join(", ")}`,
+        );
+      }
+      if (input.rel_type !== undefined && !isRelType(input.rel_type)) {
+        throw new McpError(
+          MCP_ERROR.INVALID_PARAMS,
+          `invalid rel_type: ${String(input.rel_type)}. Allowed: ${REL_TYPES.join(", ")}`,
         );
       }
       if (!endpointExists(ctx.db, input.source)) {
@@ -178,14 +187,15 @@ export const addEdgeTool: ToolDef<Input, Output> = {
       const res = ctx.db
         .query(
           `INSERT INTO graph_edges
-             (source, target, tier, reason, client_tag, created_at)
-           VALUES (?, ?, ?, ?, ?, ?)`,
+             (source, target, tier, reason, rel_type, client_tag, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
         )
         .run(
           input.source,
           input.target,
           input.tier,
           input.reason ?? null,
+          input.rel_type ?? null,
           input.client_tag,
           Date.now(),
         );
