@@ -1,6 +1,6 @@
 // tests/server/embeddings/chunker.test.ts
 import { test, expect, describe } from "bun:test";
-import { chunkNote } from "../../../src/server/embeddings/chunker";
+import { chunkNote, CHUNKER_VERSION } from "../../../src/server/embeddings/chunker";
 import { parseStructural } from "../../../src/server/indexer/structural-parse";
 
 const SHORT = `---
@@ -199,5 +199,25 @@ Body D.
     expect(counts.length).toBeGreaterThan(1);
     for (const n of counts) expect(n).toBeLessThanOrEqual(wordBudget);      // max guard
     expect(counts[counts.length - 1]).toBeGreaterThanOrEqual(Math.floor(wordBudget / 2)); // min guard (no tiny tail)
+  });
+
+  test("exposes a chunker_version on every chunk", () => {
+    const parsed = parseStructural("a.md", `---\ntitle: T\n---\n\n## S\n\nbody\n`);
+    const chunks = chunkNote(parsed, { maxTokens: 450, overlapTokens: 50 });
+    expect(chunks.length).toBeGreaterThan(0);
+    for (const c of chunks) {
+      expect(c.chunker_version).toBe(CHUNKER_VERSION);
+      expect(typeof c.chunker_version).toBe("number");
+    }
+  });
+
+  test("content_hash is version-tagged", () => {
+    const parsed = parseStructural("a.md", `---\ntitle: T\n---\n\n## S\n\nbody\n`);
+    const chunk = chunkNote(parsed, { maxTokens: 450, overlapTokens: 50 })[0];
+    const { createHash } = require("crypto");
+    const expected = createHash("sha256")
+      .update(`v${CHUNKER_VERSION}:${chunk.text}`)
+      .digest("hex");
+    expect(chunk.content_hash).toBe(expected);
   });
 });

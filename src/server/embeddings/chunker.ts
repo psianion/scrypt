@@ -31,14 +31,19 @@ export interface ChunkOptions {
 // decide when to split; the embedder's tokenizer does the real thing.
 const APPROX_TOKENS_PER_WORD = 1.3;
 
-const CHUNKER_VERSION = 1;
+// Bump when the chunking algorithm or context-prefix format changes; this
+// is folded into content_hash so a bump forces a global re-embed via the
+// hasFreshChunk fast-path. No schema migration required.
+export const CHUNKER_VERSION = 1;
 
 function approxWordBudget(maxTokens: number): number {
   return Math.max(1, Math.floor(maxTokens / APPROX_TOKENS_PER_WORD));
 }
 
 function hash(text: string): string {
-  return createHash("sha256").update(text).digest("hex");
+  return createHash("sha256")
+    .update(`v${CHUNKER_VERSION}:${text}`)
+    .digest("hex");
 }
 
 function sectionBody(
