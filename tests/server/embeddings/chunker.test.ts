@@ -29,8 +29,46 @@ describe("chunkNote", () => {
     const parsed = parseStructural("a.md", SHORT);
     const chunks = chunkNote(parsed, { maxTokens: 450, overlapTokens: 50 });
     for (const c of chunks) {
-      expect(c.text.startsWith("Short Note\n\n")).toBe(true);
+      expect(c.text.startsWith("Short Note")).toBe(true);
     }
+  });
+
+  const NESTED = `---
+title: Combat Rules
+---
+
+## Attacks
+
+Roll to hit.
+
+### Critical Hits
+
+Double the dice.
+`;
+
+  test("embedded text starts with title + heading breadcrumb", () => {
+    const parsed = parseStructural("combat.md", NESTED);
+    const chunks = chunkNote(parsed, { maxTokens: 450, overlapTokens: 50 });
+    const crit = chunks.find((c) => c.chunk_id === "combat_md:critical-hits")!;
+    expect(crit).toBeDefined();
+    expect(
+      crit.text.startsWith("Combat Rules › Attacks › Critical Hits\n\n"),
+    ).toBe(true);
+  });
+
+  test("top-level section breadcrumb is just the title", () => {
+    const parsed = parseStructural("combat.md", NESTED);
+    const chunks = chunkNote(parsed, { maxTokens: 450, overlapTokens: 50 });
+    const atk = chunks.find((c) => c.chunk_id === "combat_md:attacks")!;
+    expect(atk.text.startsWith("Combat Rules › Attacks\n\n")).toBe(true);
+  });
+
+  test("intro section breadcrumb is the bare title", () => {
+    const intro = `---\ntitle: Combat Rules\n---\n\nPreamble text.\n\n## Attacks\n\nRoll.\n`;
+    const parsed = parseStructural("combat.md", intro);
+    const chunks = chunkNote(parsed, { maxTokens: 450, overlapTokens: 50 });
+    const introChunk = chunks.find((c) => c.chunk_id === "combat_md:h-intro-0")!;
+    expect(introChunk.text.startsWith("Combat Rules\n\n")).toBe(true);
   });
 
   test("long sections split into overlapping sub-chunks with :part_N ids", () => {

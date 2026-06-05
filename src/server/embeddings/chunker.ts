@@ -49,12 +49,39 @@ function isBlank(s: string): boolean {
   return s.replace(/\s+/g, "") === "";
 }
 
+function buildBreadcrumb(
+  parsed: ParsedStructural,
+  section: ParsedSection,
+): string {
+  const trail: string[] = [parsed.title];
+  if (section.level > 0) {
+    const idx = parsed.sections.indexOf(section);
+    const ancestors: string[] = [];
+    let needed = section.level - 1;
+    for (let i = idx - 1; i >= 0 && needed >= 0; i--) {
+      const s = parsed.sections[i];
+      if (s.level > 0 && s.level <= needed + 1 && s.level < section.level) {
+        ancestors.unshift(s.headingText);
+        needed = s.level - 1;
+      }
+    }
+    trail.push(...ancestors, section.headingText);
+  }
+  return trail.join(" › ");
+}
+
+function contextPrefix(
+  parsed: ParsedStructural,
+  section: ParsedSection,
+): string {
+  return `${buildBreadcrumb(parsed, section)}\n\n`;
+}
+
 export function chunkNote(
   parsed: ParsedStructural,
   opts: ChunkOptions,
 ): EmbeddingChunk[] {
   const chunks: EmbeddingChunk[] = [];
-  const titlePrefix = `${parsed.title}\n\n`;
   const wordBudget = approxWordBudget(opts.maxTokens);
   const overlapWords = approxWordBudget(opts.overlapTokens);
   const step = Math.max(1, wordBudget - overlapWords);
@@ -63,9 +90,10 @@ export function chunkNote(
     const body = sectionBody(parsed, section);
     if (isBlank(body)) continue;
 
+    const prefix = contextPrefix(parsed, section);
     const words = body.split(/\s+/).filter((w) => w.length > 0);
     if (words.length <= wordBudget) {
-      const text = titlePrefix + body;
+      const text = prefix + body;
       chunks.push({
         note_path: parsed.notePath,
         chunk_id: section.id,
@@ -82,7 +110,7 @@ export function chunkNote(
     while (cursor < words.length) {
       const slice = words.slice(cursor, cursor + wordBudget).join(" ");
       if (isBlank(slice)) break;
-      const text = titlePrefix + slice;
+      const text = prefix + slice;
       chunks.push({
         note_path: parsed.notePath,
         chunk_id: `${section.id}:part_${part}`,
