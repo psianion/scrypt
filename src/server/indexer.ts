@@ -238,9 +238,11 @@ export class Indexer {
       tagStmt.run(noteId, tag);
     }
 
-    // graph-v2 (G2): wikilink edge production removed. The body is no longer
-    // scanned for [[…]]; backlinks/graph_edges from prose links are gone.
-    // All connections come from add_edge (LLM-curated) or rescan_similarity.
+    // Structural reference edges (spec C2): the body IS scanned for explicit
+    // references — markdown links, [[wikilinks]], see-also, and citations —
+    // which become graph_edges (tier 'mentions', client_tag NULL) via
+    // linkReferenceEdges below. (Cosine similarity edges are produced
+    // separately; curated typed edges come from the add_edge MCP tool.)
 
     // Wave 9: legacy checkbox-based task extraction is dead. Tasks now come
     // from MCP create_task (LLM-decided during ingest, or ad-hoc) against the
@@ -253,8 +255,9 @@ export class Indexer {
     // (md links, wikilinks, see-also, citations) from the body and write
     // them as structural graph_edges (client_tag NULL). clearNoteRelations
     // already deleted this note's prior NULL-client_tag edges above, so this
-    // regenerates them on every reindex; UNIQUE(source,target,tier) +
-    // INSERT OR IGNORE keep it idempotent.
+    // regenerates them on every content-changed reindex (fullReindex zeroes
+    // hashes so both passes run); UNIQUE(source,target,tier) + INSERT OR
+    // IGNORE keep it idempotent.
     this.linkReferenceEdges(note.path, note.content);
 
     if (this.wave8) {

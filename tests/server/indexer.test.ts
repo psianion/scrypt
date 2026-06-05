@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { createDatabase, initSchema } from "../../src/server/db";
 import { FileManager } from "../../src/server/file-manager";
 import { Indexer } from "../../src/server/indexer";
+import { extractReferenceTargets } from "../../src/server/indexer/reference-links";
 import type { Database } from "bun:sqlite";
 
 let vaultPath: string;
@@ -278,6 +279,10 @@ describe("reference linker", () => {
       "---\ntitle: Dangling\n---\nSee [Ghost](notes/ghost.md).",
     );
     await indexer.reindexNote("notes/dangling.md");
+
+    // sanity: the link was recognized; the edge is absent only because the
+    // target note does not exist (resolveLink returns null).
+    expect(extractReferenceTargets("See [Ghost](notes/ghost.md).")).toHaveLength(1);
 
     const count = (
       db
