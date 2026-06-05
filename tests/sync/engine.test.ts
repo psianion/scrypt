@@ -7,7 +7,7 @@ import { initSchema } from "../../src/server/db";
 import { FileManager } from "../../src/server/file-manager";
 import { computeContentHash } from "../../src/server/sync/content-hash";
 import { setBase, loadBase } from "../../src/server/sync/state";
-import { runStatus, runPush, runPull, type SyncDeps } from "../../src/server/sync/engine";
+import { runStatus, runPush, runPull, localHashes, type SyncDeps } from "../../src/server/sync/engine";
 
 let vaultDir: string;
 let db: Database;
@@ -150,4 +150,14 @@ test("pull does NOT call rescan_similarity (recalibration is createNote → rein
   await runPull(deps);
   expect(local.rescans.length).toBe(0);
   expect(local.created.map((c) => c.path)).toEqual(["b.md"]);
+});
+
+test("localHashes excludes _index.md (per-instance derived artifact, must not sync)", async () => {
+  writeNote("projects/p/notes/a.md", "hello");
+  writeNote("projects/p/_index.md", "---\ntitle: index\n---\ngenerated");
+  const hashes = await localHashes(fm);
+  // Normal note is present
+  expect(hashes.has("projects/p/notes/a.md")).toBe(true);
+  // _index.md is excluded regardless of directory depth
+  expect(hashes.has("projects/p/_index.md")).toBe(false);
 });

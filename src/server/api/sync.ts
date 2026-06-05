@@ -72,11 +72,15 @@ export function syncRoutes(
   makeHub: HubFactory = (u, t) => new HubClient(u, t),
 ): void {
   router.get("/api/sync/manifest", () => {
+    // Exclude _index.md: it is a per-instance derived artifact regenerated on
+    // every reindex with a fresh `modified` timestamp. Syncing it would cause
+    // perpetual clashes between machines that each regenerate it independently.
     const rows = db
       .query(
         `SELECT note_path AS path, content_hash AS hash
          FROM graph_nodes
-         WHERE kind = 'note' AND note_path IS NOT NULL AND content_hash IS NOT NULL`,
+         WHERE kind = 'note' AND note_path IS NOT NULL AND content_hash IS NOT NULL
+           AND note_path NOT LIKE '%/_index.md' AND note_path != '_index.md'`,
       )
       .all() as { path: string; hash: string }[];
     return Response.json({

@@ -32,6 +32,10 @@ export async function localHashes(fm: FileManager): Promise<Map<string, string>>
   const metas = await fm.listNotes();
   const map = new Map<string, string>();
   for (const meta of metas) {
+    // _index.md is a per-instance derived artifact regenerated locally on every
+    // reindex. Its content_hash always differs between instances (fresh `modified`
+    // timestamp), so it would perpetually clash. Exclude it from sync entirely.
+    if (meta.path === "_index.md" || meta.path.endsWith("/_index.md")) continue;
     const note = await fm.readNote(meta.path);
     if (note) {
       map.set(meta.path, computeContentHash(note.frontmatter, note.content));
