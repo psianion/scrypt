@@ -219,5 +219,8 @@ Body D.
       .update(`v${CHUNKER_VERSION}:${chunk.text}`)
       .digest("hex");
     expect(chunk.content_hash).toBe(expected);
+    expect(chunk.content_hash).not.toBe(
+      createHash("sha256").update(chunk.text).digest("hex"),
+    );
   });
 });

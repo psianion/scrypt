@@ -15,7 +15,9 @@ export interface EmbeddingChunk {
   chunk_id: string;
   text: string;
   display_text: string;
-  // provisional 0 — Task 5 exports CHUNKER_VERSION and adds the DB column
+  /** Snapshot of CHUNKER_VERSION at chunk creation; a re-embed is triggered
+   *  automatically when content_hash (which encodes the version) no longer
+   *  matches the stored hash — no schema column needed. */
   chunker_version: number;
   start_line: number;
   end_line: number;
