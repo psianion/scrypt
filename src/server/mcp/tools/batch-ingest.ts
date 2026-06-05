@@ -20,11 +20,7 @@ import { createHash } from "node:crypto";
 import { parseStructural } from "../../indexer/structural-parse";
 import type { ToolDef } from "../types";
 import type { Database } from "bun:sqlite";
-import {
-  findSimilarPairs,
-  upsertSemanticEdges,
-  getSimilarityThreshold,
-} from "../../graph/semantic-similarity";
+// semantic-similarity: findSimilarPairs/upsertSemanticEdges removed (ingestion rework C3)
 import { DOC_TYPES, isDocType, type DocType } from "../../vocab/doc-types";
 import { buildVaultPath } from "../../path/vault-path";
 import { parseFrontmatter, stringifyFrontmatter } from "../../parsers";
@@ -57,7 +53,6 @@ interface Output {
   skipped: number;
   errored: number;
   total_chunks: number;
-  similarity_edges_created: number;
   files: FileResult[];
 }
 
@@ -121,20 +116,10 @@ function upsertNode(
   ).run(notePath, title, notePath, contentHash);
 }
 
-function allEmbeddedPaths(db: Database, model: string): string[] {
-  return (
-    db
-      .query<{ note_path: string }, [string]>(
-        `SELECT DISTINCT note_path FROM note_chunk_embeddings WHERE model = ?`,
-      )
-      .all(model)
-  ).map((r) => r.note_path);
-}
-
 export const batchIngestTool: ToolDef<Input, Output> = {
   name: "batch_ingest",
   description:
-    "Bulk-ingest .md files into projects/<project>/<doc_type>/<slug>.md. Writes each file with a project-first ingest-v3 frontmatter block, embeds content, then creates similarity edges between notes.",
+    "Bulk-ingest .md files into projects/<project>/<doc_type>/<slug>.md. Writes each file with a project-first ingest-v3 frontmatter block and embeds content.",
   inputSchema: {
     type: "object",
     properties: {
@@ -188,7 +173,6 @@ export const batchIngestTool: ToolDef<Input, Output> = {
       ? input.doc_type
       : "research";
     const batchSize = input.batch_size ?? 25;
-    const minSim = input.min_similarity ?? getSimilarityThreshold();
     const model =
       process.env.SCRYPT_EMBED_MODEL ?? "Xenova/bge-small-en-v1.5";
 
@@ -332,18 +316,9 @@ export const batchIngestTool: ToolDef<Input, Output> = {
       }
     }
 
-    // Compute semantically_related edges scoped to the newly-ingested notes
-    // (so we don't re-score the entire vault every batch). At least one side
-    // of every emitted pair will be a freshly-ingested note.
-    let simEdges = 0;
-    if (newPaths.size > 0) {
-      const allPaths = allEmbeddedPaths(ctx.db, model);
-      const pairs = findSimilarPairs(ctx.db, allPaths, model, {
-        minSimilarity: minSim,
-        scopedTo: newPaths,
-      });
-      simEdges = upsertSemanticEdges(ctx.db, pairs);
-    }
+    // Cosine is off-graph (ingestion rework C3): batch_ingest no longer
+    // writes semantically_related edges. Related suggestions are surfaced
+    // by relatedSuggestions() / the index generator instead.
 
     ctx.scheduleGraphRebuild();
 
@@ -353,7 +328,6 @@ export const batchIngestTool: ToolDef<Input, Output> = {
       skipped,
       errored,
       total_chunks: totalChunks,
-      similarity_edges_created: simEdges,
       files: results,
     };
   },
