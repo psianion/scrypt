@@ -289,12 +289,12 @@ test("IndexNoteScheduler coalesces rapid schedules for the same project into one
   const fm = new FileManager(vault, join(vault, ".scrypt"));
   const metadata = new MetadataRepo(db);
   let writes = 0;
-  const sched = new IndexNoteScheduler({ db, metadata, fm }, { debounceMs: 30 });
+  const sched = new IndexNoteScheduler({ db, metadata, fm }, { debounceMs: 15 });
   sched.onWrite = () => { writes += 1; };
   sched.schedule("scrypt");
   sched.schedule("scrypt");
   sched.schedule("scrypt");
-  await wait(80);
+  await wait(200);
   expect(writes).toBe(1);
   expect(readFileSync(join(vault, "projects/scrypt/_index.md"), "utf8")).toContain("kind: index");
   rmSync(vault, { recursive: true, force: true });
@@ -311,12 +311,112 @@ test("IndexNoteScheduler tracks distinct projects independently", async () => {
   );
   const fm = new FileManager(vault, join(vault, ".scrypt"));
   const metadata = new MetadataRepo(db);
-  const sched = new IndexNoteScheduler({ db, metadata, fm }, { debounceMs: 20 });
+  const sched = new IndexNoteScheduler({ db, metadata, fm }, { debounceMs: 15 });
   sched.schedule("scrypt");
   sched.schedule("dnd");
-  await wait(70);
+  await wait(200);
   expect(existsSync(join(vault, "projects/scrypt/_index.md"))).toBe(true);
   expect(existsSync(join(vault, "projects/dnd/_index.md"))).toBe(true);
+  rmSync(vault, { recursive: true, force: true });
+});
+
+test("IndexNoteScheduler single-flight: a mid-flight schedule chains one follow-up after the first resolves", async () => {
+  const vault = mkdtempSync(join(tmpdir(), "rework-sched3-"));
+  const db = new Database(":memory:");
+  initSchema(db);
+  db.run(
+    `INSERT INTO notes (path, title, project, doc_type)
+     VALUES ('projects/scrypt/spec/a.md','A','scrypt','spec')`,
+  );
+  const metadata = new MetadataRepo(db);
+  // Wrap a real FileManager and make writeNote artificially slow so the first
+  // regen is still in flight when we issue the second schedule().
+  const realFm = new FileManager(vault, join(vault, ".scrypt"));
+  let inFlight = 0;
+  let maxConcurrent = 0;
+  const order: string[] = [];
+  const slowFm = {
+    writeNote: async (
+      path: string,
+      content: string,
+      frontmatter?: Record<string, unknown>,
+    ) => {
+      inFlight += 1;
+      maxConcurrent = Math.max(maxConcurrent, inFlight);
+      order.push("start");
+      await wait(40);
+      await realFm.writeNote(path, content, frontmatter);
+      order.push("end");
+      inFlight -= 1;
+    },
+  } as unknown as FileManager;
+
+  let writes = 0;
+  const sched = new IndexNoteScheduler(
+    { db, metadata, fm: slowFm },
+    { debounceMs: 5 },
+  );
+  sched.onWrite = () => { writes += 1; };
+
+  sched.schedule("scrypt");
+  // Wait past the debounce so flush() fires and the slow write is in flight.
+  await wait(20);
+  expect(inFlight).toBe(1);
+  // Mid-flight schedule → must land on the pending path, not start a 2nd write.
+  sched.schedule("scrypt");
+  expect(inFlight).toBe(1);
+
+  await wait(200);
+  // Exactly two completed writes, never concurrent, 2nd started after 1st ended.
+  expect(writes).toBe(2);
+  expect(maxConcurrent).toBe(1);
+  expect(order).toEqual(["start", "end", "start", "end"]);
+  rmSync(vault, { recursive: true, force: true });
+});
+
+test("IndexNoteScheduler clears running after a failed write so the project isn't stuck", async () => {
+  const vault = mkdtempSync(join(tmpdir(), "rework-sched4-"));
+  const db = new Database(":memory:");
+  initSchema(db);
+  db.run(
+    `INSERT INTO notes (path, title, project, doc_type)
+     VALUES ('projects/scrypt/spec/a.md','A','scrypt','spec')`,
+  );
+  const metadata = new MetadataRepo(db);
+  const realFm = new FileManager(vault, join(vault, ".scrypt"));
+  let calls = 0;
+  const flakyFm = {
+    writeNote: async (
+      path: string,
+      content: string,
+      frontmatter?: Record<string, unknown>,
+    ) => {
+      calls += 1;
+      if (calls === 1) throw new Error("disk full (simulated)");
+      await realFm.writeNote(path, content, frontmatter);
+    },
+  } as unknown as FileManager;
+
+  let writes = 0;
+  const sched = new IndexNoteScheduler(
+    { db, metadata, fm: flakyFm },
+    { debounceMs: 5 },
+  );
+  sched.onWrite = () => { writes += 1; };
+
+  // First schedule → writeNote rejects → flush catch fires, onWrite NOT called.
+  sched.schedule("scrypt");
+  await wait(60);
+  expect(calls).toBe(1);
+  expect(writes).toBe(0);
+  expect(existsSync(join(vault, "projects/scrypt/_index.md"))).toBe(false);
+
+  // A subsequent schedule must still produce a write (running cleared in finally).
+  sched.schedule("scrypt");
+  await wait(60);
+  expect(calls).toBe(2);
+  expect(writes).toBe(1);
+  expect(existsSync(join(vault, "projects/scrypt/_index.md"))).toBe(true);
   rmSync(vault, { recursive: true, force: true });
 });
 

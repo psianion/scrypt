@@ -238,8 +238,11 @@ export interface IndexNoteResult {
 
 /**
  * Collect → render → write projects/<project>/_index.md. The whole body is
- * regenerated every call; there is no merge with prior content (the header
- * declares the file generated). Idempotent: same DB state ⇒ same body.
+ * regenerated every call (no merge with prior content — the header declares
+ * the file generated). BODY-idempotent: identical DB state ⇒ identical body.
+ * NOTE: the file itself is NOT byte-stable across calls — writeNote re-stamps
+ * the frontmatter `modified` timestamp each time, so a content-hash of the
+ * whole file will differ per regen (relevant to sync — handled in Phase 9).
  */
 export async function generateProjectIndex(
   deps: IndexGenDeps,
