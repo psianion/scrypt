@@ -3,7 +3,7 @@ import { test, expect, describe } from "bun:test";
 import { extractReferenceTargets } from "../../../src/server/indexer/reference-links";
 
 describe("extractReferenceTargets", () => {
-  test("internal markdown link → reference target (path stripped of .md)", () => {
+  test("internal markdown link → raw path preserved (no .md strip)", () => {
     const body = "Background in [the spec](projects/dnd/spec/world.md).";
     const out = extractReferenceTargets(body);
     expect(out).toContainEqual({ raw: "projects/dnd/spec/world.md", reason: "reference" });
@@ -44,5 +44,15 @@ describe("extractReferenceTargets", () => {
     const out = extractReferenceTargets(body);
     expect(out).toHaveLength(1);
     expect(out[0]).toEqual({ raw: "notes/a.md", reason: "reference" });
+  });
+
+  test("ignores image embeds", () => {
+    const out = extractReferenceTargets("![banner](assets/banner.png) and [real](notes/r.md)");
+    expect(out.map((t) => t.raw)).toEqual(["notes/r.md"]);
+  });
+
+  test("strips in-note anchor from the target path", () => {
+    const out = extractReferenceTargets("Jump to [Combat](notes/rules.md#combat).");
+    expect(out).toContainEqual({ raw: "notes/rules.md", reason: "reference" });
   });
 });

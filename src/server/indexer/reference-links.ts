@@ -10,12 +10,19 @@ export interface ReferenceTarget {
   reason: "reference" | "cites";
 }
 
-// [label](target) where target is not an external URL and not an anchor.
-const MD_LINK_RE = /\[[^\]]*\]\(([^)\s]+)\)/g;
+// [label](target) — NOT an image embed (![...]) and not an external URL/anchor.
+const MD_LINK_RE = /(?<!!)\[[^\]]*\]\(([^)\s]+)\)/g;
 // [[Target]] or [[Target|alias]] — wikilink, target is the left side.
 const WIKILINK_RE = /\[\[([^\]|#]+)(?:[|#][^\]]*)?\]\]/g;
 // A heading line that opens a citation context.
 const CITES_HEADING_RE = /^#{1,6}\s+(references|sources|citations|bibliography)\s*$/i;
+
+// Known, accepted limitations (deferred — NOT implemented here). Downstream
+// resolveLink filters non-note targets, so the worst case is a *missed* edge,
+// never a spurious one:
+//   - tilde `~~~` fences are not stripped by stripFences (only ``` fences are);
+//   - an unterminated ``` fence drops the remainder of the note;
+//   - markdown title attributes `[x](p "t")` are not matched by MD_LINK_RE.
 
 function isExternal(target: string): boolean {
   return (
@@ -57,8 +64,9 @@ export function extractReferenceTargets(body: string): ReferenceTarget[] {
 
     for (const m of ln.matchAll(MD_LINK_RE)) {
       const target = m[1];
-      if (isExternal(target)) continue;
-      add(target, inCites ? "cites" : "reference");
+      if (isExternal(target)) continue; // catches bare "#anchor"
+      const bare = target.split("#")[0]; // drop in-note anchor
+      add(bare, inCites ? "cites" : "reference");
     }
     for (const m of ln.matchAll(WIKILINK_RE)) {
       add(m[1], inCites ? "cites" : "reference");
