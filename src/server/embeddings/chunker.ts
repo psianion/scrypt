@@ -2,8 +2,8 @@
 //
 // Turns a ParsedStructural into EmbeddingChunk records ready for the
 // embedder. One primary chunk per section; long sections split into
-// overlapping sub-chunks. Every chunk text is prefixed with the note
-// title so short chunks retain whole-note context.
+// overlapping sub-chunks. Every chunk text is prefixed with a title →
+// heading breadcrumb so short chunks retain whole-note context.
 import { createHash } from "crypto";
 import type {
   ParsedStructural,
@@ -57,12 +57,12 @@ function buildBreadcrumb(
   if (section.level > 0) {
     const idx = parsed.sections.indexOf(section);
     const ancestors: string[] = [];
-    let needed = section.level - 1;
-    for (let i = idx - 1; i >= 0 && needed >= 0; i--) {
+    let wantLevel = section.level - 1; // next-shallower ancestor still needed
+    for (let i = idx - 1; i >= 0 && wantLevel >= 1; i--) {
       const s = parsed.sections[i];
-      if (s.level > 0 && s.level <= needed + 1 && s.level < section.level) {
+      if (s.level > 0 && s.level <= wantLevel) {
         ancestors.unshift(s.headingText);
-        needed = s.level - 1;
+        wantLevel = s.level - 1;
       }
     }
     trail.push(...ancestors, section.headingText);

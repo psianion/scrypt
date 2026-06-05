@@ -29,7 +29,7 @@ describe("chunkNote", () => {
     const parsed = parseStructural("a.md", SHORT);
     const chunks = chunkNote(parsed, { maxTokens: 450, overlapTokens: 50 });
     for (const c of chunks) {
-      expect(c.text.startsWith("Short Note")).toBe(true);
+      expect(c.text.startsWith("Short Note ›")).toBe(true);
     }
   });
 
@@ -69,6 +69,35 @@ Double the dice.
     const chunks = chunkNote(parsed, { maxTokens: 450, overlapTokens: 50 });
     const introChunk = chunks.find((c) => c.chunk_id === "combat_md:h-intro-0")!;
     expect(introChunk.text.startsWith("Combat Rules\n\n")).toBe(true);
+  });
+
+  const SIBLINGS = `---
+title: Manual
+---
+
+## Chapter A
+
+Intro A.
+
+### Section B
+
+Body B.
+
+## Chapter C
+
+Intro C.
+
+### Section D
+
+Body D.
+`;
+
+  test("breadcrumb uses the real ancestor, not a same-level sibling", () => {
+    const parsed = parseStructural("manual.md", SIBLINGS);
+    const chunks = chunkNote(parsed, { maxTokens: 450, overlapTokens: 50 });
+    const d = chunks.find((c) => c.chunk_id === "manual_md:section-d")!;
+    expect(d).toBeDefined();
+    expect(d.text.startsWith("Manual › Chapter C › Section D\n\n")).toBe(true);
   });
 
   test("long sections split into overlapping sub-chunks with :part_N ids", () => {
