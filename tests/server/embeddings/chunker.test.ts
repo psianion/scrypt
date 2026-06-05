@@ -127,4 +127,20 @@ Body D.
     const b = chunkNote(parsed, { maxTokens: 450, overlapTokens: 50 });
     expect(a.map((c) => c.content_hash)).toEqual(b.map((c) => c.content_hash));
   });
+
+  test("content_hash changes when the note title changes", () => {
+    const a = parseStructural("x.md", `---\ntitle: Alpha\n---\n\n## S\n\nbody text\n`);
+    const b = parseStructural("x.md", `---\ntitle: Bravo\n---\n\n## S\n\nbody text\n`);
+    const ha = chunkNote(a, { maxTokens: 450, overlapTokens: 50 })[0].content_hash;
+    const hb = chunkNote(b, { maxTokens: 450, overlapTokens: 50 })[0].content_hash;
+    expect(ha).not.toBe(hb);
+  });
+
+  test("content_hash changes when an ancestor heading changes", () => {
+    const a = parseStructural("y.md", `## Attacks\n\nx\n\n### Crit\n\nbody text\n`);
+    const b = parseStructural("y.md", `## Defense\n\nx\n\n### Crit\n\nbody text\n`);
+    const ca = chunkNote(a, { maxTokens: 450, overlapTokens: 50 }).find((c) => c.chunk_id === "y_md:crit")!;
+    const cb = chunkNote(b, { maxTokens: 450, overlapTokens: 50 }).find((c) => c.chunk_id === "y_md:crit")!;
+    expect(ca.content_hash).not.toBe(cb.content_hash);
+  });
 });
