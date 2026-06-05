@@ -1,8 +1,9 @@
 // src/server/mcp/tools/rescan-similarity.ts
 //
-// Idempotent semantic-similarity scan over an arbitrary subset of notes.
-// Useful after a single create_note ingest where the skill wants new edges
-// without paying the full batch_ingest cost. Spec §4.2 step 3.
+// Semantic-similarity scan over an arbitrary subset of notes. Returns ranked
+// cosine candidate pairs (off-graph) — it writes NO graph edges. Useful after
+// a single create_note ingest where the skill wants ranked similarity
+// candidates without paying the full batch_ingest cost. Spec §4.2 step 3.
 import { McpError, MCP_ERROR } from "../errors";
 import type { ToolDef } from "../types";
 import {

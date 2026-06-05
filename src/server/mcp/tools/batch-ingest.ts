@@ -35,7 +35,6 @@ interface Input {
   /** ingest-v3: doc_type bucket under the project. Defaults to "research". */
   doc_type?: DocType;
   batch_size?: number;
-  min_similarity?: number;
   client_tag: string;
 }
 
@@ -143,11 +142,6 @@ export const batchIngestTool: ToolDef<Input, Output> = {
         description: "doc_type bucket under the project (default: research).",
       },
       batch_size: { type: "number", description: "Files per yield (default: 25)" },
-      min_similarity: {
-        type: "number",
-        description:
-          "Cosine threshold for semantically_related edges. Default: SCRYPT_SIMILARITY_THRESHOLD env (0.78 if unset).",
-      },
       client_tag: {
         type: "string",
         description:

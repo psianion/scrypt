@@ -86,6 +86,19 @@ describe("rescan_similarity tool", () => {
     expect(edgeCount?.n).toBe(0);
   });
 
+  test("pairs are ranked by descending score when several exceed threshold", async () => {
+    // Three notes whose pairwise cosines are all > 0.5 but distinct, so the
+    // returned ordering is observable: a·b > b·c > a·c.
+    seedNote(ctx.db, "a.md", [1, 0, 0]);
+    seedNote(ctx.db, "b.md", [0.9, 0.1, 0]);
+    seedNote(ctx.db, "c.md", [0.6, 0.8, 0]);
+    const r = await rescanSimilarityTool.handler(ctx, { min_similarity: 0.5, model: MODEL }, "c");
+    expect(r.pairs.length).toBeGreaterThanOrEqual(2);
+    for (let i = 1; i < r.pairs.length; i++) {
+      expect(r.pairs[i - 1].score).toBeGreaterThanOrEqual(r.pairs[i].score);
+    }
+  });
+
   test("scopedTo paths restricts emitted pairs", async () => {
     seedNote(ctx.db, "a.md", [1, 0, 0]);
     seedNote(ctx.db, "b.md", [1, 0, 0]);
