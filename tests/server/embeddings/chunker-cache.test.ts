@@ -40,6 +40,7 @@ describe("chunker cache parity", () => {
     const raw = `---\ntitle: T\n---\n\n## S\n\nbody text\n`;
     seed(raw);
     const again = chunkNote(parseStructural("n.md", raw), { maxTokens: 450, overlapTokens: 50 });
+    expect(again.length).toBeGreaterThan(0);
     for (const c of again) {
       expect(repo.hasFreshChunk(c.note_path, c.chunk_id, MODEL, c.content_hash)).toBe(true);
     }
