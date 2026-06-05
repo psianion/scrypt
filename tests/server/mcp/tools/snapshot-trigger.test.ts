@@ -217,10 +217,11 @@ describe("MCP write tools trigger snapshot rebuild", () => {
     expect(h.spy.scheduleCalls.length).toBeGreaterThanOrEqual(1);
   });
 
-  test("rescan_similarity schedules a rebuild", async () => {
-    // The schedule() call lives after an early-return for fewer than 2
-    // embedded notes — so we must seed two real embeddings via the repo
-    // (it owns the BLOB packing for `vector`).
+  test("rescan_similarity does NOT schedule a rebuild (off-graph, writes no edges)", async () => {
+    // rescan_similarity is off-graph (C3): it returns ranked candidate pairs
+    // and writes no graph edges, so it must never trigger a graph rebuild.
+    // We still seed two real embeddings to prove rescan actually runs (it has
+    // an early-return guard for <2 embedded notes) and still stays silent.
     const model = "test-model";
     process.env.SCRYPT_EMBED_MODEL = model;
     const insertNode = h.db.prepare(
@@ -258,7 +259,7 @@ describe("MCP write tools trigger snapshot rebuild", () => {
       { min_similarity: 0.5, model },
       "corr-rescan",
     );
-    expect(h.spy.scheduleCalls.length).toBeGreaterThanOrEqual(1);
+    expect(h.spy.scheduleCalls.length).toBe(0);
   });
 
   test("cluster_graph schedules a rebuild", async () => {
