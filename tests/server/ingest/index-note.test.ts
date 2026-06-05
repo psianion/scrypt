@@ -121,6 +121,11 @@ import { Database } from "bun:sqlite";
 import { initSchema } from "../../../src/server/db";
 import { MetadataRepo } from "../../../src/server/indexer/metadata-repo";
 import { collectProjectEntries } from "../../../src/server/ingest/index-note";
+import { mkdtempSync, readFileSync, rmSync, existsSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { FileManager } from "../../../src/server/file-manager";
+import { generateProjectIndex } from "../../../src/server/ingest/index-note";
 
 test("collectProjectEntries gathers notes, summaries, and meaningful edges for a project", () => {
   const db = new Database(":memory:");
@@ -205,3 +210,62 @@ test("collectProjectEntries tolerates a graph_edges table without rel_type (labe
     { target: "projects/scrypt/plan/b.md", label: "builds_on" },
   ]);
 });
+
+// ---------------------------------------------------------------------------
+// Task 28: generateProjectIndex
+// ---------------------------------------------------------------------------
+
+test("generateProjectIndex writes _index.md and is byte-stable on re-run (idempotent body)", async () => {
+  const vault = mkdtempSync(join(tmpdir(), "rework-idx-"));
+  const db = new Database(":memory:");
+  initSchema(db);
+  db.run(
+    `INSERT INTO notes (path, title, project, doc_type) VALUES
+      ('projects/scrypt/spec/a.md','A','scrypt','spec'),
+      ('projects/scrypt/plan/b.md','B','scrypt','plan')`,
+  );
+  const metadata = new MetadataRepo(db);
+  metadata.upsert("projects/scrypt/spec/a.md", { summary: "First." });
+  const fm = new FileManager(vault, join(vault, ".scrypt"));
+
+  const res = await generateProjectIndex({ db, metadata, fm }, "scrypt");
+  expect(res.written).toBe(true);
+  expect(res.vaultPath).toBe("projects/scrypt/_index.md");
+  expect(res.noteCount).toBe(2);
+
+  const raw1 = readFileSync(join(vault, "projects/scrypt/_index.md"), "utf8");
+  expect(raw1).toContain("kind: index");
+  expect(raw1).toContain("## plan");
+  expect(raw1).toContain("[A](spec/a.md) — First.");
+
+  await generateProjectIndex({ db, metadata, fm }, "scrypt");
+  const raw2 = readFileSync(join(vault, "projects/scrypt/_index.md"), "utf8");
+  const bodyOf = (s: string) => s.slice(s.indexOf("\n---\n", 4) + 5);
+  expect(bodyOf(raw2)).toBe(bodyOf(raw1));
+
+  rmSync(vault, { recursive: true, force: true });
+});
+
+test("regeneration after a hand edit overwrites it — nothing hand-written survives", async () => {
+  const vault = mkdtempSync(join(tmpdir(), "rework-idx2-"));
+  const db = new Database(":memory:");
+  initSchema(db);
+  db.run(
+    `INSERT INTO notes (path, title, project, doc_type)
+     VALUES ('projects/scrypt/spec/a.md','A','scrypt','spec')`,
+  );
+  const fm = new FileManager(vault, join(vault, ".scrypt"));
+  const metadata = new MetadataRepo(db);
+  await generateProjectIndex({ db, metadata, fm }, "scrypt");
+
+  const p = join(vault, "projects/scrypt/_index.md");
+  const tampered = readFileSync(p, "utf8") + "\nHAND EDIT\n";
+  await Bun.write(p, tampered);
+  await generateProjectIndex({ db, metadata, fm }, "scrypt");
+
+  const after = readFileSync(p, "utf8");
+  expect(after).not.toContain("HAND EDIT");
+  expect(after).toContain("do not edit");
+  rmSync(vault, { recursive: true, force: true });
+});
+

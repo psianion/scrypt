@@ -6,7 +6,7 @@
 // every run. Pure renderer (renderIndexNote) is split from the I/O collector
 // (collectProjectEntries) and orchestrator (generateProjectIndex) so the
 // markdown shaping is unit-testable.
-import { stringifyFrontmatter } from "../parsers";
+import { stringifyFrontmatter, parseFrontmatter } from "../parsers";
 import type { DocType } from "../vocab/doc-types";
 import type { Database } from "bun:sqlite";
 import type { MetadataRepo } from "../indexer/metadata-repo";
@@ -224,3 +224,35 @@ export function collectProjectEntries(
     };
   });
 }
+
+// ---------------------------------------------------------------------------
+// Task 28: generateProjectIndex
+// ---------------------------------------------------------------------------
+
+export interface IndexNoteResult {
+  project: string;
+  vaultPath: string;
+  written: boolean;
+  noteCount: number;
+}
+
+/**
+ * Collect → render → write projects/<project>/_index.md. The whole body is
+ * regenerated every call; there is no merge with prior content (the header
+ * declares the file generated). Idempotent: same DB state ⇒ same body.
+ */
+export async function generateProjectIndex(
+  deps: IndexGenDeps,
+  project: string,
+): Promise<IndexNoteResult> {
+  if (!deps.fm) throw new Error("generateProjectIndex requires deps.fm");
+  const entries = collectProjectEntries(deps, project);
+  const rendered = renderIndexNote(project, entries);
+  const vaultPath = `projects/${project}/_index.md`;
+  // renderIndexNote returns a full stringified note (frontmatter + body).
+  // writeNote wants (path, bodyOnly, frontmatterObject) — parse them apart.
+  const { frontmatter, body } = parseFrontmatter(rendered);
+  await deps.fm.writeNote(vaultPath, body, frontmatter);
+  return { project, vaultPath, written: true, noteCount: entries.length };
+}
+
