@@ -7,6 +7,7 @@ import {
   extractTags,
 } from "./parsers";
 import { parseStructural } from "./indexer/structural-parse";
+import { extractReferenceTargets } from "./indexer/reference-links";
 import { computeContentHash } from "./sync/content-hash";
 import type { SectionsRepo } from "./indexer/sections-repo";
 import type { EmbedderLike } from "./embeddings/service";
@@ -248,6 +249,14 @@ export class Indexer {
 
     this.writeLinkIndexRows(note.path, note.title ?? "");
 
+    // Spec C2: deterministic reference edges. Extract explicit references
+    // (md links, wikilinks, see-also, citations) from the body and write
+    // them as structural graph_edges (client_tag NULL). clearNoteRelations
+    // already deleted this note's prior NULL-client_tag edges above, so this
+    // regenerates them on every reindex; UNIQUE(source,target,tier) +
+    // INSERT OR IGNORE keep it idempotent.
+    this.linkReferenceEdges(note.path, note.content);
+
     if (this.wave8) {
       const raw = await this.fm.readRaw(path);
       if (raw !== null) {
@@ -462,6 +471,26 @@ export class Indexer {
     // Wave 9: tasks are no longer joined to notes via note_id. They live
     // standalone in the new tasks schema and are managed via MCP tools.
     this.db.query("DELETE FROM aliases WHERE note_id = ?").run(noteId);
+  }
+
+  private linkReferenceEdges(sourcePath: string, body: string): void {
+    const targets = extractReferenceTargets(body);
+    if (targets.length === 0) return;
+
+    const insert = this.db.query(
+      `INSERT OR IGNORE INTO graph_edges
+         (source, target, tier, weight, reason, client_tag, created_at)
+       VALUES (?, ?, 'mentions', NULL, ?, NULL, ?)`,
+    );
+    const now = Date.now();
+    const seenTargets = new Set<string>();
+    for (const t of targets) {
+      const resolved = this.resolveLink(t.raw);
+      if (!resolved || resolved === sourcePath) continue;
+      if (seenTargets.has(resolved)) continue;
+      seenTargets.add(resolved);
+      insert.run(sourcePath, resolved, t.reason, now);
+    }
   }
 
   private resolveLink(target: string): string | null {
