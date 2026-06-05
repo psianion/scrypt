@@ -55,6 +55,33 @@ test("groups the ToC by doc_type with markdown links and 1-line summaries", () =
   expect(md).not.toContain("ingest-plan.md) —");
 });
 
+test("a null doc_type lands in an 'other' group that sorts after named groups", () => {
+  const withUntyped: IndexNoteEntry[] = [
+    {
+      path: "projects/scrypt/spec/typed.md",
+      title: "Typed",
+      summary: null,
+      doc_type: "spec",
+      related: [],
+      links: [],
+    },
+    {
+      path: "projects/scrypt/misc/loose.md",
+      title: "Loose",
+      summary: null,
+      doc_type: null,
+      related: [],
+      links: [],
+    },
+  ];
+  const md = renderIndexNote("scrypt", withUntyped);
+  const specIdx = md.indexOf("## spec");
+  const otherIdx = md.indexOf("## other");
+  expect(specIdx).toBeGreaterThan(-1);
+  expect(otherIdx).toBeGreaterThan(specIdx);
+  expect(md).toContain("- [Loose](misc/loose.md)");
+});
+
 test("renders a Links section listing each note's meaningful edges", () => {
   const withLinks: IndexNoteEntry[] = [
     {
@@ -127,6 +154,53 @@ test("collectProjectEntries gathers notes, summaries, and meaningful edges for a
   const a = entries.find((e) => e.path === "projects/scrypt/spec/a.md")!;
   expect(a.summary).toBe("First spec.");
   expect(a.doc_type).toBe("spec");
+  expect(a.links).toEqual([
+    { target: "projects/scrypt/plan/b.md", label: "builds_on" },
+  ]);
+});
+
+test("collectProjectEntries tolerates a graph_edges table without rel_type (label falls back to reason)", () => {
+  const db = new Database(":memory:");
+  // Minimal raw schema WITHOUT rel_type — exercises the NULL AS rel_type
+  // branch (initSchema would always add rel_type via wave11).
+  db.run(
+    `CREATE TABLE notes (
+       id INTEGER PRIMARY KEY, path TEXT UNIQUE NOT NULL, title TEXT,
+       project TEXT, doc_type TEXT
+     )`,
+  );
+  db.run(
+    `CREATE TABLE graph_edges (
+       id INTEGER PRIMARY KEY AUTOINCREMENT,
+       source TEXT NOT NULL, target TEXT NOT NULL, tier TEXT NOT NULL,
+       reason TEXT, created_at INTEGER
+     )`,
+  );
+  db.run(
+    `CREATE TABLE note_chunk_embeddings (
+       chunk_id TEXT, note_path TEXT, model TEXT, dims INTEGER, vector BLOB
+     )`,
+  );
+  db.run(
+    `CREATE TABLE note_metadata (
+       note_path TEXT PRIMARY KEY, description TEXT, entities TEXT,
+       themes TEXT, doc_type TEXT, summary TEXT, updated_at INTEGER
+     )`,
+  );
+  db.run(
+    `INSERT INTO notes (path, title, project, doc_type) VALUES
+      ('projects/scrypt/spec/a.md','A','scrypt','spec'),
+      ('projects/scrypt/plan/b.md','B','scrypt','plan')`,
+  );
+  db.run(
+    `INSERT INTO graph_edges (source, target, tier, reason, created_at)
+     VALUES ('projects/scrypt/spec/a.md','projects/scrypt/plan/b.md','connected','builds_on',0)`,
+  );
+  const metadata = new MetadataRepo(db);
+
+  const entries = collectProjectEntries({ db, metadata }, "scrypt");
+  const a = entries.find((e) => e.path === "projects/scrypt/spec/a.md")!;
+  // rel_type column absent → label falls back to reason.
   expect(a.links).toEqual([
     { target: "projects/scrypt/plan/b.md", label: "builds_on" },
   ]);
