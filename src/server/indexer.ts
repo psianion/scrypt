@@ -25,12 +25,22 @@ interface Wave8Pipeline {
   embedService: EmbedderLike;
 }
 
+export interface IndexScheduleHook {
+  schedule(project: string): void;
+}
+
 export class Indexer {
+  private scheduler?: IndexScheduleHook;
+
   constructor(
     private db: Database,
     private fm: FileManager,
     private wave8?: Wave8Pipeline,
   ) {}
+
+  setIndexScheduler(hook: IndexScheduleHook): void {
+    this.scheduler = hook;
+  }
 
   private slugifyTitle(title: string): string {
     return title
@@ -260,6 +270,13 @@ export class Indexer {
     // hashes so both passes run); UNIQUE(source,target,tier) + INSERT OR
     // IGNORE keep it idempotent.
     this.linkReferenceEdges(note.path, note.content);
+
+    // Phase 9: a sync pull / file-watch / create_note reindex of a note
+    // under projects/<project>/ refreshes that project's _index.md (C6).
+    // Derived inline from the path (projects/<project>/<doc_type>/<slug>.md);
+    // there is no shared vault-path helper to reuse. Loose notes schedule
+    // nothing. Debounced + single-flight per project inside IndexNoteScheduler.
+    this.scheduleProjectIndex(note.path);
 
     if (this.wave8) {
       const raw = await this.fm.readRaw(path);
@@ -509,6 +526,15 @@ export class Indexer {
       seenTargets.add(resolved);
       insert.run(sourcePath, resolved, t.reason, now);
     }
+  }
+
+  private scheduleProjectIndex(notePath: string): void {
+    if (!this.scheduler) return;
+    const parts = notePath.split("/");
+    // Don't recurse: regenerating _index.md must not schedule another regen.
+    if (parts[parts.length - 1] === "_index.md") return;
+    if (parts[0] !== "projects" || parts.length < 2 || !parts[1]) return;
+    this.scheduler.schedule(parts[1]);
   }
 
   private resolveLink(target: string): string | null {

@@ -328,3 +328,40 @@ describe("reference linker", () => {
     expect(count).toBe(0);
   });
 });
+
+describe("project index scheduling", () => {
+  test("reindexing a note under projects/<p>/ schedules that project", async () => {
+    const scheduled: string[] = [];
+    indexer.setIndexScheduler({ schedule: (p: string) => scheduled.push(p) });
+    await writeTestNote(
+      "projects/p/notes/x.md",
+      "---\ntitle: X\n---\nbody",
+    );
+    await indexer.reindexNote("projects/p/notes/x.md");
+    expect(scheduled).toEqual(["p"]);
+  });
+
+  test("reindexing a non-project note schedules nothing", async () => {
+    const scheduled: string[] = [];
+    indexer.setIndexScheduler({ schedule: (p: string) => scheduled.push(p) });
+    await writeTestNote("notes/loose.md", "---\ntitle: Loose\n---\nbody");
+    await indexer.reindexNote("notes/loose.md");
+    expect(scheduled).toEqual([]);
+  });
+
+  test("no scheduler wired is a no-op (does not throw)", async () => {
+    await writeTestNote(
+      "projects/p/spec/s.md",
+      "---\ntitle: S\n---\nbody",
+    );
+    await indexer.reindexNote("projects/p/spec/s.md");
+  });
+
+  test("reindexing a project's _index.md schedules nothing (no regen loop)", async () => {
+    const scheduled: string[] = [];
+    indexer.setIndexScheduler({ schedule: (p: string) => scheduled.push(p) });
+    await writeTestNote("projects/p/_index.md", "---\ntitle: p — index\nkind: index\n---\nbody");
+    await indexer.reindexNote("projects/p/_index.md");
+    expect(scheduled).toEqual([]);
+  });
+});
