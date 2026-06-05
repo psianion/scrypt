@@ -1,6 +1,7 @@
 // src/server/indexer.ts
 import type { Database } from "bun:sqlite";
 import { randomUUID } from "node:crypto";
+import { join, dirname, posix } from "node:path";
 import type { FileManager } from "./file-manager";
 import {
   parseFrontmatter,
@@ -488,7 +489,21 @@ export class Indexer {
     const now = Date.now();
     const seenTargets = new Set<string>();
     for (const t of targets) {
-      const resolved = this.resolveLink(t.raw);
+      // First: try to resolve as a source-relative vault path.
+      // E.g. source=projects/p/spec/a.md + target=../plan/c.md → projects/p/plan/c.md
+      // Only accepted if a note row actually EXISTS at that path (no false edges).
+      let resolved: string | null = null;
+      if (t.raw && !t.raw.includes(" ")) {
+        const candidate = posix.normalize(
+          join(dirname(sourcePath), t.raw).replace(/\\/g, "/"),
+        ).replace(/^\.\//, "");
+        const exists = this.db
+          .query("SELECT 1 FROM notes WHERE path = ?")
+          .get(candidate) as 1 | null;
+        if (exists) resolved = candidate;
+      }
+      // Fall back to title/alias/absolute resolution.
+      if (!resolved) resolved = this.resolveLink(t.raw);
       if (!resolved || resolved === sourcePath) continue;
       if (seenTargets.has(resolved)) continue;
       seenTargets.add(resolved);

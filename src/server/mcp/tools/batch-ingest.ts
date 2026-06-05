@@ -250,6 +250,10 @@ export const batchIngestTool: ToolDef<Input, Output> = {
 
             if (ctx.legacyIndexer) {
               try {
+                // NOTE: reference edges to notes ingested LATER in the same
+                // batch (forward refs) resolve on the next fullReindex (e.g.
+                // server boot), not necessarily within the batch — single-pass
+                // per file.
                 await ctx.legacyIndexer.reindexNote(vaultPath);
               } catch {}
             }

@@ -90,11 +90,10 @@ afterEach(() => {
 
 test("ingest flow: batch_ingest → embed + reference edges → typed edge → _index.md, no similarity edges", async () => {
   writeFileSync(join(srcDir, "core-architecture.md"), "# Core Architecture\n\nThe system layers.\n");
-  // Use a wikilink so resolveLink can match by title ("Core Architecture").
-  // A bare-filename md link like (core-architecture.md) won't resolve because
-  // resolveLink does an exact notes.path lookup and the vault path is
-  // projects/scrypt/spec/core-architecture.md, not core-architecture.md.
-  writeFileSync(join(srcDir, "auth-spec.md"), "# Auth Spec\n\nSee [[Core Architecture]] for the layering.\n");
+  // Use a relative markdown link — the common inter-note form.
+  // This exercises relative-path resolution: source projects/scrypt/spec/auth-spec.md
+  // + target core-architecture.md → projects/scrypt/spec/core-architecture.md.
+  writeFileSync(join(srcDir, "auth-spec.md"), "# Auth Spec\n\nSee [Core Architecture](core-architecture.md) for the layering.\n");
 
   // ── C1/ingest: place files and embed chunks ───────────────────────────────
   const out = await batchIngestTool.handler(

@@ -273,6 +273,42 @@ describe("reference linker", () => {
     expect(count).toBe(1);
   });
 
+  test("relative sibling link resolves to sibling note in same folder", async () => {
+    await writeTestNote(
+      "projects/p/spec/b.md",
+      "---\ntitle: B\n---\nbody",
+    );
+    await writeTestNote(
+      "projects/p/spec/a.md",
+      "---\ntitle: A\n---\nSee [B](b.md).",
+    );
+    await indexer.reindexNote("projects/p/spec/b.md");
+    await indexer.reindexNote("projects/p/spec/a.md");
+
+    const row = db
+      .query("SELECT target FROM graph_edges WHERE source = ?")
+      .get("projects/p/spec/a.md") as { target: string } | null;
+    expect(row?.target).toBe("projects/p/spec/b.md");
+  });
+
+  test("relative ../ link resolves to note in parent-sibling folder", async () => {
+    await writeTestNote(
+      "projects/p/plan/c.md",
+      "---\ntitle: C\n---\nbody",
+    );
+    await writeTestNote(
+      "projects/p/spec/a.md",
+      "---\ntitle: A\n---\nSee [X](../plan/c.md).",
+    );
+    await indexer.reindexNote("projects/p/plan/c.md");
+    await indexer.reindexNote("projects/p/spec/a.md");
+
+    const row = db
+      .query("SELECT target FROM graph_edges WHERE source = ?")
+      .get("projects/p/spec/a.md") as { target: string } | null;
+    expect(row?.target).toBe("projects/p/plan/c.md");
+  });
+
   test("unresolvable target writes no edge", async () => {
     await writeTestNote(
       "notes/dangling.md",
