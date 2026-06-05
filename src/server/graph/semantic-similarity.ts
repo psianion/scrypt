@@ -1,10 +1,9 @@
 // src/server/graph/semantic-similarity.ts
 //
-// Post-batch embedding similarity scan (spec §4.2 step 3).
-//
-// Averages chunk embeddings into a per-note vector, finds pairs whose
-// cosine similarity meets the configured threshold, and writes them as
-// `graph_edges.tier = 'semantically_related'` (graph-v2 tier enum).
+// Averages chunk embeddings into a per-note vector and finds pairs whose
+// cosine similarity meets the configured threshold. Cosine is off-graph
+// (ingestion rework C3): results power search, find_similar, and the
+// relatedSuggestions() helper — they are NOT written as graph_edges.
 import type { Database } from "bun:sqlite";
 
 export interface SimilarPair {
@@ -168,29 +167,4 @@ export function relatedSuggestions(
   }
   scored.sort((a, b) => b.score - a.score);
   return scored.slice(0, topN);
-}
-
-/**
- * Insert one `graph_edges` row per pair as a `semantically_related` edge.
- * Idempotent — relies on the existing `UNIQUE (source, target, tier)`
- * constraint to skip duplicates. Returns the count of newly inserted rows.
- */
-export function upsertSemanticEdges(
-  db: Database,
-  pairs: SimilarPair[],
-): number {
-  if (pairs.length === 0) return 0;
-  const insert = db.prepare(
-    `INSERT OR IGNORE INTO graph_edges
-       (source, target, tier, weight, reason, created_at)
-     VALUES (?, ?, 'semantically_related', ?, ?, ?)`,
-  );
-  const now = Date.now();
-  let created = 0;
-  for (const p of pairs) {
-    const reason = `embedding cosine ${p.score.toFixed(3)}`;
-    const res = insert.run(p.source, p.target, p.score, reason, now);
-    if (res.changes > 0) created += 1;
-  }
-  return created;
 }

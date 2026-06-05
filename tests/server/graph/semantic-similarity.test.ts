@@ -4,7 +4,6 @@ import { Database } from "bun:sqlite";
 import { initSchema } from "../../../src/server/db";
 import {
   findSimilarPairs,
-  upsertSemanticEdges,
   getSimilarityThreshold,
 } from "../../../src/server/graph/semantic-similarity";
 
@@ -18,13 +17,6 @@ function unitVec(values: number[]): Uint8Array {
   const norm = Math.sqrt(n);
   for (let i = 0; i < values.length; i++) f[i] /= norm;
   return new Uint8Array(f.buffer);
-}
-
-function insertNode(db: Database, path: string): void {
-  db.run(
-    `INSERT INTO graph_nodes (id, kind, label, note_path) VALUES (?, 'note', ?, ?)`,
-    [path, path, path],
-  );
 }
 
 function insertChunk(
@@ -124,46 +116,6 @@ describe("graph/semantic-similarity", () => {
       });
       // Only a.md has rows in model-x — no second note to pair with.
       expect(pairs).toHaveLength(0);
-    });
-  });
-
-  describe("upsertSemanticEdges", () => {
-    test("inserts edges with tier=semantically_related and reason", () => {
-      insertNode(db, "a.md");
-      insertNode(db, "b.md");
-      const created = upsertSemanticEdges(db, [
-        { source: "a.md", target: "b.md", score: 0.92 },
-      ]);
-      expect(created).toBe(1);
-      const row = db
-        .query<
-          { tier: string; reason: string; weight: number },
-          []
-        >(`SELECT tier, reason, weight FROM graph_edges WHERE source='a.md' AND target='b.md'`)
-        .get();
-      expect(row?.tier).toBe("semantically_related");
-      expect(row?.reason).toContain("cosine");
-      expect(row?.weight).toBeCloseTo(0.92, 2);
-    });
-
-    test("idempotent — same pair twice does not double insert", () => {
-      insertNode(db, "a.md");
-      insertNode(db, "b.md");
-      upsertSemanticEdges(db, [{ source: "a.md", target: "b.md", score: 0.9 }]);
-      const second = upsertSemanticEdges(db, [
-        { source: "a.md", target: "b.md", score: 0.95 },
-      ]);
-      expect(second).toBe(0);
-      const total = db
-        .query<{ c: number }, []>(
-          `SELECT COUNT(*) AS c FROM graph_edges WHERE source='a.md' AND target='b.md'`,
-        )
-        .get()?.c;
-      expect(total).toBe(1);
-    });
-
-    test("returns 0 for empty input", () => {
-      expect(upsertSemanticEdges(db, [])).toBe(0);
     });
   });
 
