@@ -14,6 +14,8 @@ export interface EmbeddingChunk {
   note_path: string;
   chunk_id: string;
   text: string;
+  display_text: string;
+  chunker_version: number;
   start_line: number;
   end_line: number;
   content_hash: string;
@@ -98,6 +100,8 @@ export function chunkNote(
         note_path: parsed.notePath,
         chunk_id: section.id,
         text,
+        display_text: body,
+        chunker_version: 0,
         start_line: section.startLine,
         end_line: section.endLine,
         content_hash: hash(text),
@@ -115,6 +119,8 @@ export function chunkNote(
         note_path: parsed.notePath,
         chunk_id: `${section.id}:part_${part}`,
         text,
+        display_text: slice,
+        chunker_version: 0,
         start_line: section.startLine,
         end_line: section.endLine,
         content_hash: hash(text),

@@ -143,4 +143,13 @@ Body D.
     const cb = chunkNote(b, { maxTokens: 450, overlapTokens: 50 }).find((c) => c.chunk_id === "y_md:crit")!;
     expect(ca.content_hash).not.toBe(cb.content_hash);
   });
+
+  test("display_text holds the raw body without the context prefix", () => {
+    const parsed = parseStructural("a.md", `---\ntitle: T\n---\n\n## Alpha\n\nbody words here\n`);
+    const chunks = chunkNote(parsed, { maxTokens: 450, overlapTokens: 50 });
+    const alpha = chunks[0];
+    expect(alpha.display_text).toBe("body words here");
+    expect(alpha.text).toBe("T › Alpha\n\nbody words here");
+    expect(alpha.text.endsWith(alpha.display_text)).toBe(true);
+  });
 });

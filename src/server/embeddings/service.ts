@@ -159,7 +159,7 @@ export class EmbeddingService {
         repo.upsert({
           note_path: c.note_path,
           chunk_id: c.chunk_id,
-          chunk_text: c.text,
+          chunk_text: c.display_text,
           start_line: c.start_line,
           end_line: c.end_line,
           model: engine.model,
