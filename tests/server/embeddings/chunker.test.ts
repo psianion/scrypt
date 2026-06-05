@@ -188,4 +188,16 @@ Body D.
     expect(chunks.length).toBeGreaterThan(1);
     expect(chunks[0].display_text.startsWith("alpha")).toBe(true);
   });
+
+  test("multi-paragraph body rebalances a tiny final paragraph (pack path)", () => {
+    const p = (w: string, n: number) => (w + " ").repeat(n).trim();
+    const body = `## Sec\n\n${p("alpha", 330)}\n\n${p("bravo", 330)}\n\n${p("charlie", 40)}\n`;
+    const parsed = parseStructural("multi.md", body);
+    const chunks = chunkNote(parsed, { maxTokens: 450, overlapTokens: 50 });
+    const wordBudget = Math.floor(450 / 1.3); // 346
+    const counts = chunks.map((c) => c.display_text.split(/\s+/).filter(Boolean).length);
+    expect(counts.length).toBeGreaterThan(1);
+    for (const n of counts) expect(n).toBeLessThanOrEqual(wordBudget);      // max guard
+    expect(counts[counts.length - 1]).toBeGreaterThanOrEqual(Math.floor(wordBudget / 2)); // min guard (no tiny tail)
+  });
 });
