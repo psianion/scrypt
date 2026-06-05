@@ -73,13 +73,6 @@ export async function runPush(deps: SyncDeps): Promise<RunResult> {
       result.failed.push({ path: item.path, error: String(err) });
     }
   }
-  if (result.pushed.length > 0) {
-    try {
-      await deps.remote.rescanSimilarity(`sync-rescan-${Date.now()}`);
-    } catch (err) {
-      console.warn(`[sync] post-push rescan_similarity failed (non-fatal): ${String(err)}`);
-    }
-  }
   return result;
 }
 
@@ -101,13 +94,6 @@ export async function runPull(deps: SyncDeps): Promise<RunResult> {
       result.pulled.push(item.path);
     } catch (err) {
       result.failed.push({ path: item.path, error: String(err) });
-    }
-  }
-  if (result.pulled.length > 0) {
-    try {
-      await deps.local.rescanSimilarity(`sync-rescan-${Date.now()}`);
-    } catch (err) {
-      console.warn(`[sync] post-pull rescan_similarity failed (non-fatal): ${String(err)}`);
     }
   }
   return result;
@@ -148,8 +134,6 @@ export async function runSync(deps: SyncDeps): Promise<RunResult> {
       result.pulled.push(item.path);
     } catch (e) { result.failed.push({ path: item.path, error: String(e) }); }
   }
-  if (result.pushed.length) { try { await deps.remote.rescanSimilarity(`sync-rescan-${Date.now()}`); } catch (e) { console.warn("remote rescan failed", e); } }
-  if (result.pulled.length) { try { await deps.local.rescanSimilarity(`sync-rescan-${Date.now()}`); } catch (e) { console.warn("local rescan failed", e); } }
   return result;
 }
 
@@ -159,5 +143,4 @@ export async function resolveClash(deps: SyncDeps, path: string, merged: string)
   const note = await deps.fm.readNote(path);                            // 3. canonical local hash
   const hash = note ? computeContentHash(note.frontmatter, note.content) : computeContentHash({}, merged);
   setBase(deps.db, path, hash, merged);                                 // 4. base = merged
-  try { await deps.remote.rescanSimilarity(`resolve-rescan-${Date.now()}`); } catch (e) { console.warn("resolve rescan failed", e); }
 }

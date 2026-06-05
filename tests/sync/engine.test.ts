@@ -133,19 +133,21 @@ test("a per-note push failure is recorded in failed and does not abort other not
   expect(result.failed.find((f) => f.path === "bad.md")!.error).toMatch(/server rejected/);
 });
 
-test("push triggers a remote rescan_similarity", async () => {
+test("push does NOT call rescan_similarity (recalibration is createNote → reindex)", async () => {
   writeNote("a.md", "hello");
   const remote = fakeHub(new Map());
   const local = fakeHub(new Map());
   const deps: SyncDeps = { db, fm, vaultPath: vaultDir, remote: remote as any, local: local as any };
   await runPush(deps);
-  expect(remote.rescans.length).toBe(1);
+  expect(remote.rescans.length).toBe(0);
+  expect(remote.created.map((c) => c.path)).toEqual(["a.md"]);
 });
 
-test("pull triggers a local rescan_similarity", async () => {
+test("pull does NOT call rescan_similarity (recalibration is createNote → reindex)", async () => {
   const remote = fakeHub(new Map([["b.md", "remote-body"]]));
   const local = fakeHub(new Map());
   const deps: SyncDeps = { db, fm, vaultPath: vaultDir, remote: remote as any, local: local as any };
   await runPull(deps);
-  expect(local.rescans.length).toBe(1);
+  expect(local.rescans.length).toBe(0);
+  expect(local.created.map((c) => c.path)).toEqual(["b.md"]);
 });
