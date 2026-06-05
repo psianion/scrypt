@@ -179,9 +179,9 @@ describe("hybridSearch", () => {
         { id: "far.md", title: "Far", doc_type: null, project: "p", degree: 1, community: null },
       ],
       edges: [
-        { source: "focus.md", target: "near.md", tier: "mentions", reason: null },
-        { source: "near.md", target: "mid.md", tier: "mentions", reason: null },
-        { source: "mid.md", target: "far.md", tier: "mentions", reason: null },
+        { source: "focus.md", target: "near.md", tier: "mentions", reason: null, rel_type: null },
+        { source: "near.md", target: "mid.md", tier: "mentions", reason: null, rel_type: null },
+        { source: "mid.md", target: "far.md", tier: "mentions", reason: null, rel_type: null },
       ],
     };
     const hits = await hybridSearch(db, {
@@ -211,7 +211,7 @@ describe("hybridSearch", () => {
         { id: "far.md", title: "Far", doc_type: null, project: "p", degree: 0, community: null },
       ],
       edges: [
-        { source: "focus.md", target: "near.md", tier: "mentions", reason: null },
+        { source: "focus.md", target: "near.md", tier: "mentions", reason: null, rel_type: null },
       ],
     };
     const hits = await hybridSearch(db, {
