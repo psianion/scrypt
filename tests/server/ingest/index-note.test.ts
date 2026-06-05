@@ -125,7 +125,10 @@ import { mkdtempSync, readFileSync, rmSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { FileManager } from "../../../src/server/file-manager";
-import { generateProjectIndex } from "../../../src/server/ingest/index-note";
+import {
+  generateProjectIndex,
+  IndexNoteScheduler,
+} from "../../../src/server/ingest/index-note";
 
 test("collectProjectEntries gathers notes, summaries, and meaningful edges for a project", () => {
   const db = new Database(":memory:");
@@ -266,6 +269,54 @@ test("regeneration after a hand edit overwrites it — nothing hand-written surv
   const after = readFileSync(p, "utf8");
   expect(after).not.toContain("HAND EDIT");
   expect(after).toContain("do not edit");
+  rmSync(vault, { recursive: true, force: true });
+});
+
+// ---------------------------------------------------------------------------
+// Task 29: IndexNoteScheduler
+// ---------------------------------------------------------------------------
+
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+test("IndexNoteScheduler coalesces rapid schedules for the same project into one write", async () => {
+  const vault = mkdtempSync(join(tmpdir(), "rework-sched-"));
+  const db = new Database(":memory:");
+  initSchema(db);
+  db.run(
+    `INSERT INTO notes (path, title, project, doc_type)
+     VALUES ('projects/scrypt/spec/a.md','A','scrypt','spec')`,
+  );
+  const fm = new FileManager(vault, join(vault, ".scrypt"));
+  const metadata = new MetadataRepo(db);
+  let writes = 0;
+  const sched = new IndexNoteScheduler({ db, metadata, fm }, { debounceMs: 30 });
+  sched.onWrite = () => { writes += 1; };
+  sched.schedule("scrypt");
+  sched.schedule("scrypt");
+  sched.schedule("scrypt");
+  await wait(80);
+  expect(writes).toBe(1);
+  expect(readFileSync(join(vault, "projects/scrypt/_index.md"), "utf8")).toContain("kind: index");
+  rmSync(vault, { recursive: true, force: true });
+});
+
+test("IndexNoteScheduler tracks distinct projects independently", async () => {
+  const vault = mkdtempSync(join(tmpdir(), "rework-sched2-"));
+  const db = new Database(":memory:");
+  initSchema(db);
+  db.run(
+    `INSERT INTO notes (path, title, project, doc_type) VALUES
+      ('projects/scrypt/spec/a.md','A','scrypt','spec'),
+      ('projects/dnd/research/c.md','C','dnd','research')`,
+  );
+  const fm = new FileManager(vault, join(vault, ".scrypt"));
+  const metadata = new MetadataRepo(db);
+  const sched = new IndexNoteScheduler({ db, metadata, fm }, { debounceMs: 20 });
+  sched.schedule("scrypt");
+  sched.schedule("dnd");
+  await wait(70);
+  expect(existsSync(join(vault, "projects/scrypt/_index.md"))).toBe(true);
+  expect(existsSync(join(vault, "projects/dnd/_index.md"))).toBe(true);
   rmSync(vault, { recursive: true, force: true });
 });
 

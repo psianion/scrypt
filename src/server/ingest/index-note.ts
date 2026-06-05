@@ -256,3 +256,71 @@ export async function generateProjectIndex(
   return { project, vaultPath, written: true, noteCount: entries.length };
 }
 
+// ---------------------------------------------------------------------------
+// Task 29: IndexNoteScheduler
+// ---------------------------------------------------------------------------
+
+export interface IndexSchedulerOpts {
+  debounceMs?: number;
+}
+
+/**
+ * Debounced per-project index regeneration. Mirrors SnapshotScheduler:
+ * rapid schedule(project) calls within debounceMs collapse to one write;
+ * an in-flight regen for a project chains exactly one follow-up if asked
+ * again mid-flight. `onWrite` is a test seam fired after each completed write.
+ */
+export class IndexNoteScheduler {
+  private timers = new Map<string, ReturnType<typeof setTimeout>>();
+  private running = new Set<string>();
+  private pending = new Set<string>();
+  private readonly debounceMs: number;
+  onWrite: (project: string) => void = () => {};
+
+  constructor(
+    private deps: IndexGenDeps,
+    opts: IndexSchedulerOpts = {},
+  ) {
+    this.debounceMs = opts.debounceMs ?? 2000;
+  }
+
+  schedule(project: string): void {
+    if (this.running.has(project)) {
+      this.pending.add(project);
+      return;
+    }
+    const existing = this.timers.get(project);
+    if (existing) clearTimeout(existing);
+    this.timers.set(
+      project,
+      setTimeout(() => {
+        this.timers.delete(project);
+        void this.flush(project);
+      }, this.debounceMs),
+    );
+  }
+
+  private async flush(project: string): Promise<void> {
+    if (this.running.has(project)) {
+      this.pending.add(project);
+      return;
+    }
+    this.running.add(project);
+    try {
+      await generateProjectIndex(this.deps, project);
+      this.onWrite(project);
+    } catch (err) {
+      console.error("[scrypt] index-note write failed", {
+        project,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      this.running.delete(project);
+      if (this.pending.has(project)) {
+        this.pending.delete(project);
+        this.schedule(project);
+      }
+    }
+  }
+}
+
