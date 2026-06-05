@@ -71,8 +71,18 @@ describe("wave11 migration", () => {
     expect(tiers).toEqual(["connected", "mentions"]);
   });
 
+  test("deletes semantically_related even when rel_type column already exists", () => {
+    applyWave11Migration(db); // adds rel_type
+    db.run(`INSERT INTO graph_edges (source, target, tier) VALUES ('x','y','semantically_related')`);
+    db.run(`INSERT INTO graph_edges (source, target, tier) VALUES ('x','z','connected')`);
+    applyWave11Migration(db); // ALTER skipped; DELETE must still fire
+    const tiers = db.query<{ tier: string }, []>(`SELECT tier FROM graph_edges ORDER BY tier`).all().map((r) => r.tier);
+    expect(tiers).toEqual(["connected"]);
+  });
+
   test("no-ops when graph_edges does not exist", () => {
     const fresh = new Database(":memory:");
     expect(() => applyWave11Migration(fresh)).not.toThrow();
+    fresh.close();
   });
 });

@@ -111,6 +111,10 @@ export function initSchema(db: Database): void {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       source TEXT NOT NULL,
       target TEXT NOT NULL,
+      -- 'semantically_related' is retained as a permitted tier value for
+      -- back-compat (walk-graph tier ranking / TIER_VALUES) but is no longer
+      -- written by any producer: cosine is off-graph (ingestion rework C3),
+      -- and wave11 drops legacy semantically_related rows at init.
       tier TEXT NOT NULL CHECK (tier IN ('connected','mentions','semantically_related')),
       weight REAL,
       reason TEXT,
