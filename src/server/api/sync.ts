@@ -80,7 +80,7 @@ export function syncRoutes(
         `SELECT note_path AS path, content_hash AS hash
          FROM graph_nodes
          WHERE kind = 'note' AND note_path IS NOT NULL AND content_hash IS NOT NULL
-           AND note_path NOT LIKE '%/_index.md' AND note_path != '_index.md'`,
+           AND note_path NOT LIKE '%/!_index.md' ESCAPE '!' AND note_path != '_index.md'`,
       )
       .all() as { path: string; hash: string }[];
     return Response.json({
