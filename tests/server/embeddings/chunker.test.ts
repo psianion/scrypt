@@ -152,4 +152,40 @@ Body D.
     expect(alpha.text).toBe("T › Alpha\n\nbody words here");
     expect(alpha.text.endsWith(alpha.display_text)).toBe(true);
   });
+
+  test("long section splits into evenly sized parts (no tiny tail)", () => {
+    const big = `## Huge\n\n` + "word ".repeat(2000);
+    const parsed = parseStructural("b.md", big);
+    const chunks = chunkNote(parsed, { maxTokens: 450, overlapTokens: 50 });
+    const wordBudget = Math.floor(450 / 1.3); // ~346
+    const partCounts = chunks.map(
+      (c) => c.display_text.split(/\s+/).filter(Boolean).length,
+    );
+    for (const n of partCounts) {
+      expect(n).toBeLessThanOrEqual(wordBudget); // max guard
+    }
+    // min guard: the last part is at least half the budget (no orphan tail)
+    expect(partCounts[partCounts.length - 1]).toBeGreaterThanOrEqual(
+      Math.floor(wordBudget / 2),
+    );
+  });
+
+  test("heading-less note splits by size into intro parts", () => {
+    const raw = "para ".repeat(2000); // no headings, no frontmatter
+    const parsed = parseStructural("flat.md", raw);
+    const chunks = chunkNote(parsed, { maxTokens: 450, overlapTokens: 50 });
+    expect(chunks.length).toBeGreaterThan(1);
+    for (const c of chunks) {
+      expect(c.chunk_id.startsWith("flat_md:h-intro-0")).toBe(true);
+    }
+  });
+
+  test("prose section splits on paragraph boundaries when possible", () => {
+    const p1 = "alpha ".repeat(200).trim();
+    const p2 = "bravo ".repeat(200).trim();
+    const parsed = parseStructural("p.md", `## Sec\n\n${p1}\n\n${p2}\n`);
+    const chunks = chunkNote(parsed, { maxTokens: 200, overlapTokens: 20 });
+    expect(chunks.length).toBeGreaterThan(1);
+    expect(chunks[0].display_text.startsWith("alpha")).toBe(true);
+  });
 });
