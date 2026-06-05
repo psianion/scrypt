@@ -127,6 +127,49 @@ export function findSimilarPairs(
   return pairs;
 }
 
+export interface RelatedNeighbor {
+  path: string;
+  score: number;
+}
+
+/**
+ * Off-graph "related" suggestions: top-N cosine neighbors of `path` using
+ * the same per-note averaged + normalized vector as findSimilarPairs.
+ * No graph_edges are written — consumed by the index generator and offered
+ * to the AI as candidate pairs to type via add_edge. Returns [] if the
+ * source note has no embeddings.
+ */
+export function relatedSuggestions(
+  db: Database,
+  path: string,
+  model: string,
+  topN: number,
+): RelatedNeighbor[] {
+  const rows = db
+    .query<ChunkRow, [string]>(
+      `SELECT note_path, dims, vector
+       FROM note_chunk_embeddings
+       WHERE model = ?`,
+    )
+    .all(model);
+  if (rows.length === 0) return [];
+
+  const averaged = averageAndNormalize(rows);
+  const source = averaged.find((n) => n.path === path);
+  if (!source) return [];
+
+  const scored: RelatedNeighbor[] = [];
+  for (const n of averaged) {
+    if (n.path === path) continue;
+    let score = 0;
+    const dims = Math.min(source.vec.length, n.vec.length);
+    for (let k = 0; k < dims; k++) score += source.vec[k] * n.vec[k];
+    scored.push({ path: n.path, score });
+  }
+  scored.sort((a, b) => b.score - a.score);
+  return scored.slice(0, topN);
+}
+
 /**
  * Insert one `graph_edges` row per pair as a `semantically_related` edge.
  * Idempotent — relies on the existing `UNIQUE (source, target, tier)`
