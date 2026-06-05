@@ -7,8 +7,8 @@ import { McpError, MCP_ERROR } from "../errors";
 import type { ToolDef } from "../types";
 import {
   findSimilarPairs,
-  upsertSemanticEdges,
   getSimilarityThreshold,
+  type SimilarPair,
 } from "../../graph/semantic-similarity";
 
 interface Input {
@@ -21,10 +21,11 @@ interface Input {
 }
 
 interface Output {
-  edges_created: number;
   pairs_considered: number;
   threshold: number;
   model: string;
+  /** Ranked neighbor pairs above threshold. NOT written to the graph. */
+  pairs: SimilarPair[];
 }
 
 const DEFAULT_MODEL = "Xenova/bge-small-en-v1.5";
@@ -32,7 +33,7 @@ const DEFAULT_MODEL = "Xenova/bge-small-en-v1.5";
 export const rescanSimilarityTool: ToolDef<Input, Output> = {
   name: "rescan_similarity",
   description:
-    "Scan note chunk embeddings and emit `tier='semantically_related'` edges for note pairs above the cosine threshold. Idempotent — duplicates are skipped via UNIQUE(source,target,tier). When `paths` is provided, only pairs touching one of those paths are emitted.",
+    "Scan note chunk embeddings and return note pairs above the cosine threshold as ranked candidate suggestions. Does NOT write graph edges — cosine is off-graph; the AI may promote a pair to a typed edge via add_edge. When `paths` is provided, only pairs touching one of those paths are returned.",
   inputSchema: {
     type: "object",
     properties: {
@@ -63,26 +64,10 @@ export const rescanSimilarityTool: ToolDef<Input, Output> = {
     ).map((r) => r.note_path);
 
     if (allPaths.length < 2) {
-      return {
-        edges_created: 0,
-        pairs_considered: 0,
-        threshold,
-        model,
-      };
+      return { pairs_considered: 0, threshold, model, pairs: [] };
     }
-
     const scoped = input.paths && input.paths.length > 0 ? new Set(input.paths) : undefined;
-    const pairs = findSimilarPairs(ctx.db, allPaths, model, {
-      minSimilarity: threshold,
-      scopedTo: scoped,
-    });
-    const created = upsertSemanticEdges(ctx.db, pairs);
-    ctx.scheduleGraphRebuild();
-    return {
-      edges_created: created,
-      pairs_considered: pairs.length,
-      threshold,
-      model,
-    };
+    const pairs = findSimilarPairs(ctx.db, allPaths, model, { minSimilarity: threshold, scopedTo: scoped });
+    return { pairs_considered: pairs.length, threshold, model, pairs };
   },
 };
