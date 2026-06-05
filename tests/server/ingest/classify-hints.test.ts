@@ -19,6 +19,14 @@ test("doc_type comes from a recognized intermediate folder", () => {
   const h = suggestClassification({ sourcePath: "research/dnd/lore.md" });
   expect(h.project).toBe("dnd");
   expect(h.doc_type).toBe("research");
+  expect(h.reasons).toContain("folder:research/<project>");
+});
+
+test("a file directly under projects/<project>/ derives project, null doc_type", () => {
+  const h = suggestClassification({ sourcePath: "projects/scrypt/note.md" });
+  expect(h.project).toBe("scrypt");
+  expect(h.doc_type).toBeNull();
+  expect(h.reasons).toContain("path:projects/<project>");
 });
 
 test("unknown intermediate folder yields a null doc_type, not a guess", () => {

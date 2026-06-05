@@ -77,13 +77,18 @@ export function suggestClassification(input: HintInput): ClassificationHints {
   const parts = segments(input.sourcePath);
   const folders = parts.slice(0, -1); // drop filename — only folders classify
 
-  if (folders[0] === "projects" && folders.length >= 3) {
+  if (folders[0] === "projects" && folders.length >= 2) {
     const proj = asProject(folders[1]!);
     if (proj) {
       hints.project = proj;
-      hints.reasons.push("path:projects/<project>/<doc_type>");
+      hints.reasons.push(
+        folders.length >= 3
+          ? "path:projects/<project>/<doc_type>"
+          : "path:projects/<project>"
+      );
     }
-    if (isDocType(folders[2])) hints.doc_type = folders[2] as DocType;
+    if (folders.length >= 3 && isDocType(folders[2]))
+      hints.doc_type = folders[2] as DocType;
     return applyFrontmatter(hints, input.frontmatter);
   }
 
