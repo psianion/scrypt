@@ -3,6 +3,7 @@ import { Database } from "bun:sqlite";
 import { applyWave8Migration } from "./migrations/wave8";
 import { applyWave9Migration } from "./migrations/wave9";
 import { applyWave10Migration } from "./migrations/wave10";
+import { applyWave11Migration } from "./migrations/wave11";
 
 export function createDatabase(dbPath: string): Database {
   const db = new Database(dbPath, { create: true });
@@ -244,4 +245,8 @@ export function initSchema(db: Database): void {
 
   // Wave 10: add project / doc_type / thread columns to notes + indexes.
   applyWave10Migration(db);
+
+  // Wave 11 (ingestion rework C3+C4): add rel_type column to graph_edges for
+  // curated AI typed edges, and drop legacy semantically_related rows.
+  applyWave11Migration(db);
 }
