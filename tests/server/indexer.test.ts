@@ -201,3 +201,89 @@ describe("link_index population", () => {
   });
 
 });
+
+describe("reference linker", () => {
+  test("internal markdown link creates a reference edge (client_tag NULL, reason reference)", async () => {
+    await writeTestNote("notes/target.md", "---\ntitle: Target\n---\nbody");
+    await writeTestNote(
+      "notes/src.md",
+      "---\ntitle: Source\n---\nSee [Target](notes/target.md).",
+    );
+    await indexer.reindexNote("notes/target.md");
+    await indexer.reindexNote("notes/src.md");
+
+    const edges = db
+      .query(
+        "SELECT source, target, tier, reason, client_tag FROM graph_edges WHERE source = ?",
+      )
+      .all("notes/src.md") as Array<{
+        source: string;
+        target: string;
+        tier: string;
+        reason: string | null;
+        client_tag: string | null;
+      }>;
+    expect(edges).toContainEqual({
+      source: "notes/src.md",
+      target: "notes/target.md",
+      tier: "mentions",
+      reason: "reference",
+      client_tag: null,
+    });
+  });
+
+  test("wikilink resolves via title/alias to the target note path", async () => {
+    await writeTestNote(
+      "notes/world.md",
+      "---\ntitle: World Bible\naliases: [Canon]\n---\nbody",
+    );
+    await writeTestNote(
+      "notes/lore.md",
+      "---\ntitle: Lore\n---\nGrounded in [[Canon]].",
+    );
+    await indexer.reindexNote("notes/world.md");
+    await indexer.reindexNote("notes/lore.md");
+
+    const row = db
+      .query("SELECT target FROM graph_edges WHERE source = ?")
+      .get("notes/lore.md") as { target: string } | null;
+    expect(row?.target).toBe("notes/world.md");
+  });
+
+  test("re-reindex is idempotent — no duplicate reference edges", async () => {
+    await writeTestNote("notes/t.md", "---\ntitle: T\n---\nbody");
+    await writeTestNote(
+      "notes/s.md",
+      "---\ntitle: S\n---\nLink [T](notes/t.md).",
+    );
+    await indexer.reindexNote("notes/t.md");
+    await indexer.reindexNote("notes/s.md");
+
+    db.query("UPDATE notes SET content_hash = '' WHERE path = ?").run("notes/s.md");
+    await indexer.reindexNote("notes/s.md");
+
+    const count = (
+      db
+        .query(
+          "SELECT COUNT(*) as c FROM graph_edges WHERE source = ? AND target = ?",
+        )
+        .get("notes/s.md", "notes/t.md") as { c: number }
+    ).c;
+    expect(count).toBe(1);
+  });
+
+  test("unresolvable target writes no edge", async () => {
+    await writeTestNote(
+      "notes/dangling.md",
+      "---\ntitle: Dangling\n---\nSee [Ghost](notes/ghost.md).",
+    );
+    await indexer.reindexNote("notes/dangling.md");
+
+    const count = (
+      db
+        .query("SELECT COUNT(*) as c FROM graph_edges WHERE source = ?")
+        .get("notes/dangling.md") as { c: number }
+    ).c;
+    expect(count).toBe(0);
+  });
+});
