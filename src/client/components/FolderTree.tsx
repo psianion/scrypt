@@ -4,6 +4,8 @@ import {
   buildProjectTree,
   type FolderTreeNote,
 } from "./FolderTree.helpers";
+import { SyncDot } from "./SyncDot";
+import { useSyncStatus, syncDotState } from "../stores/syncStatus";
 
 const STORAGE_KEY = "scrypt.sidebar.expanded";
 
@@ -48,6 +50,9 @@ export function FolderTree({
   onNoteClick,
 }: FolderTreeProps) {
   const [expanded, setExpanded] = useState<Set<string>>(() => loadExpanded());
+
+  const notPushed = useSyncStatus((s) => s.notPushed);
+  const clashes = useSyncStatus((s) => s.clashes);
 
   const groups = useMemo(
     () => buildProjectTree(notes, { thread, project }),
@@ -127,14 +132,14 @@ export function FolderTree({
                           key={n.path}
                           type="button"
                           onClick={() => onNoteClick?.(n.path)}
-                          title={`${n.title ?? ""}\n${n.path}`.trim()}
-                          className={`block w-full text-left truncate pl-7 pr-2 py-0.5 ${
+                          className={`flex w-full items-center text-left truncate pl-7 pr-2 py-0.5 ${
                             isActive
                               ? "text-[var(--text)] bg-[var(--surface-hover)]"
                               : "text-[var(--text-muted)] hover:text-[var(--text)]"
                           }`}
                         >
-                          {label}
+                          <SyncDot state={syncDotState(n.path, notPushed, clashes)} />
+                          <span className="truncate">{label}</span>
                         </button>
                       );
                     })}

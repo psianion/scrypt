@@ -10,7 +10,8 @@
     "outDir": "dist",
     "rootDir": ".",
     "baseUrl": ".",
-    "paths": { "@/*": ["src/*"] }
+    "paths": { "@/*": ["src/*"] },
+    "types": ["bun-types"]
   },
   "include": ["src/**/*", "tests/**/*"]
 }

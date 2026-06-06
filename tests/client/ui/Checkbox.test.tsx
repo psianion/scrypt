@@ -16,7 +16,7 @@ describe("Checkbox", () => {
       <Checkbox checked={false} onChange={(n) => { v = n; }} aria-label="c" />,
     );
     fireEvent.click(getByRole("checkbox"));
-    expect(v).toBe(true);
+    expect(v as boolean | null).toBe(true);
   });
 
   test("disabled blocks onChange", () => {

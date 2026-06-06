@@ -4,11 +4,12 @@
 // parse, upserts sections and the graph_nodes row, runs the embedding
 // pipeline, and returns a structural result the caller uses to drive
 // follow-up tool calls.
-import { writeFileSync, mkdirSync } from "node:fs";
+import { writeFileSync, mkdirSync, readFileSync, existsSync } from "node:fs";
 import { dirname, resolve, relative, isAbsolute } from "node:path";
 import { McpError, MCP_ERROR } from "../errors";
 import { parseStructural } from "../../indexer/structural-parse";
 import { refreshNoteFts } from "../../indexer/fts-refresh";
+import { computeContentHash } from "../../sync/content-hash";
 import { parseFrontmatter } from "../../parsers";
 import { validateProjectPath } from "../../path/validate-project-path";
 import type { ToolDef } from "../types";
@@ -18,6 +19,12 @@ import type { Database } from "bun:sqlite";
 // scanned for [[…]]; all connections come from add_edge (LLM-curated) or
 // rescan_similarity (semantic). `edges_created` stays in the response for
 // backward compat with callers but is always 0.
+
+// F13: cap accepted note content so an accidentally-huge .md (a renamed
+// binary, a pasted blob) can't OOM the process or the hub during sync.
+// Mirrors MAX_NOTE_BYTES on the /api/sync/note read path so the write and
+// read ceilings agree.
+const MAX_NOTE_BYTES = 25 * 1024 * 1024; // 25 MiB
 
 interface Input {
   path: string;
@@ -29,6 +36,16 @@ interface Input {
    * non-standard paths like `_inbox/stashed.md`. Defaults to false.
    */
   allow_nonstandard_path?: boolean;
+  /**
+   * F12 (opt-in additive guard): when set, the hub overwrites the note only
+   * if the current on-disk content's engine hash equals this value. A
+   * mismatch means the note diverged since the caller last read it, so the
+   * write is rejected with CONFLICT instead of blindly overwriting — letting
+   * a pusher convert a genuine divergence into a server-detected clash.
+   * Use "" to assert the note must NOT already exist (additive create). When
+   * omitted, behaviour is unchanged: create-or-replace.
+   */
+  expected_prev_hash?: string;
 }
 
 interface Output {
@@ -87,6 +104,7 @@ export const createNoteTool: ToolDef<Input, Output> = {
       content: { type: "string" },
       client_tag: { type: "string" },
       allow_nonstandard_path: { type: "boolean" },
+      expected_prev_hash: { type: "string" },
     },
     required: ["path", "content", "client_tag"],
   },
@@ -96,6 +114,48 @@ export const createNoteTool: ToolDef<Input, Output> = {
       input.client_tag,
       async () => {
         const abs = assertInsideVault(ctx.vaultDir, input.path);
+
+        // F13: reject oversized content before we parse, embed, or write it.
+        // Measure UTF-8 bytes (not string length) to match the byte-based
+        // ceiling used by the /api/sync/note read path.
+        const contentBytes = Buffer.byteLength(input.content, "utf8");
+        if (contentBytes > MAX_NOTE_BYTES) {
+          throw new McpError(
+            MCP_ERROR.INVALID_PARAMS,
+            `note content exceeds the ${MAX_NOTE_BYTES}-byte limit`,
+            { code: "note_too_large", bytes: contentBytes },
+          );
+        }
+
+        // F12 (opt-in additive guard): if the caller pinned an expected hash,
+        // refuse to overwrite a note that has since diverged. "" asserts the
+        // note must not already exist (a pure additive create). The default
+        // (param omitted) keeps the historical create-or-replace contract so
+        // existing callers — including the in-app resolveClash write — are
+        // unaffected.
+        if (input.expected_prev_hash !== undefined) {
+          const exists = existsSync(abs);
+          let currentHash = "";
+          if (exists) {
+            const onDisk = readFileSync(abs, "utf8");
+            const { frontmatter: curFm, body: curBody } =
+              parseFrontmatter(onDisk);
+            currentHash = computeContentHash(curFm, curBody);
+          }
+          if (currentHash !== input.expected_prev_hash) {
+            throw new McpError(
+              MCP_ERROR.CONFLICT,
+              exists
+                ? "note diverged since last read; overwrite rejected"
+                : "note does not exist; cannot match expected_prev_hash",
+              {
+                code: "hash_mismatch",
+                expected: input.expected_prev_hash,
+                actual: currentHash,
+              },
+            );
+          }
+        }
 
         // ingest-v3: enforce the projects/<project>/<doc_type>/<slug>.md
         // layout unless the caller explicitly opts out. Parse the content's
@@ -118,6 +178,13 @@ export const createNoteTool: ToolDef<Input, Output> = {
 
         const parsed = parseStructural(input.path, input.content);
 
+        // F3: graph_nodes.content_hash MUST match the engine's
+        // computeContentHash so the hub manifest advertises a hash a puller
+        // can reproduce. parsed.contentHash is sha256(body) (used as the
+        // embed cache key) and is the WRONG value for graph_nodes — derive
+        // the engine hash from the same parsed frontmatter/body here.
+        const engineHash = computeContentHash(parsed.frontmatter, parsed.body);
+
         ctx.sections.replaceNoteSections(
           input.path,
           parsed.sections.map((s) => ({
@@ -130,7 +197,7 @@ export const createNoteTool: ToolDef<Input, Output> = {
           })),
         );
 
-        upsertNode(ctx.db, input.path, parsed.title, parsed.contentHash);
+        upsertNode(ctx.db, input.path, parsed.title, engineHash);
 
         const embed = await ctx.embedService.embedNote(parsed, correlationId);
 

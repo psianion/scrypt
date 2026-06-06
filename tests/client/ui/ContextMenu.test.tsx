@@ -113,7 +113,7 @@ describe("ContextMenu", () => {
       />,
     );
     fireEvent.keyDown(getByRole("menu"), { key: "Enter" });
-    expect(selected).toBe("rename");
+    expect(selected as string | null).toBe("rename");
     expect(closed).toBe(1);
   });
 
@@ -133,7 +133,7 @@ describe("ContextMenu", () => {
       />,
     );
     fireEvent.click(getByText("Move to…"));
-    expect(selected).toBe("move");
+    expect(selected as string | null).toBe("move");
     expect(closed).toBe(1);
   });
 

@@ -1,0 +1,11 @@
+.sync-bar { padding: 10px 12px; border-top: 1px solid var(--border-subtle); display: flex; flex-direction: column; gap: 7px; }
+.sync-bar__counts { display: flex; gap: 10px; flex-wrap: wrap; font-size: 11px; }
+.sync-bar__push { color: var(--warning); }
+.sync-bar__pull { color: var(--text-muted); }
+.sync-bar__clash { color: var(--danger); }
+.sync-bar__synced { color: var(--text-subtle); }
+.sync-bar__actions { display: flex; gap: 6px; align-items: center; }
+.sync-bar__sync { display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 12px; padding: 5px 12px; border-radius: var(--radius-sm); cursor: pointer; color: var(--accent); background: color-mix(in srgb, var(--accent) 13%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); }
+.sync-bar__sync:disabled { opacity: .6; cursor: default; }
+.sync-bar__refresh { font: inherit; font-size: 13px; padding: 4px 9px; border-radius: var(--radius-sm); cursor: pointer; color: var(--text-muted); background: var(--surface-hover); border: 1px solid var(--border); }
+.sync-bar__last { font-size: 9.5px; color: var(--text-subtle); }

@@ -5,6 +5,17 @@ import type { GraphResponse } from "../shared/graph-types";
 
 const BASE = "";
 
+export interface MergeRegion { type: "clean"; text: string; }
+export interface MergeConflict { type: "conflict"; local: string; remote: string; base?: string; }
+export type DiffRegion = MergeRegion | MergeConflict;
+
+export interface HubStatusOk {
+  ok: true; checkedAt: number; counts: { push: number; pull: number; clash: number };
+  notPushed: string[]; clashes: string[]; toPull: { path: string; reason: string }[]; removedOnHub: string[];
+}
+export type HubStatus = HubStatusOk | { ok: false; error: "hub_unreachable" };
+export interface SyncResult { ok: boolean; pushed?: number; pulled?: number; clashes?: number; failed?: string[]; checkedAt?: number; error?: string; }
+
 async function json<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${url}`, init);
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
@@ -115,6 +126,14 @@ export const api = {
     list: () => json<{ file: string }[]>("/api/data"),
     get: (file: string) => json<Record<string, unknown>[]>(`/api/data/${file}`),
     schema: (file: string) => json<{ headers: string[]; types: string[]; rowCount: number }>(`/api/data/${file}/schema`),
+  },
+
+  sync: {
+    localStatus: () => json<{ notPushed: string[] }>("/api/sync/local-status"),
+    status: () => json<HubStatus>("/api/sync/status"),
+    diff: (path: string) => json<{ path: string; regions: DiffRegion[] }>(`/api/sync/diff?path=${encodeURIComponent(path)}`),
+    sync: () => json<SyncResult>("/api/sync/sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }),
+    resolve: (path: string, content: string) => json<{ ok: boolean }>("/api/sync/resolve", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path, content }) }),
   },
 };
 

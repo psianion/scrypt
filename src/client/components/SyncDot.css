@@ -1,0 +1,4 @@
+.sync-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 7px; flex: 0 0 auto; vertical-align: middle; }
+.sync-dot--placeholder { background: transparent; }
+.sync-dot--not_pushed { background: var(--warning); }
+.sync-dot--clash { background: var(--danger); }

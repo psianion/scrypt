@@ -3,6 +3,8 @@ import { useNavigate } from "react-router";
 import { api } from "../api";
 import type { NoteMeta } from "../../shared/types";
 import { Dropzone } from "../components/Dropzone";
+import { SyncDot } from "../components/SyncDot";
+import { useSyncStatus, syncDotState } from "../stores/syncStatus";
 
 type SortKey = "modified" | "created" | "title";
 
@@ -11,6 +13,8 @@ export function NotesList() {
   const [notes, setNotes] = useState<NoteMeta[]>([]);
   const [sort, setSort] = useState<SortKey>("modified");
   const [tagFilter, setTagFilter] = useState("");
+  const notPushed = useSyncStatus((s) => s.notPushed);
+  const clashes = useSyncStatus((s) => s.clashes);
 
   useEffect(() => {
     api.notes.list().then(setNotes).catch(() => setNotes([]));
@@ -71,7 +75,10 @@ export function NotesList() {
               onClick={() => navigate(`/note/${n.path}`)}
               className="border-t border-[var(--border)] hover:bg-[var(--surface-hover)] cursor-pointer"
             >
-              <td className="py-1.5 text-[var(--text)]">{n.title}</td>
+              <td className="py-1.5 text-[var(--text)]">
+                  <SyncDot state={syncDotState(n.path, notPushed, clashes)} />
+                  {n.title}
+                </td>
               <td className="py-1.5 text-[var(--text-muted)]">
                 {n.tags.map((t) => `#${t}`).join(" ")}
               </td>

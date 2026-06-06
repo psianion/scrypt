@@ -21,12 +21,34 @@ import { useStore } from "./store";
 import { useApplyTheme } from "./theme";
 import { connectWebSocket } from "./api";
 import { ToastRegion } from "./ui/Toast";
+import { useSyncStatus } from "./stores/syncStatus";
 
 export function AppContent() {
   useApplyTheme();
   const commandPaletteOpen = useStore((s) => s.commandPaletteOpen);
   const toggleCommandPalette = useStore((s) => s.toggleCommandPalette);
   const [newNoteOpen, setNewNoteOpen] = useState(false);
+
+  useEffect(() => {
+    const s = useSyncStatus.getState();
+    void s.refreshLocal();
+    void s.refreshHub();
+
+    // Auto-refresh hub status on an interval so pull/clash counts and the
+    // in-note clash banner don't go stale. Only fire when the tab is visible
+    // to avoid background polling. (F10)
+    const tick = () => {
+      if (document.visibilityState === "visible") {
+        void useSyncStatus.getState().refreshHub();
+      }
+    };
+    const interval = setInterval(tick, 90_000);
+    document.addEventListener("visibilitychange", tick);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", tick);
+    };
+  }, []);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {

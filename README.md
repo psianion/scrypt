@@ -20,6 +20,7 @@ Each ingested note carries a `ingest:` frontmatter block (source hash, tokens, c
 | **Live overlay** | Journal view ActivityStrip + CodeMirror `embed-pulse` + graph node pulse, all driven by a `vault:embedding` WebSocket channel |
 | **REST API** | Full read/write surface for notes, search, graph, tasks, threads, research runs, daily context |
 | **Kanban / Data / Tags** | Every `- [ ]` across the vault on one board; CSV/XLSX preview; hierarchical tag browser |
+| **Sync across devices** | Git-style additive push/pull against a central VPS hub over Tailscale; in-app SyncBar + 3-way clash resolver, or the `scrypt-sync` CLI |
 | **Git autocommit** | Opt-in background loop snapshots the vault every 15 min |
 
 ![Graph view](assets/screenshots/graph.png)
@@ -57,6 +58,17 @@ Every `create_note` runs the full chunking + embedding pipeline server-side and 
 
 For stdio instead of HTTP: `bun run scrypt-mcp`.
 
+## Sync across devices
+
+Scrypt is single-user, but your vault can live on more than one machine. A central VPS instance acts as the hub; every other machine pushes its new notes to the hub and pulls the rest, git-style. Pushes are additive-only — sync never deletes a note on the other side — and when both ends edited the same note since the last sync, your local copy is kept and the clash is flagged for the in-app 3-way resolver (`ClashResolver`) to reconcile. There is no peer-to-peer; everything fans through the hub.
+
+Sync runs over your [Tailscale](https://tailscale.com) tailnet, so the hub is never exposed to the public internet. To turn it on, point each client at the hub and give it the shared bearer token:
+
+- `SCRYPT_HUB_URL` — the hub's tailnet URL, e.g. `http://100.x.y.z:3777`. Activates the in-app SyncBar/resolver and is the `--hub` default for the `scrypt-sync` CLI. (The bare `HUB_URL` is accepted as a one-release fallback.)
+- `SCRYPT_AUTH_TOKEN` — the same shared token the hub requires; remote tailnet callers must send it as `Bearer <token>`. The hub fails closed if no token is configured.
+
+The hub itself is the standard Scrypt Docker deploy — see `docker-compose.vps.yml`. Detailed setup, the full env catalog, and the operator runbook live in `docs/CONFIG-vault-sync.md` and `docs/RELEASE-vault-sync.md`.
+
 ## Environment variables
 
 Core:
@@ -67,6 +79,7 @@ Core:
 | `SCRYPT_VAULT_PATH` | `cwd` | Where your notes live (inside the container: `/vault`) |
 | `SCRYPT_VAULT_DIR` | `./vault` | Host path mounted as `/vault` by docker compose |
 | `SCRYPT_PORT` | `3777` | |
+| `SCRYPT_HUB_URL` | — | Tailnet URL of the central sync hub; enables in-app sync + the `scrypt-sync` CLI (see [Sync across devices](#sync-across-devices)) |
 | `SCRYPT_GIT_AUTOCOMMIT` | `0` | `1` enables the 15-min vault snapshot loop |
 
 Wave 8 embeddings (all optional, sensible defaults):
