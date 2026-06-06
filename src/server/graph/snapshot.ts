@@ -42,6 +42,7 @@ export interface SnapshotEdge {
   target: string;
   tier: Tier;
   reason: string | null;
+  rel_type: string | null;
 }
 
 export interface GraphSnapshot {
@@ -62,6 +63,7 @@ interface EdgeRow {
   target: string;
   tier: string;
   reason: string | null;
+  rel_type: string | null;
 }
 
 interface MetaRow {
@@ -101,7 +103,7 @@ export function buildGraphSnapshot(db: Database): GraphSnapshot {
 
   const edgeRows = db
     .query<EdgeRow, []>(
-      `SELECT source, target, tier, reason FROM graph_edges`,
+      `SELECT source, target, tier, reason, rel_type FROM graph_edges`,
     )
     .all();
 
@@ -157,6 +159,7 @@ export function buildGraphSnapshot(db: Database): GraphSnapshot {
       target: e.target,
       tier,
       reason: e.reason,
+      rel_type: e.rel_type,
     });
     degree.set(e.source, (degree.get(e.source) ?? 0) + 1);
     degree.set(e.target, (degree.get(e.target) ?? 0) + 1);

@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { createDatabase, initSchema } from "../../src/server/db";
 import { FileManager } from "../../src/server/file-manager";
 import { Indexer } from "../../src/server/indexer";
+import { extractReferenceTargets } from "../../src/server/indexer/reference-links";
 import type { Database } from "bun:sqlite";
 
 let vaultPath: string;
@@ -200,4 +201,167 @@ describe("link_index population", () => {
     ).toBe(0);
   });
 
+});
+
+describe("reference linker", () => {
+  test("internal markdown link creates a reference edge (client_tag NULL, reason reference)", async () => {
+    await writeTestNote("notes/target.md", "---\ntitle: Target\n---\nbody");
+    await writeTestNote(
+      "notes/src.md",
+      "---\ntitle: Source\n---\nSee [Target](notes/target.md).",
+    );
+    await indexer.reindexNote("notes/target.md");
+    await indexer.reindexNote("notes/src.md");
+
+    const edges = db
+      .query(
+        "SELECT source, target, tier, reason, client_tag FROM graph_edges WHERE source = ?",
+      )
+      .all("notes/src.md") as Array<{
+        source: string;
+        target: string;
+        tier: string;
+        reason: string | null;
+        client_tag: string | null;
+      }>;
+    expect(edges).toContainEqual({
+      source: "notes/src.md",
+      target: "notes/target.md",
+      tier: "mentions",
+      reason: "reference",
+      client_tag: null,
+    });
+  });
+
+  test("wikilink resolves via title/alias to the target note path", async () => {
+    await writeTestNote(
+      "notes/world.md",
+      "---\ntitle: World Bible\naliases: [Canon]\n---\nbody",
+    );
+    await writeTestNote(
+      "notes/lore.md",
+      "---\ntitle: Lore\n---\nGrounded in [[Canon]].",
+    );
+    await indexer.reindexNote("notes/world.md");
+    await indexer.reindexNote("notes/lore.md");
+
+    const row = db
+      .query("SELECT target FROM graph_edges WHERE source = ?")
+      .get("notes/lore.md") as { target: string } | null;
+    expect(row?.target).toBe("notes/world.md");
+  });
+
+  test("re-reindex is idempotent — no duplicate reference edges", async () => {
+    await writeTestNote("notes/t.md", "---\ntitle: T\n---\nbody");
+    await writeTestNote(
+      "notes/s.md",
+      "---\ntitle: S\n---\nLink [T](notes/t.md).",
+    );
+    await indexer.reindexNote("notes/t.md");
+    await indexer.reindexNote("notes/s.md");
+
+    db.query("UPDATE notes SET content_hash = '' WHERE path = ?").run("notes/s.md");
+    await indexer.reindexNote("notes/s.md");
+
+    const count = (
+      db
+        .query(
+          "SELECT COUNT(*) as c FROM graph_edges WHERE source = ? AND target = ?",
+        )
+        .get("notes/s.md", "notes/t.md") as { c: number }
+    ).c;
+    expect(count).toBe(1);
+  });
+
+  test("relative sibling link resolves to sibling note in same folder", async () => {
+    await writeTestNote(
+      "projects/p/spec/b.md",
+      "---\ntitle: B\n---\nbody",
+    );
+    await writeTestNote(
+      "projects/p/spec/a.md",
+      "---\ntitle: A\n---\nSee [B](b.md).",
+    );
+    await indexer.reindexNote("projects/p/spec/b.md");
+    await indexer.reindexNote("projects/p/spec/a.md");
+
+    const row = db
+      .query("SELECT target FROM graph_edges WHERE source = ?")
+      .get("projects/p/spec/a.md") as { target: string } | null;
+    expect(row?.target).toBe("projects/p/spec/b.md");
+  });
+
+  test("relative ../ link resolves to note in parent-sibling folder", async () => {
+    await writeTestNote(
+      "projects/p/plan/c.md",
+      "---\ntitle: C\n---\nbody",
+    );
+    await writeTestNote(
+      "projects/p/spec/a.md",
+      "---\ntitle: A\n---\nSee [X](../plan/c.md).",
+    );
+    await indexer.reindexNote("projects/p/plan/c.md");
+    await indexer.reindexNote("projects/p/spec/a.md");
+
+    const row = db
+      .query("SELECT target FROM graph_edges WHERE source = ?")
+      .get("projects/p/spec/a.md") as { target: string } | null;
+    expect(row?.target).toBe("projects/p/plan/c.md");
+  });
+
+  test("unresolvable target writes no edge", async () => {
+    await writeTestNote(
+      "notes/dangling.md",
+      "---\ntitle: Dangling\n---\nSee [Ghost](notes/ghost.md).",
+    );
+    await indexer.reindexNote("notes/dangling.md");
+
+    // sanity: the link was recognized; the edge is absent only because the
+    // target note does not exist (resolveLink returns null).
+    expect(extractReferenceTargets("See [Ghost](notes/ghost.md).")).toHaveLength(1);
+
+    const count = (
+      db
+        .query("SELECT COUNT(*) as c FROM graph_edges WHERE source = ?")
+        .get("notes/dangling.md") as { c: number }
+    ).c;
+    expect(count).toBe(0);
+  });
+});
+
+describe("project index scheduling", () => {
+  test("reindexing a note under projects/<p>/ schedules that project", async () => {
+    const scheduled: string[] = [];
+    indexer.setIndexScheduler({ schedule: (p: string) => scheduled.push(p) });
+    await writeTestNote(
+      "projects/p/notes/x.md",
+      "---\ntitle: X\n---\nbody",
+    );
+    await indexer.reindexNote("projects/p/notes/x.md");
+    expect(scheduled).toEqual(["p"]);
+  });
+
+  test("reindexing a non-project note schedules nothing", async () => {
+    const scheduled: string[] = [];
+    indexer.setIndexScheduler({ schedule: (p: string) => scheduled.push(p) });
+    await writeTestNote("notes/loose.md", "---\ntitle: Loose\n---\nbody");
+    await indexer.reindexNote("notes/loose.md");
+    expect(scheduled).toEqual([]);
+  });
+
+  test("no scheduler wired is a no-op (does not throw)", async () => {
+    await writeTestNote(
+      "projects/p/spec/s.md",
+      "---\ntitle: S\n---\nbody",
+    );
+    await indexer.reindexNote("projects/p/spec/s.md");
+  });
+
+  test("reindexing a project's _index.md schedules nothing (no regen loop)", async () => {
+    const scheduled: string[] = [];
+    indexer.setIndexScheduler({ schedule: (p: string) => scheduled.push(p) });
+    await writeTestNote("projects/p/_index.md", "---\ntitle: p — index\nkind: index\n---\nbody");
+    await indexer.reindexNote("projects/p/_index.md");
+    expect(scheduled).toEqual([]);
+  });
 });

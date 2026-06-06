@@ -272,6 +272,22 @@ test("POST /api/sync/sync surfaces 'bad_manifest' on an unexpected manifest shap
   rmSync(vault, { recursive: true, force: true });
 });
 
+test("GET /api/sync/manifest excludes _index.md (per-instance derived artifact)", async () => {
+  const { vault, db, fm, router } = setup([]);
+  // Seed graph_nodes directly: one normal note and one _index.md
+  db.run(`INSERT INTO graph_nodes (id, kind, note_path, content_hash)
+          VALUES ('n1', 'note', 'projects/p/notes/a.md', 'hash-a'),
+                 ('n2', 'note', 'projects/p/_index.md', 'hash-index')`);
+  syncRoutes(router, db, vault, fm);
+  const res = await router.handle(new Request("http://localhost/api/sync/manifest"))!;
+  expect(res.status).toBe(200);
+  const body = await res.json() as { notes: { path: string; content_hash: string }[] };
+  const paths = body.notes.map((n) => n.path);
+  expect(paths).toContain("projects/p/notes/a.md");
+  expect(paths).not.toContain("projects/p/_index.md");
+  rmSync(vault, { recursive: true, force: true });
+});
+
 test("POST /api/sync/sync stays 'hub_unreachable' on a genuine network throw", async () => {
   const { vault, db, fm, router } = setup([{ rel: "projects/p/notes/local.md", body: "L" }]);
   process.env.HUB_URL = "http://hub.invalid";

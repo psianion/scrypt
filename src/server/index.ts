@@ -40,6 +40,7 @@ import { fileURLToPath } from "node:url";
 import { dirname } from "node:path";
 import { Idempotency } from "./mcp/idempotency";
 import { SnapshotScheduler } from "./graph/snapshot-scheduler";
+import { IndexNoteScheduler } from "./ingest/index-note";
 import { wireWebSocketSink } from "./embeddings/ws-sink";
 import type { ToolContext } from "./mcp/types";
 import { IngestRouter } from "./ingest/router";
@@ -93,6 +94,10 @@ export function createApp(config: AppConfig) {
   const wave8Metadata = new MetadataRepo(db);
   const wave9Tasks = new TasksRepo(db);
   const snapshotScheduler = new SnapshotScheduler(db, config.vaultPath);
+  const indexNoteScheduler = new IndexNoteScheduler(
+    { db, metadata: wave8Metadata, fm },
+    { debounceMs: Number(process.env.SCRYPT_INDEX_DEBOUNCE_MS ?? 2000) },
+  );
   const wave8Embeddings = new ChunkEmbeddingsRepo(db);
   const wave8Bus = new ProgressBus();
   // Parent-side engine is kept only for query-time operations (e.g.
@@ -141,6 +146,7 @@ export function createApp(config: AppConfig) {
       ? undefined
       : { sections: wave8Sections, embedService: wave8EmbedClient },
   );
+  indexer.setIndexScheduler(indexNoteScheduler);
   const ws = new WebSocketManager();
   const router = new Router();
 

@@ -51,6 +51,7 @@ describe("buildGraphSnapshot", () => {
         target: "b.md",
         tier: "connected",
         reason: "does the thing",
+        rel_type: null,
       },
     ]);
   });
