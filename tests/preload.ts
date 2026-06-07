@@ -1,3 +1,32 @@
+// === Keep test scratch OUT of the repo root ===
+// ~50 test files create temp dirs via `mkdtemp(join(tmpdir(), "<prefix>-"))`.
+// In environments where TMPDIR is relative or points into the repo, that dumps
+// scratch dirs straight into the repo root (we once found 465). Force an
+// absolute base outside the repo, nest every test temp dir under one run-root,
+// and delete that run-root when the whole suite finishes — so a normal
+// `bun test` leaves nothing behind.
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { mkdtempSync, rmSync, existsSync } from "node:fs";
+import { afterAll } from "bun:test";
+import { safeTempBase } from "./safe-tmpdir";
+
+const repoRoot = resolve(import.meta.dir, "..");
+let tmpBase = safeTempBase(tmpdir(), repoRoot);
+if (!existsSync(tmpBase)) tmpBase = tmpdir(); // extreme fallback; /tmp always exists on macOS+Linux
+const testRunRoot = mkdtempSync(join(tmpBase, "scrypt-testrun-"));
+process.env.TMPDIR = testRunRoot;
+process.env.TMP = testRunRoot;
+process.env.TEMP = testRunRoot;
+afterAll(() => {
+  try {
+    rmSync(testRunRoot, { recursive: true, force: true });
+  } catch {
+    // best-effort: an interrupted run may leave it, but it's under the system
+    // temp dir (outside the repo), so the OS reaps it.
+  }
+});
+
 // Register happy-dom so tests/client/ files get document/window/HTMLElement,
 // but preserve Bun's native fetch/Request/Response/Headers so tests/server/
 // integration tests can still talk to Bun.serve. happy-dom's network types
