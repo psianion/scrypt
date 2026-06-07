@@ -36,9 +36,10 @@ test-screenshots/
 *.png
 !assets/screenshots/*.png
 
-# Test scratch dirs — mkdtemp output occasionally lands in repo root (some
-# runs override TMPDIR / cwd-relative). Ignore so they don't pollute git
-# status. Root cause tracked separately.
+# Test scratch dirs. Root cause is now fixed at the source: tests/preload.ts
+# redirects TMPDIR to a run-scoped dir outside the repo and deletes it after the
+# run (see tests/safe-tmpdir.ts). These patterns stay as a belt-and-suspenders
+# safety net for interrupted runs in misconfigured environments.
 /scrypt-*/
 /bunx-*/
 /vault-e2e-*/
