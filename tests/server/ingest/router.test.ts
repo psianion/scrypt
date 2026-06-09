@@ -144,59 +144,6 @@ describe("IngestRouter.ingest — basic", () => {
   });
 });
 
-describe("IngestRouter.ingest — journal kind", () => {
-  test("creates today's journal file on first write", async () => {
-    const res = await ingest.ingest({
-      kind: "journal",
-      title: "unused",
-      content: "First entry of the day",
-    });
-    expect(res.path).toMatch(/^journal\/\d{4}-\d{2}-\d{2}\.md$/);
-    const raw = readFileSync(join(vaultPath, res.path), "utf-8");
-    expect(raw).toContain("First entry of the day");
-  });
-
-  test("appends to existing journal file under a timestamp heading and bumps modified", async () => {
-    const res1 = await ingest.ingest({
-      kind: "journal",
-      title: "unused",
-      content: "Morning thought",
-    });
-    const raw1 = readFileSync(join(vaultPath, res1.path), "utf-8");
-    const fm1 = parseFrontmatter(raw1).frontmatter;
-    await Bun.sleep(10);
-    const res2 = await ingest.ingest({
-      kind: "journal",
-      title: "unused",
-      content: "Afternoon thought",
-    });
-    const raw2 = readFileSync(join(vaultPath, res2.path), "utf-8");
-    const fm2 = parseFrontmatter(raw2).frontmatter;
-    expect(raw2).toContain("Morning thought");
-    expect(raw2).toContain("Afternoon thought");
-    expect(raw2).toMatch(/##\s+\d{2}:\d{2}\s+UTC/);
-    expect(res2.created).toBe(false);
-    expect(String(fm2.modified) > String(fm1.modified)).toBe(true);
-    expect(fm2.created).toBe(fm1.created);
-  });
-
-  test("emits append activity log row for journal appends", async () => {
-    await ingest.ingest({
-      kind: "journal",
-      title: "u",
-      content: "first",
-    });
-    await ingest.ingest({
-      kind: "journal",
-      title: "u",
-      content: "second",
-    });
-    const rows = activity.query({ kind: "journal" });
-    expect(rows.some((r) => r.action === "create")).toBe(true);
-    expect(rows.some((r) => r.action === "append")).toBe(true);
-  });
-});
-
 describe("IngestRouter.ingest — research_run side effects", () => {
   async function seedThread(slug: string) {
     await ingest.ingest({

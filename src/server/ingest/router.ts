@@ -8,7 +8,6 @@ import type { Indexer } from "../indexer";
 import { ActivityLog } from "../activity";
 import { isValidKind, destinationFor, KINDS, type Kind } from "./kinds";
 import { slugify } from "../slugger";
-import { parseFrontmatter } from "../parsers";
 import {
   insertResearchRun,
   appendRunToThread,
@@ -91,10 +90,6 @@ export class IngestRouter {
     }
 
     const now = new Date();
-
-    if (req.kind === "journal") {
-      return this.ingestJournal(req.content, now);
-    }
 
     const slug = slugify(req.title);
 
@@ -315,53 +310,5 @@ export class IngestRouter {
       }
       throw err;
     }
-  }
-
-  private async ingestJournal(content: string, now: Date): Promise<IngestResult> {
-    const y = now.getUTCFullYear();
-    const m = String(now.getUTCMonth() + 1).padStart(2, "0");
-    const d = String(now.getUTCDate()).padStart(2, "0");
-    const relPath = `journal/${y}-${m}-${d}.md`;
-
-    const hh = String(now.getUTCHours()).padStart(2, "0");
-    const mm = String(now.getUTCMinutes()).padStart(2, "0");
-    const entryHeading = `## ${hh}:${mm} UTC`;
-    const entryBody = this.stripFrontmatterFromBody(content).trim();
-
-    const priorRaw = await this.deps.fm.readRaw(relPath);
-    const existed = priorRaw !== null;
-
-    let newBody: string;
-    let fm: Record<string, unknown>;
-    if (existed) {
-      const parsed = parseFrontmatter(priorRaw!);
-      fm = { ...parsed.frontmatter };
-      newBody =
-        parsed.body.trimEnd() + `\n\n${entryHeading}\n\n${entryBody}\n`;
-    } else {
-      fm = {
-        title: `${y}-${m}-${d}`,
-        kind: "journal",
-        source: "claude",
-        tags: ["journal", "daily"],
-      };
-      newBody = `# ${y}-${m}-${d}\n\n${entryHeading}\n\n${entryBody}\n`;
-    }
-
-    await this.deps.fm.writeNote(relPath, newBody, fm);
-
-    this.deps.activity.record({
-      action: existed ? "append" : "create",
-      kind: "journal",
-      path: relPath,
-      actor: "claude",
-      meta: { bytes: newBody.length },
-    });
-
-    return {
-      path: relPath,
-      kind: "journal",
-      created: !existed,
-    };
   }
 }
