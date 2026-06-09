@@ -7,7 +7,7 @@ import {
 } from "../../../src/server/ingest/kinds";
 
 describe("KINDS", () => {
-  test("contains exactly the 10 expected kinds", () => {
+  test("contains exactly the 9 expected kinds", () => {
     expect(new Set(KINDS)).toEqual(
       new Set([
         "thread",
@@ -19,7 +19,6 @@ describe("KINDS", () => {
         "log",
         "thought",
         "idea",
-        "journal",
       ]),
     );
   });
@@ -89,12 +88,6 @@ describe("destinationFor", () => {
   test("idea", () => {
     expect(destinationFor("idea", "new-product", now)).toBe(
       "notes/ideas/new-product.md",
-    );
-  });
-
-  test("journal always goes to today's file", () => {
-    expect(destinationFor("journal", "ignored-slug", now)).toBe(
-      "journal/2026-04-12.md",
     );
   });
 });
