@@ -68,9 +68,9 @@ export function journalRoutes(
 
   async function dayBundle(date: string) {
     const doc = await loadDoc(date);
-    const due = tasks
-      .list({ status: "open" })
-      .tasks.filter((t) => t.due_date === date);
+    // Include tasks of any status due this day: a completed task should stay
+    // visible (struck-through) so it can be un-checked, not vanish on toggle.
+    const due = tasks.list({ due_date: date }).tasks;
     const related =
       engine && embeddings
         ? await buildRelated(date, doc, indexer, engine, embeddings)
