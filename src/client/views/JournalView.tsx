@@ -55,7 +55,7 @@ export function JournalView() {
     load(date);
   }
 
-  const showAside = (day != null && day.related.length > 0) || hasActivity;
+  const showAside = (day?.related?.length ?? 0) > 0 || hasActivity;
 
   return (
     <div data-testid="journal-view" className="flex h-full">
