@@ -16,6 +16,20 @@ export interface HubStatusOk {
 export type HubStatus = HubStatusOk | { ok: false; error: "hub_unreachable" };
 export interface SyncResult { ok: boolean; pushed?: number; pulled?: number; clashes?: number; failed?: string[]; checkedAt?: number; error?: string; }
 
+// Journal day bundle — mirrors the server `journalRoutes` day-bundle shape.
+export interface JournalEntryDTO {
+  id: string; // exact UTC ISO — also the entry's identity for PATCH/DELETE
+  displayTime: string;
+  body: string;
+}
+export interface RelatedNoteDTO { path: string; title: string; score: number; }
+export interface JournalDay {
+  date: string;
+  entries: JournalEntryDTO[];
+  tasks_due: Task[];
+  related: RelatedNoteDTO[];
+}
+
 async function json<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${url}`, init);
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
@@ -90,8 +104,26 @@ export const api = {
   backlinks: (path: string) => json<any[]>(`/api/backlinks/${path}`),
 
   journal: {
-    today: () => json<Note>("/api/journal/today"),
-    get: (date: string) => json<Note>(`/api/journal/${date}`),
+    today: () => json<JournalDay>("/api/journal/today"),
+    day: (date: string) => json<JournalDay>(`/api/journal/${date}`),
+    calendar: (from: string, to: string) =>
+      json<{ date: string; count: number }[]>(
+        `/api/journal/calendar?from=${from}&to=${to}`,
+      ),
+    addEntry: (date: string, body: string) =>
+      json<JournalDay>(`/api/journal/${date}/entries`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ body }),
+      }),
+    editEntry: (date: string, id: string, body: string) =>
+      json<JournalDay>(`/api/journal/${date}/entries/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ body }),
+      }),
+    deleteEntry: (date: string, id: string) =>
+      json<JournalDay>(`/api/journal/${date}/entries/${id}`, { method: "DELETE" }),
   },
 
   templates: {
@@ -120,6 +152,21 @@ export const api = {
         `/api/tasks/list${qs.toString() ? `?${qs}` : ""}`,
       );
     },
+    create: (input: {
+      title: string; type: string; due_date?: string;
+      note_path?: string; priority?: number; client_tag: string;
+    }) =>
+      json<Task>("/api/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      }),
+    update: (id: number, patch: Partial<{ status: string; title: string; due_date: string }>) =>
+      json<Task>(`/api/tasks/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      }),
   },
 
   data: {
