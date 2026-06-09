@@ -156,7 +156,7 @@ export function createApp(config: AppConfig) {
   // catch-all /api/graph/*path that would otherwise swallow /api/graph/snapshot.
   graphRoutes(router, db, config.vaultPath, snapshotScheduler, wave8Engine, wave8Embeddings);
   searchRoutes(router, indexer, wave8Engine, wave8Embeddings);
-  journalRoutes(router, fm, indexer, config.vaultPath);
+  journalRoutes(router, fm, indexer, wave9Tasks, db, wave8Engine, wave8Embeddings);
   templateRoutes(router, fm, config.vaultPath);
   // Wave 9: legacy /api/tasks REST endpoint removed. Tasks are managed via
   // MCP create_task/get_task/list_tasks/update_task/delete_task tools.
