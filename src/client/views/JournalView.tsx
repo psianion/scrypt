@@ -4,7 +4,7 @@ import { api, type JournalDay } from "../api";
 import { JournalCalendar } from "../components/JournalCalendar";
 import { ActivityStrip } from "../components/ActivityStrip";
 import { useEmbeddingProgress } from "../stores/embeddingProgress";
-import { todayKey, formatEntryDateTime } from "../../shared/date";
+import { todayKey, formatEntryDateTime, formatDayHeading } from "../../shared/date";
 
 export function JournalView() {
   const [date, setDate] = useState(todayKey());
@@ -59,22 +59,29 @@ export function JournalView() {
 
   return (
     <div data-testid="journal-view" className="flex h-full">
-      <div className="flex flex-col flex-1 min-w-0 p-4 gap-4 overflow-y-auto">
+      <div className="flex flex-col flex-1 min-w-0 overflow-y-auto">
+        <div className="w-full max-w-[760px] mx-auto px-5 py-6 flex flex-col gap-5">
+        <header className="flex items-end justify-between gap-3 flex-wrap">
+          <h1 className="text-xl font-semibold leading-tight text-[var(--text)]">
+            {formatDayHeading(date)}
+          </h1>
+          <div className="flex items-center gap-2">
+            <input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className="px-2 py-1 text-sm bg-[var(--surface)] border border-[var(--border)] rounded text-[var(--text)]"
+            />
+            <button
+              onClick={() => setDate(todayKey())}
+              className="px-3 py-1 text-sm bg-[var(--surface-hover)] text-[var(--text-muted)] rounded hover:text-[var(--text)]"
+            >
+              Today
+            </button>
+          </div>
+        </header>
+
         <JournalCalendar counts={counts} selected={date} onSelect={setDate} />
-        <div className="flex items-center gap-2">
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="px-2 py-1 text-sm bg-[var(--surface)] border border-[var(--border)] rounded text-[var(--text)]"
-          />
-          <button
-            onClick={() => setDate(todayKey())}
-            className="px-3 py-1 text-sm bg-[var(--surface-hover)] text-[var(--text-muted)] rounded hover:text-[var(--text)]"
-          >
-            Today
-          </button>
-        </div>
 
         {/* Thoughts feed */}
         <section className="flex flex-col gap-3">
@@ -147,6 +154,7 @@ export function JournalView() {
             </button>
           </div>
         </section>
+        </div>
       </div>
 
       {/* Right rail — related notes (semantic) + ActivityStrip */}

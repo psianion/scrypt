@@ -97,6 +97,24 @@ test("tasks due on the day appear in tasks_due", async () => {
   expect(bundle.tasks_due.map((t: any) => t.title)).toEqual(["do laundry"]);
 });
 
+test("a completed task due that day stays in tasks_due (not filtered out)", async () => {
+  const { router, tasks } = setup();
+  const t = tasks.create({
+    title: "finish report",
+    type: "CUSTOM",
+    due_date: "2026-06-09",
+    note_path: "journal/2026-06-09.md",
+  });
+  tasks.update(t.id, { status: "closed" });
+  const get = await router.handle(
+    new Request("http://x/api/journal/2026-06-09"),
+  )!;
+  const bundle = await get.json();
+  const found = bundle.tasks_due.find((x: any) => x.title === "finish report");
+  expect(found).toBeDefined();
+  expect(found.status).toBe("closed");
+});
+
 test("rejects an invalid date key", async () => {
   const { router } = setup();
   const res = await router.handle(

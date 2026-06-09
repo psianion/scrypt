@@ -85,6 +85,7 @@ export interface ListFilter {
   note_path?: string;
   type?: TaskType;
   status?: TaskStatus;
+  due_date?: string | null;
   limit?: number;
   offset?: number;
 }
@@ -137,6 +138,14 @@ export class TasksRepo {
     if (filter.status !== undefined) {
       where.push(`status = ?`);
       params.push(filter.status);
+    }
+    if (filter.due_date !== undefined) {
+      if (filter.due_date === null) {
+        where.push(`due_date IS NULL`);
+      } else {
+        where.push(`due_date = ?`);
+        params.push(filter.due_date);
+      }
     }
     const whereClause = where.length > 0 ? `WHERE ${where.join(" AND ")}` : "";
 

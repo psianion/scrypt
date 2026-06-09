@@ -33,3 +33,8 @@ export function formatTime(iso: string): string {
 export function formatEntryDateTime(iso: string): string {
   return dayjs.utc(iso).format(`${DAY_FMT} · ${TIME_FMT}`);
 }
+
+/** Render a day key (YYYY-MM-DD) as a human heading, e.g. "Tuesday, June 9, 2026". */
+export function formatDayHeading(dayKey: string): string {
+  return dayjs.utc(dayKey, DAY_FMT, true).format("dddd, MMMM D, YYYY");
+}
