@@ -52,13 +52,22 @@ export function searchChunks(
 
 export function groupByNote(hits: ChunkHit[], limit: number): GroupedHit[] {
   const byNote = new Map<string, GroupedHit>();
+  // Journal entries are temporal: each `journal/<date>.md` chunk is its own
+  // timestamped thought, so collapsing to one-per-note would hide every entry
+  // but the best-scoring one. Keep journal chunks entry-granular; collapse
+  // every other note to its single best chunk.
+  const perEntry: GroupedHit[] = [];
   for (const h of hits) {
+    if (h.note_path.startsWith("journal/")) {
+      perEntry.push({ ...h });
+      continue;
+    }
     const existing = byNote.get(h.note_path);
     if (!existing || h.score > existing.score) {
       byNote.set(h.note_path, { ...h });
     }
   }
-  return Array.from(byNote.values())
+  return [...byNote.values(), ...perEntry]
     .sort((a, b) => b.score - a.score)
     .slice(0, limit);
 }

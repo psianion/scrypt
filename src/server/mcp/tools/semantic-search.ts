@@ -1,8 +1,9 @@
 // src/server/mcp/tools/semantic-search.ts
 import { McpError, MCP_ERROR } from "../errors";
 import { searchChunks, groupByNote } from "../../embeddings/search";
-import type { ToolDef } from "../types";
+import type { ToolDef, ToolContext } from "../types";
 import { DOC_TYPES, type DocType } from "../../vocab/doc-types";
+import { formatEntryDateTime } from "../../../shared/date";
 
 interface Input {
   query: string;
@@ -27,6 +28,36 @@ interface SearchResult {
   project: string | null;
   doc_type: string | null;
   thread: string | null;
+  /** For journal hits only: the entry's exact UTC ISO timestamp. */
+  entry_time?: string;
+  /** For journal hits only: "YYYY-MM-DD · h:mm A" rendering of entry_time. */
+  entry_display?: string;
+}
+
+const ENTRY_ISO = /^\d{4}-\d{2}-\d{2}T[0-9:.]+Z$/;
+
+/**
+ * Journal entries are headed by their exact UTC ISO timestamp, which the
+ * indexer stores as the section's `heading_text`. The chunk_id is either the
+ * section id or `<section_id>:part_N`, so strip the part suffix to recover the
+ * section, then read its heading. Returns the entry datetime when the hit is a
+ * journal chunk whose heading is a UTC ISO; otherwise null.
+ */
+function journalEntryTime(
+  db: ToolContext["db"],
+  note_path: string,
+  chunk_id: string,
+): { time: string; display: string } | null {
+  if (!note_path.startsWith("journal/")) return null;
+  const sectionId = chunk_id.replace(/:part_\d+$/, "");
+  const row = db
+    .query<{ heading_text: string | null }, [string]>(
+      `SELECT heading_text FROM note_sections WHERE id = ?`,
+    )
+    .get(sectionId);
+  const h = row?.heading_text;
+  if (!h || !ENTRY_ISO.test(h)) return null;
+  return { time: h, display: formatEntryDateTime(h) };
 }
 
 interface Output {
@@ -115,7 +146,7 @@ export const semanticSearchTool: ToolDef<Input, Output> = {
     return {
       results: filtered.map((g) => {
         const m = metaByPath.get(g.note_path);
-        return {
+        const result: SearchResult = {
           path: g.note_path,
           title: m?.title ?? g.note_path,
           score: g.score,
@@ -126,6 +157,12 @@ export const semanticSearchTool: ToolDef<Input, Output> = {
           doc_type: m?.doc_type ?? null,
           thread: m?.thread ?? null,
         };
+        const entry = journalEntryTime(ctx.db, g.note_path, g.chunk_id);
+        if (entry) {
+          result.entry_time = entry.time;
+          result.entry_display = entry.display;
+        }
+        return result;
       }),
       model: ctx.engine.model,
     };
