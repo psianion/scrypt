@@ -49,6 +49,6 @@
     "typescript": "^5.9.3"
   },
   "overrides": {
-    "@codemirror/view": "6.43.0"
+    "@codemirror/view": "$@codemirror/view"
   }
 }
