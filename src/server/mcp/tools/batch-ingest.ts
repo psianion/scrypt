@@ -25,6 +25,7 @@ import { DOC_TYPES, isDocType, type DocType } from "../../vocab/doc-types";
 import { buildVaultPath } from "../../path/vault-path";
 import { parseFrontmatter, stringifyFrontmatter } from "../../parsers";
 import { INGEST_VERSION } from "../../ingest/ingest-block";
+import { nowIso, isoFromMs } from "../../../shared/date";
 
 interface Input {
   source_dir: string;
@@ -202,11 +203,11 @@ export const batchIngestTool: ToolDef<Input, Output> = {
               original_path: absSource,
               source_hash: hash,
               source_size: rawBytes.length,
-              source_mtime: new Date(stat.mtimeMs).toISOString(),
+              source_mtime: isoFromMs(stat.mtimeMs),
               tokens: null,
               cost_usd: null,
               model: null,
-              ingested_at: new Date().toISOString(),
+              ingested_at: nowIso(),
               ingest_version: INGEST_VERSION,
             };
 

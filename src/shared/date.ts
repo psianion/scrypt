@@ -19,6 +19,16 @@ export function nowIso(): string {
   return dayjs.utc().toISOString();
 }
 
+/** Day key (YYYY-MM-DD, UTC) for any Date / ISO string / epoch-ms input. */
+export function dayKey(input: Date | string | number): string {
+  return dayjs.utc(input).format(DAY_FMT);
+}
+
+/** UTC ISO string for an epoch-ms timestamp (e.g. a file mtime). */
+export function isoFromMs(ms: number): string {
+  return dayjs.utc(ms).toISOString();
+}
+
 /** Strict YYYY-MM-DD validation (needs customParseFormat). */
 export function isValidDayKey(s: string): boolean {
   return dayjs.utc(s, DAY_FMT, true).isValid();

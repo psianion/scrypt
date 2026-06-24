@@ -1,6 +1,7 @@
 // src/server/parsers.ts
 import matter from "gray-matter";
 import type { WikiLink, ParsedTask, Tag } from "../shared/types";
+import { nowIso } from "../shared/date";
 
 function slugifyValue(value: string): string {
   return value
@@ -181,7 +182,7 @@ export function mergeServerTimestamps(
   frontmatter: Record<string, unknown>,
   ctx: TimestampContext,
 ): Record<string, unknown> {
-  const now = new Date().toISOString();
+  const now = nowIso();
   const { created: _clientCreated, modified: _clientModified, ...rest } =
     frontmatter as Record<string, unknown>;
   return {

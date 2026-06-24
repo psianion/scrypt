@@ -5,6 +5,7 @@ import { readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import type { Router } from "../router";
 import type { FileManager } from "../file-manager";
+import { nowIso, dayKey } from "../../shared/date";
 
 export function templateRoutes(router: Router, fm: FileManager, vaultPath: string): void {
   const templatesDir = join(vaultPath, "templates");
@@ -29,8 +30,8 @@ export function templateRoutes(router: Router, fm: FileManager, vaultPath: strin
     }
 
     let content = await readFile(templateFile, "utf-8");
-    const now = new Date().toISOString();
-    const date = now.split("T")[0];
+    const now = nowIso();
+    const date = dayKey(now);
     const vars: Record<string, string> = {
       date,
       now,
