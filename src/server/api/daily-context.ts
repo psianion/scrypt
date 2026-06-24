@@ -5,6 +5,7 @@ import type { Router } from "../router";
 import type { FileManager } from "../file-manager";
 import type { Indexer } from "../indexer";
 import { parseFrontmatter } from "../parsers";
+import { todayKey, nowIso } from "../../shared/date";
 
 export function dailyContextRoutes(
   router: Router,
@@ -13,11 +14,7 @@ export function dailyContextRoutes(
   vaultPath: string,
 ): void {
   router.get("/api/daily_context", async () => {
-    const now = new Date();
-    const y = now.getUTCFullYear();
-    const m = String(now.getUTCMonth() + 1).padStart(2, "0");
-    const d = String(now.getUTCDate()).padStart(2, "0");
-    const date = `${y}-${m}-${d}`;
+    const date = todayKey();
     const journalRel = `journal/${date}.md`;
     const journalAbs = join(vaultPath, journalRel);
 
@@ -30,7 +27,7 @@ export function dailyContextRoutes(
       : { path: journalRel, content: "", exists: false };
 
     const notes = await fm.listNotes();
-    const cutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
     const recent_notes: any[] = [];
     const open_threads: any[] = [];
@@ -105,7 +102,7 @@ export function dailyContextRoutes(
     // based) in Task 5.3. The old tag/domain disk-walk bundle is retired.
 
     return Response.json({
-      generated_at: now.toISOString(),
+      generated_at: nowIso(),
       today: { date, journal },
       recent_notes: recent_notes.slice(0, 20),
       open_threads,

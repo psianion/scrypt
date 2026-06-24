@@ -1,6 +1,6 @@
 // src/client/components/JournalCalendar.tsx
 import { useEffect, useRef } from "react";
-import { todayKey } from "../../shared/date";
+import { todayKey, dayKey } from "../../shared/date";
 import "./JournalCalendar.css";
 
 interface Props {
@@ -26,7 +26,7 @@ export function JournalCalendar({ counts, selected, onSelect }: Props) {
   for (let i = 371; i >= 0; i--) {
     const d = new Date(today);
     d.setUTCDate(today.getUTCDate() - i);
-    const date = d.toISOString().slice(0, 10);
+    const date = dayKey(d);
     cells.push({ date, count: byDate.get(date) ?? 0 });
   }
   const total = cells.reduce((n, c) => n + c.count, 0);
