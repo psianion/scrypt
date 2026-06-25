@@ -50,11 +50,23 @@ export function createTestEnv() {
       } catch {}
       server.stop();
       app.db.close();
-      rmSync(vaultPath, { recursive: true, force: true });
+      // Restore the env BEFORE rmSync so a throwing rmSync can never skip this
+      // and leak SCRYPT_EMBED_DISABLE=1 into the next test (which would make its
+      // embedding-dependent assertions fail).
       if (prevEmbedDisable === undefined) {
         delete process.env.SCRYPT_EMBED_DISABLE;
       } else {
         process.env.SCRYPT_EMBED_DISABLE = prevEmbedDisable;
+      }
+      // Best-effort: WAL mode leaves -wal/-shm files whose memory-map handles
+      // Windows releases a beat after db.close(), so an immediate rm can trip
+      // EBUSY. maxRetries covers the common case; the try/catch covers the rest.
+      // The scratch dir lives under the system temp run-root (see
+      // tests/preload.ts), which afterAll + the OS reap.
+      try {
+        rmSync(vaultPath, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
+      } catch {
+        /* released after the run; harmless */
       }
     },
     authFetch(path: string, init?: RequestInit) {

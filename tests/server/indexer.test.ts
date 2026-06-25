@@ -28,7 +28,16 @@ beforeEach(async () => {
 afterEach(() => {
   fm.stopWatching();
   db.close();
-  rmSync(vaultPath, { recursive: true, force: true });
+  // Best-effort: WAL mode leaves -wal/-shm files whose memory-map handles
+  // Windows releases a beat after db.close(), so an immediate rm can trip
+  // EBUSY. maxRetries covers the common case; the try/catch covers the rest.
+  // The scratch dir lives under the system temp run-root (see tests/preload.ts),
+  // which afterAll + the OS reap — so a stranded dir here never pollutes the repo.
+  try {
+    rmSync(vaultPath, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
+  } catch {
+    /* released after the run; harmless */
+  }
 });
 
 async function writeTestNote(path: string, content: string) {
