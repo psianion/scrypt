@@ -1,120 +1,108 @@
 # Scrypt
 
-> A personal second brain for the AI era. Markdown on disk, SQLite-indexed, with a browser UI, a REST API, and an MCP server that humans and LLMs both talk to.
+**A second brain that Claude can actually use.**
 
-Every project, research thread, and half-baked idea lives as a `.md` file under `projects/<project>/<doc_type>/<slug>.md`. Claude reads and writes into the same vault you do, so your knowledge base keeps its own context across sessions instead of starting from scratch every chat.
-
-Each ingested note carries a `ingest:` frontmatter block (source hash, tokens, cost, model) and an optional `thread:` that groups a workstream into research → spec → plan chains via typed lineage edges (`derives-from`, `implements`, `supersedes`).
+Your notes are plain `.md` files on disk. Scrypt indexes them with SQLite, serves them through a browser UI and a REST API, and exposes them to Claude over MCP — so the AI reads and writes into the *same* vault you do. Your knowledge base stops starting from scratch every chat.
 
 ![Editor with backlinks](assets/screenshots/editor.png)
 
-## Features
+Everything lives at `projects/<project>/<doc_type>/<slug>.md`. Ingested notes carry an `ingest:` block (source hash, tokens, cost, model) and an optional `thread:` that chains a workstream together — research → spec → plan — with typed lineage edges (`derives-from`, `implements`, `supersedes`).
+
+## What's inside
 
 | | |
 |---|---|
-| **Editor** | CodeMirror 6 markdown, auto-save, line wrap, backlinks panel |
-| **Graph** | Pixi WebGL canvas with tiered lineage edges (`connected` / `mentions` / `semantic`) over typed `add_edge` + embedding similarity |
-| **Search** | SQLite FTS5 keyword search + **semantic search** over local `bge-small-en-v1.5` embeddings, hybrid RRF on `/api/graph/search` |
-| **MCP server** | 19 tools over stdio + `POST /mcp` streamable-http. JSON-RPC 2.0, bearer auth, idempotent `client_tag`s |
-| **Design system** | Token-driven UI (every color/space/radius routed through `theme/tokens.css`), light + dark with `prefers-color-scheme` auto, `⌘⇧L` to toggle, `/design-system` inspector for every primitive × variant × state |
-| **Live overlay** | Journal view ActivityStrip + CodeMirror `embed-pulse` + graph node pulse, all driven by a `vault:embedding` WebSocket channel |
-| **REST API** | Full read/write surface for notes, search, graph, tasks, threads, research runs, daily context |
-| **Kanban / Data / Tags** | Every `- [ ]` across the vault on one board; CSV/XLSX preview; hierarchical tag browser |
-| **Sync across devices** | Git-style additive push/pull against a central VPS hub over Tailscale; in-app SyncBar + 3-way clash resolver, or the `scrypt-sync` CLI |
-| **Git autocommit** | Opt-in background loop snapshots the vault every 15 min |
+| **Editor** | CodeMirror 6 markdown — auto-save, line wrap, live backlinks |
+| **Graph** | WebGL canvas, tiered edges (`connected` / `mentions` / `semantic`) from typed links + embedding similarity |
+| **Search** | FTS5 keyword **and** semantic search over local `bge-small-en-v1.5` embeddings, hybrid-ranked |
+| **MCP** | 19 tools over stdio + streamable-HTTP — JSON-RPC, bearer auth, idempotent writes |
+| **Sync** | Git-style push/pull across devices through a private Tailscale hub, with a 3-way clash resolver |
+| **Plus** | Kanban of every `- [ ]` in the vault · CSV/XLSX preview · tag browser · live embedding overlay · opt-in git autocommit · token-driven light/dark UI |
 
 ![Graph view](assets/screenshots/graph.png)
 
-## Quick start (Docker Desktop)
+## Get running
+
+One command sets everything up. The `scrypt` CLI detects your runtime, generates a strong token, writes `.env` (merging — never clobbering), starts the server, verifies health, runs a security audit, and wires Claude in.
 
 ```bash
 git clone https://github.com/psianion/scrypt.git
 cd scrypt
-cp .env.example .env
-# set SCRYPT_AUTH_TOKEN + SCRYPT_VAULT_DIR=/Users/you/scrypt-vault
-mkdir -p /Users/you/scrypt-vault
-docker compose up -d --build
-open http://localhost:3777
+bun install
+bun run scrypt init
 ```
 
-Or run it directly: `SCRYPT_VAULT_PATH=~/scrypt-vault bun run src/server/index.ts`.
+That's it. The wizard asks three things — profile, vault, ingest folder — and handles the rest.
 
-## MCP — second brain for Claude
+> **Windows / PowerShell:** `bun run scrypt <command>` works everywhere. `bun link` also drops a `scrypt` shim on your PATH.
 
-Register the Scrypt MCP server in Claude Code:
+### Pick a profile
+
+| Profile | What it does | |
+|---|---|---|
+| **native** | Run locally with Bun — fastest for dev | ⚠️ binds all interfaces; don't expose untrusted. Run `scrypt doctor`. |
+| **docker** | Run locally in Docker — production-like | Auto-detects x64 / Apple Silicon. Token required. |
+| **vps** | Turn this machine into a sync client | Points at a remote hub; no local server. |
+
+Handy flags: `--profile`, `--vault <path>`, `--yes` (no prompts), `--print-env` (dry run), `--rotate-token`.
+
+### Day-to-day
 
 ```bash
-./scripts/install-scrypt-mcp.sh
+bun run scrypt up                 # start, wait for /health
+bun run scrypt down [--volumes]   # stop (--volumes also clears the embed cache)
+bun run scrypt doctor             # health + security audit
+bun run scrypt mcp install        # (re)register the MCP server in Claude
+bun run scrypt token rotate       # new auth token
+bun run scrypt sync status        # push/pull against the hub
 ```
 
-That installs the 19 tools over HTTP:
+`scrypt doctor` is your safety net — it catches a missing token on an exposed server, the native all-interfaces bind, a `.env` that slipped out of `.gitignore`, a mismatched compose platform, and more.
 
-- **Reads (7)** — `get_note`, `search_notes`, `semantic_search`, `find_similar`, `walk_graph`, `cluster_graph`, `get_report`
-- **Content writes (5)** — `create_note`, `update_note_metadata`, `add_section_summary`, `add_edge`, `remove_edge`
-- **Tasks (5)** — `create_task`, `get_task`, `list_tasks`, `update_task`, `delete_task`
-- **Maintenance (2)** — `batch_ingest`, `rescan_similarity`
+## Claude as a power user
 
-Every `create_note` runs the full chunking + embedding pipeline server-side and broadcasts live progress to the UI overlay.
+`scrypt mcp install` (run for you at the end of `init`) registers Scrypt's tools in Claude Code. It reads the token and port from `.env`, probes the server, and is idempotent.
 
-For stdio instead of HTTP: `bun run scrypt-mcp`.
+- **Read** — `get_note`, `search_notes`, `semantic_search`, `find_similar`, `walk_graph`, `cluster_graph`, `get_report`
+- **Write** — `create_note`, `update_note_metadata`, `add_section_summary`, `add_edge`, `remove_edge`
+- **Tasks** — `create_task`, `get_task`, `list_tasks`, `update_task`, `delete_task`
+- **Maintenance** — `batch_ingest`, `rescan_similarity`
+
+Every `create_note` runs the full chunk + embed pipeline server-side and streams progress to the UI. Prefer stdio? `bun run scrypt-mcp`.
 
 ## Sync across devices
 
-Scrypt is single-user, but your vault can live on more than one machine. A central VPS instance acts as the hub; every other machine pushes its new notes to the hub and pulls the rest, git-style. Pushes are additive-only — sync never deletes a note on the other side — and when both ends edited the same note since the last sync, your local copy is kept and the clash is flagged for the in-app 3-way resolver (`ClashResolver`) to reconcile. There is no peer-to-peer; everything fans through the hub.
+Scrypt is single-user, but your vault can live on many machines. One VPS instance is the hub; every other machine pushes its new notes and pulls the rest, git-style. Pushes are additive — sync never deletes the other side — and when both ends edited the same note, your local copy wins and the clash is flagged for the in-app 3-way resolver.
 
-Sync runs over your [Tailscale](https://tailscale.com) tailnet, so the hub is never exposed to the public internet. To turn it on, point each client at the hub and give it the shared bearer token:
+It all runs over your [Tailscale](https://tailscale.com) tailnet, so the hub never touches the public internet. Point each client at it:
 
-- `SCRYPT_HUB_URL` — the hub's tailnet URL, e.g. `http://100.x.y.z:3777`. Activates the in-app SyncBar/resolver and is the `--hub` default for the `scrypt-sync` CLI. (The bare `HUB_URL` is accepted as a one-release fallback.)
-- `SCRYPT_AUTH_TOKEN` — the same shared token the hub requires; remote tailnet callers must send it as `Bearer <token>`. The hub fails closed if no token is configured.
+- `SCRYPT_HUB_URL` — the hub's tailnet URL, e.g. `http://100.x.y.z:3777`
+- `SCRYPT_AUTH_TOKEN` — the shared token; remote callers must send it as `Bearer <token>`
 
-The hub itself is the standard Scrypt Docker deploy — see `docker-compose.vps.yml`. Detailed setup, the full env catalog, and the operator runbook live in `docs/CONFIG-vault-sync.md` and `docs/RELEASE-vault-sync.md`.
+The hub is just the standard Docker deploy (`docker-compose.vps.yml`). Full runbook in `docs/CONFIG-vault-sync.md`.
 
-## Environment variables
+## Configuration
 
-Core:
+The CLI writes a sensible `.env` for you. The knobs worth knowing:
 
-| Var | Default | Note |
+| Var | Default | |
 |---|---|---|
-| `SCRYPT_AUTH_TOKEN` | — | Required in production for non-localhost callers |
-| `SCRYPT_VAULT_PATH` | `cwd` | Where your notes live (inside the container: `/vault`) |
-| `SCRYPT_VAULT_DIR` | `./vault` | Host path mounted as `/vault` by docker compose |
+| `SCRYPT_AUTH_TOKEN` | — | Required for any non-localhost caller |
+| `SCRYPT_VAULT_PATH` | `cwd` | Where your notes live (`/vault` in Docker) |
 | `SCRYPT_PORT` | `3777` | |
-| `SCRYPT_HUB_URL` | — | Tailnet URL of the central sync hub; enables in-app sync + the `scrypt-sync` CLI (see [Sync across devices](#sync-across-devices)) |
-| `SCRYPT_GIT_AUTOCOMMIT` | `0` | `1` enables the 15-min vault snapshot loop |
+| `SCRYPT_HUB_URL` | — | Tailnet URL of the sync hub |
+| `SCRYPT_GIT_AUTOCOMMIT` | `0` | `1` snapshots the vault every 15 min |
+| `SCRYPT_EMBED_DISABLE` | `0` | `1` skips embeddings entirely |
 
-Wave 8 embeddings (all optional, sensible defaults):
-
-| Var | Default |
-|---|---|
-| `SCRYPT_EMBED_MODEL` | `Xenova/bge-small-en-v1.5` |
-| `SCRYPT_EMBED_CACHE_DIR` | `/data/embed-cache` (named volume in compose) |
-| `SCRYPT_EMBED_MAX_TOKENS` / `SCRYPT_EMBED_OVERLAP` / `SCRYPT_EMBED_BATCH` | `450` / `50` / `8` |
-| `SCRYPT_EMBED_PREWARM` | `1` (compose) — load the model at boot |
-| `SCRYPT_EMBED_DISABLE` | `0` — set `1` to skip embeddings entirely |
-
-Full catalog and three-layer flow (`.env → docker-compose → loadConfig`) in `docs/BUILD_AND_RUN.md`.
-
-## Fresh start (test vault)
-
-After any change to the ingest schema, the test vault is wiped and reingested — no migration tooling is maintained.
-
-1. `docker compose down`
-2. `rm -rf "$SCRYPT_VAULT_DIR"/* "$SCRYPT_VAULT_DIR"/.scrypt` (e.g. `/Users/admin/scrypt-dnd-test`)
-3. `docker compose up -d`
-4. For each project root on disk: `/scrypt-ingest <source-root> --project <name>`
-5. Verify via `mcp__scrypt__get_report({})` that `projects[]` and `threads[]` look correct.
-
-The ingest skill is idempotent: re-running it on the same source files is safe (hash-matched skips). If source content changed, the slug bumps to `-v2` and a `supersedes` edge is emitted from the new note to the prior one.
-
-Loose captures that don't fit an existing project route to the reserved `_inbox` project; promote them later via the graph UI's "Move to project" action.
+Embeddings default to `Xenova/bge-small-en-v1.5` and need no tuning. Full catalog and the `.env → docker-compose → loadConfig` flow live in `docs/BUILD_AND_RUN.md`.
 
 ## Docs
 
-`docs/` is gitignored (your local-only copy):
+`docs/` is gitignored (your local copy):
 
-- `docs/BUILD_AND_RUN.md` — every run mode, env walkthrough, maintenance, troubleshooting
-- `docs/ARCHITECTURE.md` — data model, indexer pipeline, Wave 8 MCP + embeddings chapter, load-bearing invariants
-- `docs/API.md` — every REST endpoint, every MCP tool, auth, error codes
+- `docs/BUILD_AND_RUN.md` — every run mode, env walkthrough, troubleshooting
+- `docs/ARCHITECTURE.md` — data model, indexer pipeline, MCP + embeddings internals
+- `docs/API.md` — every REST endpoint and MCP tool
 
 ## License
 

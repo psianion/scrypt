@@ -2,13 +2,18 @@
   "name": "scrypt",
   "version": "0.1.0",
   "type": "module",
+  "bin": {
+    "scrypt": "src/cli/main.ts"
+  },
   "scripts": {
     "dev": "bun run --hot src/server/index.ts",
     "dev:client": "vite",
     "build": "vite build",
-    "test": "bun test tests/server/ && bun test tests/client/",
+    "scrypt": "bun run src/cli/main.ts",
+    "test": "bun test tests/server/ && bun test tests/client/ && bun test tests/cli/",
     "test:server": "bun test tests/server/",
     "test:client": "bun test tests/client/",
+    "test:cli": "bun test tests/cli/",
     "scrypt-mcp": "bun run scripts/scrypt-mcp.ts",
     "scrypt-reindex": "bun run scripts/scrypt-reindex.ts",
     "sync": "bun run scripts/scrypt-sync.ts",
