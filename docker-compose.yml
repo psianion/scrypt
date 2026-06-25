@@ -1,6 +1,8 @@
 services:
   scrypt:
-    platform: linux/arm64
+    # No platform pin: BuildKit builds for the host arch (works on arm64 + x64).
+    # `scrypt init` can also generate docker-compose.override.yml to pin a
+    # specific platform and set the ingest mount per-machine.
     build: .
     container_name: scrypt
     restart: unless-stopped
@@ -27,8 +29,10 @@ services:
       # to any absolute path (e.g. /Users/you/scrypt-vault) so your notes
       # stay outside the repo and survive container rebuilds.
       - ${SCRYPT_VAULT_DIR:-./vault}:/vault
-      # Ingest source: mount host files read-only for batch_ingest tool
-      - ${SCRYPT_INGEST_DIR:-/Users/admin/Desktop/Files}:/ingest:ro
+      # Ingest source: mount host files read-only for batch_ingest tool.
+      # Defaults to ./ingest (repo-relative) so it works on any OS; override
+      # with SCRYPT_INGEST_DIR in .env (or via `scrypt init`).
+      - ${SCRYPT_INGEST_DIR:-./ingest}:/ingest:ro
       # Wave 8: embedding model cache — ~33MB download on first boot,
       # reused across rebuilds so you only pay the download once.
       - scrypt-embed-cache:/data/embed-cache

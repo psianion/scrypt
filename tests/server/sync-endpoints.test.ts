@@ -1,7 +1,23 @@
 import { test, expect, beforeEach, afterEach } from "bun:test";
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
+// Symlink creation needs admin / Developer Mode on Windows. Probe once so the
+// realpath-escape test is honestly SKIPPED (not silently passed) where the OS
+// can't build the fixture. The guard itself (realpathSync in api/sync.ts) is
+// still exercised on POSIX CI.
+const canSymlink = (() => {
+  try {
+    const d = mkdtempSync(join(tmpdir(), "sym-probe-"));
+    writeFileSync(join(d, "t.txt"), "x");
+    symlinkSync(join(d, "t.txt"), join(d, "l.txt"));
+    rmSync(d, { recursive: true, force: true });
+    return true;
+  } catch {
+    return false;
+  }
+})();
 import { Database } from "bun:sqlite";
 import { initSchema } from "../../src/server/db";
 import { Router } from "../../src/server/router";
@@ -69,10 +85,9 @@ test("note rejects an absolute path", async () => {
   expect(res.status).toBe(400);
 });
 
-test("note rejects a symlink that escapes the vault", async () => {
-  const { symlinkSync, writeFileSync: wf } = await import("node:fs");
+test.skipIf(!canSymlink)("note rejects a symlink that escapes the vault", async () => {
   const outside = join(tmpdir(), `sync-outside-${Date.now()}.txt`);
-  wf(outside, "secret");
+  writeFileSync(outside, "secret");
   try {
     symlinkSync(outside, join(vaultDir, "escape.md"));
     const res = await router.handle(

@@ -190,6 +190,30 @@ export function buildGraphSnapshot(db: Database): GraphSnapshot {
   };
 }
 
+// Block the current thread for ~ms without busy-spinning. Used only on the rare
+// rename-retry path below.
+function sleepSync(ms: number): void {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+// Atomic publish of the snapshot. On Windows a concurrent reader of graph.json
+// (e.g. an in-flight GET /api/graph/snapshot) or an AV/indexer scan can make
+// renameSync transiently throw EPERM/EACCES/EBUSY even though the move is valid;
+// retry a handful of times with a short backoff before giving up.
+function renameSyncRetry(from: string, to: string, attempts = 10): void {
+  for (let i = 0; ; i++) {
+    try {
+      renameSync(from, to);
+      return;
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException)?.code;
+      const transient = code === "EPERM" || code === "EACCES" || code === "EBUSY";
+      if (i >= attempts || !transient) throw err;
+      sleepSync(5);
+    }
+  }
+}
+
 export function writeGraphSnapshot(db: Database, vaultDir: string): string {
   const snap = buildGraphSnapshot(db);
   const dir = join(vaultDir, ".scrypt");
@@ -204,7 +228,7 @@ export function writeGraphSnapshot(db: Database, vaultDir: string): string {
     fsyncSync(fd);
     closeSync(fd);
     fd = null;
-    renameSync(tmpPath, finalPath);
+    renameSyncRetry(tmpPath, finalPath);
   } catch (err) {
     if (fd !== null) {
       try { closeSync(fd); } catch {}

@@ -1,0 +1,18 @@
+# docker-compose.override.example.yml
+#
+# `scrypt init` (docker profile) copies/generates docker-compose.override.yml
+# from a template like this. Docker Compose auto-merges an override file; scalar
+# fields (like `platform`) are REPLACED when specified here. This lets non-arm64
+# hosts pin the right platform and point the ingest mount at a real local path
+# WITHOUT editing the committed docker-compose.yml.
+#
+# Copy to docker-compose.override.yml and edit, or just run `scrypt init`.
+# The generated docker-compose.override.yml is gitignored.
+
+services:
+  scrypt:
+    # Match your host architecture: linux/amd64 (x64) or linux/arm64 (Apple Silicon).
+    platform: linux/amd64
+    volumes:
+      # Real host path mounted read-only at /ingest for the batch_ingest tool.
+      - "C:\\Users\\you\\scrypt-ingest":/ingest:ro

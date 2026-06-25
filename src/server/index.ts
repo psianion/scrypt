@@ -244,16 +244,24 @@ export function createApp(config: AppConfig) {
 
   // File watcher → reindex → WS broadcast
   fm.watchFiles(async (event) => {
-    if (event.type === "delete") {
-      await indexer.removeNote(event.path);
-    } else {
-      await indexer.reindexNote(event.path);
+    // The watcher invokes this callback fire-and-forget, so any rejection here
+    // would become an unhandled promise rejection. A file event can also land
+    // mid-shutdown (db already closed) or hit a transient parse/index error on
+    // a single file — none of which should crash the process. Contain it.
+    try {
+      if (event.type === "delete") {
+        await indexer.removeNote(event.path);
+      } else {
+        await indexer.reindexNote(event.path);
+      }
+      const wsType =
+        event.type === "create" ? "noteCreated" :
+        event.type === "delete" ? "noteDeleted" : "noteChanged";
+      ws.broadcast({ type: wsType, path: event.path });
+      ws.broadcast({ type: "reindexed" });
+    } catch (err) {
+      console.error(`[scrypt] reindex of ${event.path} failed:`, err);
     }
-    const wsType =
-      event.type === "create" ? "noteCreated" :
-      event.type === "delete" ? "noteDeleted" : "noteChanged";
-    ws.broadcast({ type: wsType, path: event.path });
-    ws.broadcast({ type: "reindexed" });
   });
 
   // Initial full reindex — expose the promise so callers (tests) can await
@@ -318,6 +326,8 @@ export function createApp(config: AppConfig) {
     embedClient: wave8EmbedClient,
     stop: () => {
       autocommit?.stop();
+      snapshotScheduler.stop();
+      indexer.dispose();
     },
   };
 }

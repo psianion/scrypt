@@ -1,4 +1,4 @@
-import { isAbsolute, resolve } from "node:path";
+import { isAbsolute, relative, resolve } from "node:path";
 
 /**
  * Returns a temp base directory guaranteed to be absolute and OUTSIDE the repo.
@@ -10,14 +10,17 @@ import { isAbsolute, resolve } from "node:path";
  * itself, or anywhere inside it), fall back to `/tmp`, which exists on macOS and
  * Linux (the only platforms this project targets).
  *
- * Note the `root + "/"` guard: a sibling like `/x/scrypt-other` must NOT count
- * as inside `/x/scrypt`.
+ * Containment is checked with `relative()` rather than string prefixing so it
+ * is separator-agnostic (Windows `resolve()` yields backslashes, which a
+ * `root + "/"` prefix test would miss) and so a sibling like `/x/scrypt-other`
+ * is NOT mistaken for being inside `/x/scrypt`.
  */
 export function safeTempBase(base: string, repoRoot: string): string {
+  if (!isAbsolute(base)) return "/tmp";
   const root = resolve(repoRoot);
-  if (isAbsolute(base)) {
-    const r = resolve(base);
-    if (r !== root && !r.startsWith(root + "/")) return base;
-  }
-  return "/tmp";
+  const rel = relative(root, resolve(base));
+  // rel === "" is the repo root itself; a rel that neither escapes upward
+  // (`..`) nor is absolute (different drive on Windows) lies inside the repo.
+  const insideRepo = rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
+  return insideRepo ? "/tmp" : base;
 }

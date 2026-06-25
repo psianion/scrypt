@@ -17,6 +17,7 @@ import {
   isAbsolute,
 } from "node:path";
 import { createHash } from "node:crypto";
+import { toPosix } from "../../paths";
 import { parseStructural } from "../../indexer/structural-parse";
 import type { ToolDef } from "../types";
 import type { Database } from "bun:sqlite";
@@ -70,7 +71,7 @@ function walkMarkdown(dir: string, base = dir): string[] {
     if (st.isDirectory()) {
       acc.push(...walkMarkdown(abs, base));
     } else if (entry.endsWith(".md")) {
-      acc.push(relative(base, abs));
+      acc.push(toPosix(relative(base, abs)));
     }
   }
   return acc;

@@ -31,6 +31,7 @@ export interface IndexScheduleHook {
 
 export class Indexer {
   private scheduler?: IndexScheduleHook;
+  private disposed = false;
 
   constructor(
     private db: Database,
@@ -40,6 +41,14 @@ export class Indexer {
 
   setIndexScheduler(hook: IndexScheduleHook): void {
     this.scheduler = hook;
+  }
+
+  // Mark the indexer dead so any in-flight or late async reindex/removeNote
+  // (e.g. a debounced or fs-watch-driven call that resolves during shutdown)
+  // becomes a no-op instead of querying an already-closed DB. The dominant
+  // source of "Cannot use a closed database" rejections in teardown.
+  dispose(): void {
+    this.disposed = true;
   }
 
   private slugifyTitle(title: string): string {
@@ -65,7 +74,9 @@ export class Indexer {
   }
 
   async fullReindex(): Promise<void> {
+    if (this.disposed) return;
     const notes = await this.fm.listNotes();
+    if (this.disposed) return;
     const indexedPaths = new Set(notes.map((n) => n.path));
 
     // Remove stale
@@ -92,8 +103,12 @@ export class Indexer {
   }
 
   async reindexNote(path: string, opts?: { skipEmbed?: boolean }): Promise<void> {
+    if (this.disposed) return;
     const note = await this.fm.readNote(path);
     if (!note) return;
+    // Re-check after the I/O await: the DB may have been closed while we read
+    // the file off disk.
+    if (this.disposed) return;
 
     const contentHash = computeContentHash(note.frontmatter, note.content);
 
@@ -117,7 +132,17 @@ export class Indexer {
       )
       .run(path, path, note.title ?? "", contentHash);
 
-    if (existing && existing.content_hash === contentHash) return;
+    if (existing && existing.content_hash === contentHash) {
+      // Content unchanged, but reference targets resolve against the EVOLVING
+      // notes table: a forward reference that was unresolvable when this note
+      // was first indexed (target not yet ingested) may now point at a note
+      // that exists. Re-run the deterministic reference linker — it is additive
+      // (INSERT OR IGNORE) and idempotent — so a later single-note reindex picks
+      // up newly-resolvable edges instead of depending on ingest order. (The
+      // expensive FTS/metadata/tag rebuild below is correctly skipped.)
+      this.linkReferenceEdges(path, note.content);
+      return;
+    }
 
     const tagsJson = JSON.stringify(note.tags ?? []);
     let noteId: number;
@@ -305,6 +330,7 @@ export class Indexer {
   }
 
   async removeNote(path: string): Promise<void> {
+    if (this.disposed) return;
     const row = this.db
       .query("SELECT id FROM notes WHERE path = ?")
       .get(path) as { id: number } | null;

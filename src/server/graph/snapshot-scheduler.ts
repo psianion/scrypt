@@ -54,6 +54,18 @@ export class SnapshotScheduler {
     }, this.debounceMs);
   }
 
+  // Stop the scheduler: cancel any pending debounce timer and disable further
+  // scheduling. Used for graceful shutdown so a debounced flush can't fire
+  // against an already-closed DB after teardown.
+  stop(): void {
+    if (this.timer) {
+      clearTimeout(this.timer);
+      this.timer = null;
+    }
+    this.pendingAfterCurrent = false;
+    this._disabled = true;
+  }
+
   // Re-enables the scheduler so callers can recover from disabled state.
   async flushNow(): Promise<void> {
     if (this.timer) {

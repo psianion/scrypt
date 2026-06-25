@@ -11,6 +11,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { randomUUID } from "node:crypto";
+import { toPosix } from "../paths";
 import { parseStructural } from "../indexer/structural-parse";
 import type { EmbedderLike } from "./service";
 
@@ -45,7 +46,7 @@ function walkMarkdown(
     if (st.isDirectory()) {
       walkMarkdown(abs, acc, base);
     } else if (entry.endsWith(".md")) {
-      acc.push(relative(base, abs));
+      acc.push(toPosix(relative(base, abs)));
     }
   }
   return acc;
