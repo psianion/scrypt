@@ -3,6 +3,7 @@ import { watch, type FSWatcher } from "node:fs";
 import { mkdir, rename, readdir } from "node:fs/promises";
 import { join, relative, dirname } from "node:path";
 import { parseFrontmatter, stringifyFrontmatter, mergeServerTimestamps } from "./parsers";
+import { toPosix } from "./paths";
 import type { Note, NoteMeta, FileEvent, IngestBlock } from "../shared/types";
 
 function stringOrNull(v: unknown): string | null {
@@ -35,6 +36,7 @@ function ingestFromFrontmatter(fm: Record<string, unknown>): IngestBlock | null 
 
 export class FileManager {
   private watcher: FSWatcher | null = null;
+  private watching = false;
 
   constructor(
     private vaultPath: string,
@@ -126,7 +128,7 @@ export class FileManager {
     const notes: NoteMeta[] = [];
     await this.walkDir(searchDir, async (filePath) => {
       if (!filePath.endsWith(".md")) return;
-      const relPath = relative(this.vaultPath, filePath);
+      const relPath = toPosix(relative(this.vaultPath, filePath));
       if (relPath.startsWith(".scrypt")) return;
 
       const note = await this.readNote(relPath);
@@ -140,26 +142,37 @@ export class FileManager {
   }
 
   watchFiles(callback: (event: FileEvent) => void): void {
+    this.watching = true;
     this.watcher = watch(
       this.vaultPath,
       { recursive: true },
       async (_eventType, filename) => {
-        if (!filename || !filename.endsWith(".md")) return;
-        if (filename.startsWith(".scrypt")) return;
+        if (!this.watching || !filename) return;
+        // The recursive fs watcher emits OS-native separators; normalize so
+        // emitted event paths match the POSIX ids used everywhere else.
+        const rel = toPosix(filename);
+        if (!rel.endsWith(".md")) return;
+        if (rel.startsWith(".scrypt")) return;
 
-        const fullPath = join(this.vaultPath, filename);
+        const fullPath = join(this.vaultPath, rel);
         const exists = await Bun.file(fullPath).exists();
+        // Re-check after the await: stopWatching() may have run while the
+        // exists() check was pending. Suppressing the callback here prevents a
+        // late event from driving a reindex against an already-closed DB
+        // (the dominant source of "unhandled error between tests").
+        if (!this.watching) return;
 
         if (_eventType === "rename") {
-          callback({ type: exists ? "create" : "delete", path: filename });
+          callback({ type: exists ? "create" : "delete", path: rel });
         } else {
-          callback({ type: "modify", path: filename });
+          callback({ type: "modify", path: rel });
         }
       }
     );
   }
 
   stopWatching(): void {
+    this.watching = false;
     this.watcher?.close();
     this.watcher = null;
   }

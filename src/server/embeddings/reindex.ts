@@ -6,6 +6,7 @@
 import { readdirSync, statSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { randomUUID } from "node:crypto";
+import { toPosix } from "../paths";
 import type { Database } from "bun:sqlite";
 import type { EmbeddingService, EngineLike } from "./service";
 import type { SectionsRepo } from "../indexer/sections-repo";
@@ -30,7 +31,7 @@ function walkMarkdown(dir: string, acc: string[] = [], base = dir): string[] {
     if (st.isDirectory()) {
       walkMarkdown(abs, acc, base);
     } else if (entry.endsWith(".md")) {
-      acc.push(relative(base, abs));
+      acc.push(toPosix(relative(base, abs)));
     }
   }
   return acc;
