@@ -10,11 +10,22 @@ import { useStore } from "../../src/client/store";
 // the nav-routing test.
 import "../../src/client/views/GraphView";
 
-// Mock fetch to return empty arrays for API calls. Saved/restored per-test so
-// the full-suite run does not leak into unrelated test files.
-const mockFetch = (async () =>
-  new Response(JSON.stringify([]), { headers: { "Content-Type": "application/json" } })
-) as any;
+// Mock fetch for API calls. Saved/restored per-test so the full-suite run does
+// not leak into unrelated test files. Most endpoints return an empty array, but
+// the journal day-bundle endpoints (/api/journal/today and /api/journal/:date)
+// return an object { date, entries, tasks_due, related }, so JournalView (which
+// renders at the root route "/") gets a well-formed empty bundle instead of [].
+const mockFetch = (async (input: RequestInfo | URL) => {
+  const url = typeof input === "string" ? input : input.toString();
+  const isJournalBundle =
+    /\/api\/journal\/(today|\d{4}-\d{2}-\d{2})(\?|$)/.test(url);
+  const body = isJournalBundle
+    ? { date: "1970-01-01", entries: [], tasks_due: [], related: [] }
+    : [];
+  return new Response(JSON.stringify(body), {
+    headers: { "Content-Type": "application/json" },
+  });
+}) as any;
 
 let originalFetch: typeof globalThis.fetch;
 
@@ -81,7 +92,10 @@ describe("App Shell", () => {
       </MemoryRouter>,
     );
     await waitFor(() => {
-      expect(screen.getByText(/Today/i)).toBeDefined();
+      // Redirect landed on /journal => JournalView mounted. Assert on the
+      // unambiguous view testid; "Today" now matches multiple nodes (the
+      // "Today" button and the "Today's tasks" heading) in the reworked view.
+      expect(screen.getByTestId("journal-view")).toBeDefined();
     });
   });
 

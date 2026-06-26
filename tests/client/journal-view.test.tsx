@@ -1,30 +1,29 @@
 // tests/client/journal-view.test.tsx
-import { describe, test, expect, afterEach, beforeEach } from "bun:test";
-import { render, screen, cleanup } from "@testing-library/react";
-import { BrowserRouter } from "react-router";
+import { test, expect, mock, afterEach } from "bun:test";
+import { render, fireEvent, waitFor, cleanup } from "@testing-library/react";
 import { JournalView } from "../../src/client/views/JournalView";
-
-const __mockFetch = (async (url: string) => {
-  if (url.includes("/api/journal/today")) {
-    return new Response(JSON.stringify({
-      path: "journal/2026-04-12.md", title: "2026-04-12", content: "# Today\n\nNotes.",
-      tags: ["journal"], created: "", modified: "", aliases: [], frontmatter: {},
-    }));
-  }
-  return new Response(JSON.stringify({}));
-}) as any;
-beforeEach(() => { globalThis.fetch = __mockFetch; });
+import { api } from "../../src/client/api";
 
 afterEach(cleanup);
 
-describe("JournalView", () => {
-  test("opens today's note on view load", async () => {
-    render(<BrowserRouter><JournalView /></BrowserRouter>);
-    expect(await screen.findByTestId("journal-view")).toBeDefined();
-  });
+test("composer posts an entry and tasks render", async () => {
+  const day = {
+    date: "2026-06-09",
+    entries: [{ id: "2026-06-09T15:00:00.000Z", displayTime: "3:00 PM", body: "hi" }],
+    tasks_due: [{ id: 1, title: "do laundry", status: "open" }],
+    related: [{ path: "notes/poke.md", title: "poke", score: 0.5 }],
+  };
+  api.journal.today = mock(async () => day) as any;
+  api.journal.day = mock(async () => day) as any;
+  api.journal.calendar = mock(async () => [{ date: "2026-06-09", count: 1 }]) as any;
+  api.journal.addEntry = mock(async () => day) as any;
 
-  test("shows calendar picker for date navigation", async () => {
-    render(<BrowserRouter><JournalView /></BrowserRouter>);
-    expect(await screen.findByText("Today")).toBeDefined();
-  });
+  const { getByTestId, getByText } = render(<JournalView />);
+  await waitFor(() => getByText("hi"));
+  expect(getByText("3:00 PM")).toBeTruthy();
+  expect(getByText("do laundry")).toBeTruthy();
+
+  fireEvent.change(getByTestId("journal-composer"), { target: { value: "new thought" } });
+  fireEvent.click(getByTestId("journal-composer-save"));
+  await waitFor(() => expect(api.journal.addEntry).toHaveBeenCalled());
 });
