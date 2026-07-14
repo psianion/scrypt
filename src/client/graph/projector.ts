@@ -3,8 +3,8 @@
 // Plain 2D canvas (getContext("2d")) with manual perspective projection —
 // NOT WebGL, NOT three.js. Layout (x/y/z) is computed ONCE and cached; only
 // the camera (yaw/pitch/dolly) animates per frame. This is the sole graph
-// renderer — it owns the RenderMode/RenderOpts/RenderHandle types (the old
-// Pixi render.ts is deleted).
+// renderer — it owns the RenderMode/ProjectorOpts/ProjectorHandle types (the
+// old Pixi render.ts is deleted).
 //
 // Phase 2 (selection trace, tooltip/card picking, per-project legend
 // visibility) is implemented below on top of the `pickedId` hover-pick hook —
@@ -30,26 +30,6 @@ export type RenderMode =
   | { kind: "global" }
   | { kind: "local"; centerId: string; depthLimit: number };
 
-export interface RenderOpts {
-  snap: GraphSnapshot;
-  tierFilter: TierFilter;
-  visited: Set<string>;
-  onNodeClick: (id: string) => void;
-  onNodeVisited: (id: string) => void;
-  enableRadial: boolean;
-  mode: RenderMode;
-  width: number;
-  height: number;
-}
-
-export interface RenderHandle {
-  canvas: HTMLCanvasElement;
-  destroy(): void;
-  focusNode(id: string): void;
-  updateFilter(f: TierFilter): void;
-  updateQueryFilter(nodeIds: Set<string> | null, matches: Set<string>): void;
-}
-
 /** Phase 2 selection: the traced node + its transitive prerequisite closure
  * (ancestors only, excludes nodeId itself — see lineage.ts). */
 export interface Selection {
@@ -58,14 +38,27 @@ export interface Selection {
   color: string;
 }
 
-export interface ProjectorOpts extends RenderOpts {
+export interface ProjectorOpts {
+  snap: GraphSnapshot;
+  tierFilter: TierFilter;
+  visited: Set<string>;
+  onNodeClick: (id: string) => void;
+  onNodeVisited: (id: string) => void;
+  mode: RenderMode;
+  width: number;
+  height: number;
   /** Fired on hover-pick change: (id, screen x, screen y) or (null) on leave. */
   onHover?: (id: string | null, x: number, y: number) => void;
   /** Fired when a pick lands on empty canvas (used to clear selection). */
   onBackgroundClick?: () => void;
 }
 
-export interface ProjectorHandle extends RenderHandle {
+export interface ProjectorHandle {
+  canvas: HTMLCanvasElement;
+  destroy(): void;
+  focusNode(id: string): void;
+  updateFilter(f: TierFilter): void;
+  updateQueryFilter(nodeIds: Set<string> | null, matches: Set<string>): void;
   setSelection(sel: Selection | null): void;
   /** Set of project names to hide (fades nodes+edges out over ~250ms). */
   setProjectVisibility(hiddenProjects: Set<string>): void;

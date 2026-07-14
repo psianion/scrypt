@@ -304,7 +304,6 @@ function ConnectedGraph() {
       },
       onBackgroundClick: () => onBackgroundClickRef.current(),
       onHover: (id, x, y) => onHoverRef.current(id, x, y),
-      enableRadial: true,
       mode: { kind: "global" },
       width: rect.width,
       height: rect.height,

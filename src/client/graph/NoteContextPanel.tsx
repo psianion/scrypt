@@ -71,7 +71,6 @@ export function NoteContextPanel({ path, note: noteProp, debug = false }: Props)
         visited: new Set(),
         onNodeClick: (id) => navigate(`/note/${id}`),
         onNodeVisited: () => {},
-        enableRadial: false,
         mode: { kind: "local", centerId: path, depthLimit: 1 },
         width: 260,
         height: 260,

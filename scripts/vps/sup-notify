@@ -7,12 +7,9 @@ set -uo pipefail
 
 [[ -n "${DISCORD_NOTIFY_WEBHOOK:-}" ]] || exit 0
 
-if ! msg=$(printf '%s' "${1:-}" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))' 2>/dev/null); then
-  # Fallback without python3: escape backslashes, quotes, and newlines so the
-  # JSON stays valid (an invalid body dies silently in the `|| true` below).
-  m=${1:-}; m=${m//\\/\\\\}; m=${m//\"/\\\"}; m=${m//$'\n'/\\n}
-  msg="\"$m\""
-fi
+# python3 is a hard dep of this stack's hook scripts already; if it's somehow
+# missing, losing the notification beats posting broken JSON.
+msg=$(printf '%s' "${1:-}" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))' 2>/dev/null) || exit 0
 
 curl -fsS -m 10 -H 'Content-Type: application/json' \
   -d "{\"content\": $msg}" "$DISCORD_NOTIFY_WEBHOOK" >/dev/null 2>&1 || true

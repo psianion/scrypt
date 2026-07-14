@@ -11,14 +11,14 @@ import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/re
 import { MemoryRouter, Route, Routes } from "react-router";
 
 import type { GraphSnapshot } from "../../src/server/graph/snapshot";
-import type { RenderHandle, RenderOpts } from "../../src/client/graph/projector";
+import type { ProjectorHandle, ProjectorOpts } from "../../src/client/graph/projector";
 import { __resetSnapshotCache } from "../../src/client/graph/useGraphSnapshot";
 
 // Spy ledger captured by the mocked renderer. One entry per createGraph call.
 interface CreateCall {
-  opts: RenderOpts;
-  handle: RenderHandle & {
-    updateFilterCalls: Array<RenderOpts["tierFilter"]>;
+  opts: ProjectorOpts;
+  handle: ProjectorHandle & {
+    updateFilterCalls: Array<ProjectorOpts["tierFilter"]>;
     updateQueryCalls: Array<{ visible: Set<string> | null; matches: Set<string> }>;
     focusCalls: string[];
     destroyed: boolean;
@@ -29,9 +29,9 @@ const createCalls: CreateCall[] = [];
 
 mock.module("../../src/client/graph/projector", () => {
   return {
-    createProjector(_parent: HTMLElement, opts: RenderOpts): RenderHandle {
+    createProjector(_parent: HTMLElement, opts: ProjectorOpts): ProjectorHandle {
       const fakeCanvas = document.createElement("canvas");
-      const updateFilterCalls: Array<RenderOpts["tierFilter"]> = [];
+      const updateFilterCalls: Array<ProjectorOpts["tierFilter"]> = [];
       const updateQueryCalls: Array<{
         visible: Set<string> | null;
         matches: Set<string>;
@@ -45,7 +45,7 @@ mock.module("../../src/client/graph/projector", () => {
         focusNode(id: string) {
           focusCalls.push(id);
         },
-        updateFilter(f: RenderOpts["tierFilter"]) {
+        updateFilter(f: ProjectorOpts["tierFilter"]) {
           updateFilterCalls.push({ ...f });
         },
         updateQueryFilter(visible: Set<string> | null, matches: Set<string>) {
@@ -62,7 +62,7 @@ mock.module("../../src/client/graph/projector", () => {
         focusCalls,
       };
       createCalls.push({ opts, handle });
-      return handle as unknown as RenderHandle;
+      return handle;
     },
   };
 });

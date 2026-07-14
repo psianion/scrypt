@@ -26,7 +26,6 @@ declare module "d3-force-3d" {
 
   export function forceSimulation(nodes?: Force3DNode[], numDimensions?: number): Simulation3D;
   export function forceManyBody(): Force;
-  export function forceLink(links?: unknown[]): Force;
   export function forceCollide(radius?: number | ((d: any) => number)): Force;
   export function forceCenter(x?: number, y?: number, z?: number): Force;
   export function forceX(x?: number | ((d: any) => number)): Force;
