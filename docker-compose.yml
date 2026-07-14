@@ -36,7 +36,14 @@ services:
       # Wave 8: embedding model cache — ~33MB download on first boot,
       # reused across rebuilds so you only pay the download once.
       - scrypt-embed-cache:/data/embed-cache
+      # ponytail: SQLite WAL mode over a Windows bind mount (virtiofs/gRPC-FUSE)
+      # corrupts the db (SQLITE_CORRUPT / SHMOPEN) — park .scrypt state in a
+      # named volume so mmap/locking stays on native Docker storage. Markdown
+      # content still lives on the host bind mount above; only internal
+      # index/db state is isolated here. Revisit if Docker Desktop fixes this.
+      - scrypt-state:/vault/.scrypt
     working_dir: /vault
 
 volumes:
   scrypt-embed-cache:
+  scrypt-state:

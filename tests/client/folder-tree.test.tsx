@@ -6,6 +6,7 @@ import {
   type FolderTreeNote,
 } from "../../src/client/components/FolderTree.helpers";
 import { FolderTree } from "../../src/client/components/FolderTree";
+import { DOC_TYPES } from "../../src/server/vocab/doc-types";
 
 afterEach(() => {
   cleanup();
@@ -135,10 +136,10 @@ describe("FolderTree render", () => {
     );
     expect(screen.queryByText("architecture")).toBeNull();
     rerender(<FolderTree notes={NOTES} showAllTypes={true} />);
-    // All 9 DOC_TYPES should now have rows under each project.
+    // Every DOC_TYPE should now have a row under each project.
     const dbtmg = container.querySelector('[data-project="dbtmg"]')!;
     const docTypeRows = dbtmg.querySelectorAll("[data-doc-type]");
-    expect(docTypeRows.length).toBe(9);
+    expect(docTypeRows.length).toBe(DOC_TYPES.length);
   });
 
   test("clicking a note calls onNoteClick with the note path", () => {

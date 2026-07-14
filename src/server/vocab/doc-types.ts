@@ -7,6 +7,7 @@ export const DOC_TYPES = [
   "guide",
   "journal",
   "sessionlog",
+  "mytop10",
   "other",
 ] as const;
 
