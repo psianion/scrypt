@@ -32,7 +32,12 @@ SECRETS=/opt/secrets/shared.env
 mkdir -p "$LOG_DIR"
 
 log()  { printf '[%s] %s\n' "$(date -Iseconds)" "$*" | tee -a "$LOG" >&2; }
-fail() { log "FAIL: $1"; exit "${2:-1}"; }
+fail() {
+  log "FAIL: $1"
+  # STACK.md guarantee: every hard failure notifies (expired GHCR_PAT etc. must not die silently under cron).
+  [ -x "$HOME/bin/sup-notify" ] && "$HOME/bin/sup-notify" "update-scrypt FAILED: $1" || true
+  exit "${2:-1}"
+}
 
 # Single-instance lock — prevents cron + manual collision and concurrent restarts.
 exec 9>"$LOCK"
@@ -97,10 +102,15 @@ if ! $healthy; then
     docker tag "$PREV_IMAGE_ID" "$IMAGE"
     docker compose -f "$COMPOSE" up -d >> "$LOG" 2>&1 || true
     log "rollback dispatched; manually verify with: curl $HEALTH_URL"
+    [ -x "$HOME/bin/sup-notify" ] && "$HOME/bin/sup-notify" "scrypt update rolled back: healthcheck failed after pulling $NEW_DIGEST" || true
   else
     log "no previous image to roll back to — manual intervention required"
+    [ -x "$HOME/bin/sup-notify" ] && "$HOME/bin/sup-notify" "scrypt update FAILED: no previous image to roll back to (digest $NEW_DIGEST) — manual intervention required" || true
   fi
   exit 1
 fi
+
+log "pruning dangling images"
+docker image prune -f >> "$LOG" 2>&1 || true
 
 log "=== update-scrypt done (digest=$NEW_DIGEST) ==="

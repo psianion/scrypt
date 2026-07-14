@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# sup-notify "message" — post a message to the shared Discord alert webhook.
+# No-op (exit 0) if DISCORD_NOTIFY_WEBHOOK is unset/empty. Never breaks callers.
+set -uo pipefail
+
+[[ -r /opt/secrets/shared.env ]] && source /opt/secrets/shared.env
+
+[[ -n "${DISCORD_NOTIFY_WEBHOOK:-}" ]] || exit 0
+
+if ! msg=$(printf '%s' "${1:-}" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))' 2>/dev/null); then
+  # Fallback without python3: escape backslashes, quotes, and newlines so the
+  # JSON stays valid (an invalid body dies silently in the `|| true` below).
+  m=${1:-}; m=${m//\\/\\\\}; m=${m//\"/\\\"}; m=${m//$'\n'/\\n}
+  msg="\"$m\""
+fi
+
+curl -fsS -m 10 -H 'Content-Type: application/json' \
+  -d "{\"content\": $msg}" "$DISCORD_NOTIFY_WEBHOOK" >/dev/null 2>&1 || true

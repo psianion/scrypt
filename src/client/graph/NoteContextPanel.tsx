@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { api } from "../api";
 import { useGraphSnapshot } from "./useGraphSnapshot";
-import { createGraph, type RenderHandle } from "./render";
+import { createProjector, type ProjectorHandle } from "./projector";
 import type { IngestBlock, Note, NoteIncomingEdge } from "../../shared/types";
 
 interface Props {
@@ -28,7 +28,7 @@ export function NoteContextPanel({ path, note: noteProp, debug = false }: Props)
   const [reloadTick, setReloadTick] = useState(0);
   const [semExpanded, setSemExpanded] = useState(false);
   const hostRef = useRef<HTMLDivElement>(null);
-  const handleRef = useRef<RenderHandle | null>(null);
+  const handleRef = useRef<ProjectorHandle | null>(null);
   const navigate = useNavigate();
 
   // When a caller passes `note` directly, that's our source of truth; skip
@@ -65,7 +65,7 @@ export function NoteContextPanel({ path, note: noteProp, debug = false }: Props)
     if (!snap || !hostRef.current || !path) return;
     const host = hostRef.current;
     try {
-      handleRef.current = createGraph(host, {
+      handleRef.current = createProjector(host, {
         snap,
         tierFilter: { connected: true, mentions: true, semantically_related: true },
         visited: new Set(),
@@ -76,8 +76,10 @@ export function NoteContextPanel({ path, note: noteProp, debug = false }: Props)
         width: 260,
         height: 260,
       });
+      // Pulse-highlight the active file's node in the mini-graph.
+      handleRef.current.focusNode(path);
     } catch {
-      // Pixi cannot init (e.g. jsdom without WebGL) — leave host empty; rest of panel still renders.
+      // Canvas cannot init (e.g. jsdom) — leave host empty; rest of panel still renders.
     }
     return () => {
       handleRef.current?.destroy();

@@ -4,8 +4,70 @@ import type { Database } from "bun:sqlite";
 import type { Router } from "../router";
 import type { FileManager } from "../file-manager";
 import type { Indexer } from "../indexer";
-import { parseTier, type NoteIncomingEdge } from "../../shared/types";
+import { parseTier, type NoteIncomingEdge, type NoteMeta } from "../../shared/types";
 import { moveNoteHandler } from "./notes-move";
+
+interface NoteRow {
+  path: string;
+  title: string;
+  tags: string | null;
+  created: string | null;
+  modified: string | null;
+  project: string | null;
+  doc_type: string | null;
+  thread: string | null;
+  domain: string | null;
+  subdomain: string | null;
+}
+
+const LIST_COLUMNS =
+  "SELECT path, title, tags, created, modified, project, doc_type, thread, domain, subdomain FROM notes";
+
+function parseTags(raw: string | null): string[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.map(String) : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * The list endpoint only needs metadata, which the indexer already holds. The
+ * filesystem walk it replaces opened and frontmatter-parsed every note serially
+ * — >10s on a 1k-note vault, past Bun.serve's idle timeout, so the request was
+ * reset and the sidebar rendered empty.
+ *
+ * Returns null when the index has no rows yet (cold start, before the first
+ * reindex), so the caller can fall back to the filesystem.
+ */
+function listNotesIndexed(db: Database | undefined, folder?: string): NoteMeta[] | null {
+  if (!db) return null;
+  const total = db.query("SELECT count(*) AS c FROM notes").get() as { c: number } | null;
+  if (!total || total.c === 0) return null;
+
+  const rows = (folder
+    ? db.query(`${LIST_COLUMNS} WHERE path LIKE ?1 ESCAPE '\\'`)
+        .all(`${folder.replace(/[\\%_]/g, "\\$&")}/%`)
+    : db.query(LIST_COLUMNS).all()) as NoteRow[];
+
+  return rows.map((r) => ({
+    path: r.path,
+    title: r.title,
+    tags: parseTags(r.tags),
+    created: r.created ?? "",
+    modified: r.modified ?? "",
+    aliases: [],
+    domain: r.domain,
+    subdomain: r.subdomain,
+    identifierTags: [],
+    topicTags: [],
+    project: r.project,
+    doc_type: r.doc_type,
+    thread: r.thread,
+  }));
+}
 
 export function notesRoutes(
   router: Router,
@@ -20,22 +82,10 @@ export function notesRoutes(
     const folder = url.searchParams.get("folder") || undefined;
     const sort = url.searchParams.get("sort");
 
-    let notes = await fm.listNotes(folder);
+    let notes = listNotesIndexed(db, folder) ?? (await fm.listNotes(folder));
 
     if (tag) {
-      const taggedPaths = new Set(
-        indexer.getTags()
-          .filter((t) => t.tag === tag)
-          .length > 0
-            ? (indexer as any).db
-                .query("SELECT n.path FROM notes n JOIN tags t ON t.note_id = n.id WHERE t.tag = ?")
-                .all(tag)
-                .map((r: any) => r.path)
-            : []
-      );
-      if (taggedPaths.size > 0) {
-        notes = notes.filter((n) => taggedPaths.has(n.path));
-      }
+      notes = notes.filter((n) => n.tags.includes(tag));
     }
 
     if (sort === "modified") {

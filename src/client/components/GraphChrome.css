@@ -1,0 +1,98 @@
+/* src/client/components/GraphChrome.css
+ * Phase 1 overlay chrome for the funnel-cloud graph view. Positioned inside
+ * .graph-view__canvas (already `position: relative`, see main.css). The
+ * overlay itself ignores pointer events so drag/scroll reach the canvas
+ * underneath; only the legend buttons opt back in.
+ */
+
+.graph-chrome {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: var(--space-8);
+  pointer-events: none;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+.graph-chrome__hero {
+  max-width: 420px;
+}
+
+.graph-chrome__hero h1 {
+  margin: 0 0 var(--space-2);
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.graph-chrome__hero p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.graph-chrome__bottom {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-8);
+}
+
+.graph-chrome__legend {
+  pointer-events: auto;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-height: none;
+  overflow: visible;
+}
+
+.graph-chrome__legend-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 3px var(--space-3);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  transition: opacity 250ms ease;
+}
+
+.graph-chrome__legend-item:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.graph-chrome__legend-item.is-dimmed {
+  opacity: 0.35;
+}
+
+.graph-chrome__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  flex-shrink: 0;
+}
+
+.graph-chrome__legend-label {
+  white-space: nowrap;
+}
+
+.graph-chrome__legend-count {
+  color: var(--text-subtle);
+  margin-left: var(--space-2);
+}
+
+.graph-chrome__hint {
+  font-size: 11px;
+  color: var(--text-subtle);
+  white-space: nowrap;
+}

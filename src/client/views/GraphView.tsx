@@ -1,18 +1,30 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
+import type { SnapshotNode } from "../../server/graph/snapshot";
 import { useGraphSnapshot } from "../graph/useGraphSnapshot";
 import {
   loadTierFilter,
   saveTierFilter,
   type TierFilter,
 } from "../graph/tierFilter";
-import { createGraph, type RenderHandle } from "../graph/render";
+import { createProjector, type ProjectorHandle, type Selection } from "../graph/projector";
+import {
+  prerequisiteClosure,
+  directPrerequisites,
+  directDependents,
+  lineageDepth,
+  displayLevel,
+} from "../graph/lineage";
 import {
   edgeStyleFor,
   sourceNodeOpacityFor,
   truncateLabel,
 } from "../graph/graphStyle";
+import { colorForProject } from "../graph/colors";
 import { api } from "../api";
+import { GraphChrome } from "../components/GraphChrome";
+import { NodeDetailCard, type DetailListItem } from "../components/NodeDetailCard";
+import { NodeTooltip } from "../components/NodeTooltip";
 
 const VISITED_KEY = "graph-visited";
 
@@ -206,23 +218,92 @@ function ConnectedGraph() {
   const [query, setQuery] = useState("");
   const [tier, setTier] = useState<TierFilter>(() => loadTierFilter());
   const hostRef = useRef<HTMLDivElement>(null);
-  const handleRef = useRef<RenderHandle | null>(null);
+  const handleRef = useRef<ProjectorHandle | null>(null);
+
+  // ── Phase 2: selection trace, back stack, hover tooltip, legend toggle ──
+  const [selected, setSelected] = useState<Selection | null>(null);
+  const [backStack, setBackStack] = useState<Selection[]>([]);
+  const [hover, setHover] = useState<{ id: string; x: number; y: number } | null>(null);
+  const [hiddenProjects, setHiddenProjects] = useState<Set<string>>(new Set());
+
+  const nodeById = useMemo(() => {
+    const m = new Map<string, SnapshotNode>();
+    if (snap) for (const n of snap.nodes) m.set(n.id, n);
+    return m;
+  }, [snap]);
+  const depthMap = useMemo(
+    () => (snap ? lineageDepth(snap.nodes.map((n) => n.id), snap.edges) : new Map<string, number>()),
+    [snap],
+  );
+  // Card/tooltip display only: flips depthMap's direction so prerequisites
+  // read as a LOWER level than the node and dependents read HIGHER (Marble
+  // parity — see lineage.ts displayLevel). depthMap itself stays untouched
+  // since nothing else derives from it.
+  const levelMap = useMemo(() => displayLevel(depthMap), [depthMap]);
+
+  function handleSelect(id: string) {
+    if (!snap) return;
+    const node = nodeById.get(id);
+    if (!node) return;
+    if (selected && selected.nodeId !== id) setBackStack((st) => [...st, selected]);
+    const sel: Selection = {
+      nodeId: id,
+      ancestorIds: prerequisiteClosure(id, snap.edges),
+      color: colorForProject(node.project),
+    };
+    setSelected(sel);
+    handleRef.current?.setSelection(sel);
+  }
+  function handleDeselect() {
+    if (!selected) return;
+    setSelected(null);
+    setBackStack([]);
+    handleRef.current?.setSelection(null);
+  }
+  function handleBack() {
+    if (backStack.length === 0) return;
+    const prev = backStack[backStack.length - 1]!;
+    setBackStack(backStack.slice(0, -1));
+    setSelected(prev);
+    handleRef.current?.setSelection(prev);
+  }
+  function handleHoverChange(id: string | null, x: number, y: number) {
+    setHover(id ? { id, x, y } : null);
+  }
+  function handleToggleProject(project: string) {
+    const next = new Set(hiddenProjects);
+    if (next.has(project)) next.delete(project);
+    else next.add(project);
+    setHiddenProjects(next);
+    handleRef.current?.setProjectVisibility(next);
+  }
+
+  // Stable trampolines: the projector is created once per `snap` and holds
+  // onto whatever functions it's given then, but handleSelect/etc. above
+  // close over per-render state (selected/backStack/hiddenProjects) — so the
+  // projector calls through a ref that's kept pointing at the latest closure.
+  const onNodeClickRef = useRef(handleSelect);
+  onNodeClickRef.current = handleSelect;
+  const onBackgroundClickRef = useRef(handleDeselect);
+  onBackgroundClickRef.current = handleDeselect;
+  const onHoverRef = useRef(handleHoverChange);
+  onHoverRef.current = handleHoverChange;
 
   useEffect(() => {
     if (!snap || !hostRef.current) return;
     const visited = loadVisited();
     const rect = hostRef.current.getBoundingClientRect();
-    handleRef.current = createGraph(hostRef.current, {
+    handleRef.current = createProjector(hostRef.current, {
       snap,
       tierFilter: tier,
       visited,
-      onNodeClick: (id) => {
-        navigate(`/note/${id}`);
-      },
+      onNodeClick: (id) => onNodeClickRef.current(id),
       onNodeVisited: (id) => {
         visited.add(id);
         saveVisited(visited);
       },
+      onBackgroundClick: () => onBackgroundClickRef.current(),
+      onHover: (id, x, y) => onHoverRef.current(id, x, y),
       enableRadial: true,
       mode: { kind: "global" },
       width: rect.width,
@@ -235,14 +316,26 @@ function ConnectedGraph() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [snap]);
 
+  // Esc clears the selection.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") handleDeselect();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected, backStack]);
+
   useEffect(() => {
     if (!snap || !focusId || !handleRef.current) return;
     const node = snap.nodes.find((n) => n.id === focusId);
     if (!node) return;
     setQuery(node.title);
     handleRef.current.focusNode(focusId);
+    handleSelect(focusId);
     const all = { connected: true, mentions: true, semantically_related: true };
     setTier(all);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [snap, focusId]);
 
   useEffect(() => {
@@ -301,6 +394,31 @@ function ConnectedGraph() {
     saveTierFilter(localStorage, next);
   };
 
+  const toDetailItems = (ids: string[]): DetailListItem[] =>
+    ids
+      .map((id) => nodeById.get(id))
+      .filter((n): n is SnapshotNode => !!n)
+      .map((n) => ({ id: n.id, title: n.title, project: n.project, depth: levelMap.get(n.id) ?? 0 }));
+
+  const buildsOn = useMemo(
+    () => (snap && selected ? toDetailItems(directPrerequisites(selected.nodeId, snap.edges)) : []),
+    [snap, selected, nodeById, levelMap],
+  );
+  const unlocks = useMemo(
+    () => (snap && selected ? toDetailItems(directDependents(selected.nodeId, snap.edges)) : []),
+    [snap, selected, nodeById, levelMap],
+  );
+  // Legend reflect: projects present anywhere in the lit closure (selected + its ancestors).
+  const litProjects = useMemo(() => {
+    if (!snap || !selected) return null;
+    const ids = new Set([selected.nodeId, ...selected.ancestorIds]);
+    const out = new Set<string>();
+    for (const n of snap.nodes) if (ids.has(n.id)) out.add(n.project);
+    return out;
+  }, [snap, selected]);
+  const selectedNode = selected ? nodeById.get(selected.nodeId) : null;
+  const hoverNode = hover ? nodeById.get(hover.id) : null;
+
   if (error)
     return (
       <div className="graph-view" data-testid="graph-view">
@@ -353,7 +471,42 @@ function ConnectedGraph() {
           </label>
         </div>
       </header>
-      <div ref={hostRef} className="graph-view__canvas" />
+      <div ref={hostRef} className="graph-view__canvas">
+        <GraphChrome
+          snap={snap}
+          hiddenProjects={hiddenProjects}
+          litProjects={litProjects}
+          onToggleProject={handleToggleProject}
+        />
+        {selected && selectedNode && (
+          <NodeDetailCard
+            nodeId={selected.nodeId}
+            title={selectedNode.title}
+            project={selectedNode.project}
+            depth={levelMap.get(selected.nodeId) ?? 0}
+            color={selected.color}
+            prereqCount={selected.ancestorIds.size}
+            buildsOn={buildsOn}
+            unlocks={unlocks}
+            canGoBack={backStack.length > 0}
+            onBack={handleBack}
+            onClose={handleDeselect}
+            onSelect={handleSelect}
+            onOpenNote={(id) => navigate(`/note/${id}`)}
+          />
+        )}
+        {hover && hoverNode && hover.id !== selected?.nodeId && (
+          <NodeTooltip
+            nodeId={hover.id}
+            title={hoverNode.title}
+            project={hoverNode.project}
+            depth={levelMap.get(hover.id) ?? 0}
+            color={colorForProject(hoverNode.project)}
+            x={hover.x}
+            y={hover.y}
+          />
+        )}
+      </div>
     </div>
   );
 }

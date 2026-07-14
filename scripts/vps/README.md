@@ -1,5 +1,8 @@
 # scripts/vps — Scrypt VPS runbook
 
+This runbook covers scrypt only — see [STACK.md](STACK.md) for the full
+three-app stack.
+
 Production deploy of Scrypt onto the para-raid VPS. Image is pulled from GHCR
 (`ghcr.io/psianion/scrypt:latest`), built by `.github/workflows/release.yml` on
 git tag `vX.Y.Z`.
@@ -38,15 +41,25 @@ sudo install -m 0600 -o ubuntu -g ubuntu \
 sudo -u ubuntu vi /opt/secrets/shared.env  # set GHCR_PAT
 sudo -u ubuntu vi /opt/secrets/scrypt.env  # set SCRYPT_AUTH_TOKEN
 
-# 4. Update script
+# 4. Ops scripts — updater, Discord alerter, vault backup
 sudo install -m 0755 -o ubuntu -g ubuntu \
   scripts/vps/update-scrypt.sh /home/ubuntu/bin/update-scrypt
+sudo install -m 0755 -o ubuntu -g ubuntu \
+  scripts/vps/sup-notify /home/ubuntu/bin/sup-notify
+sudo install -m 0755 -o ubuntu -g ubuntu \
+  scripts/vps/vault-backup.sh /home/ubuntu/bin/vault-backup
 
-# 5. Log directory
+# 5. Log + backup directories
 sudo mkdir -p /var/log/sup-updates
 sudo chown ubuntu:ubuntu /var/log/sup-updates
+sudo mkdir -p /home/ubuntu/backups/vault
+sudo chown -R ubuntu:ubuntu /home/ubuntu/backups
 
-# 6. First pull + start
+# 6. Cron — staggered nightly schedule (full table in STACK.md)
+#   0 2 * * *  /home/ubuntu/bin/update-scrypt
+#   30 2 * * * /home/ubuntu/bin/vault-backup
+
+# 7. First pull + start
 ~/bin/update-scrypt
 ```
 

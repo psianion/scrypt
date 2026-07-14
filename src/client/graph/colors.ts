@@ -46,11 +46,3 @@ function hashString(s: string): number {
 export function colorForProject(project: string): string {
   return PROJECT_PALETTE[hashString(project) % PROJECT_PALETTE.length]!;
 }
-
-export function darken(hex: string, by = 0.3): string {
-  const n = parseInt(hex.replace("#", ""), 16);
-  const r = Math.max(0, Math.round(((n >> 16) & 0xff) * (1 - by)));
-  const g = Math.max(0, Math.round(((n >> 8) & 0xff) * (1 - by)));
-  const b = Math.max(0, Math.round((n & 0xff) * (1 - by)));
-  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, "0")}`;
-}

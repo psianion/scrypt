@@ -11,7 +11,7 @@ import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/re
 import { MemoryRouter, Route, Routes } from "react-router";
 
 import type { GraphSnapshot } from "../../src/server/graph/snapshot";
-import type { RenderHandle, RenderOpts } from "../../src/client/graph/render";
+import type { RenderHandle, RenderOpts } from "../../src/client/graph/projector";
 import { __resetSnapshotCache } from "../../src/client/graph/useGraphSnapshot";
 
 // Spy ledger captured by the mocked renderer. One entry per createGraph call.
@@ -27,9 +27,9 @@ interface CreateCall {
 
 const createCalls: CreateCall[] = [];
 
-mock.module("../../src/client/graph/render", () => {
+mock.module("../../src/client/graph/projector", () => {
   return {
-    createGraph(_parent: HTMLElement, opts: RenderOpts): RenderHandle {
+    createProjector(_parent: HTMLElement, opts: RenderOpts): RenderHandle {
       const fakeCanvas = document.createElement("canvas");
       const updateFilterCalls: Array<RenderOpts["tierFilter"]> = [];
       const updateQueryCalls: Array<{
@@ -54,6 +54,8 @@ mock.module("../../src/client/graph/render", () => {
             matches: new Set(matches),
           });
         },
+        setSelection() {},
+        setProjectVisibility() {},
         destroyed: false,
         updateFilterCalls,
         updateQueryCalls,
