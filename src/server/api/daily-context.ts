@@ -13,7 +13,7 @@ export function dailyContextRoutes(
   indexer: Indexer,
   vaultPath: string,
 ): void {
-  router.get("/api/daily_context", async () => {
+  const handler = async () => {
     const date = todayKey();
     const journalRel = `journal/${date}.md`;
     const journalAbs = join(vaultPath, journalRel);
@@ -109,6 +109,11 @@ export function dailyContextRoutes(
       active_memories,
       tag_cloud,
     });
-  });
+  };
+
+  // Canonical path (hyphen). The underscore spelling is kept as an alias:
+  // uxie's deployed health probe still hits /api/daily_context.
+  router.get("/api/daily-context", handler);
+  router.get("/api/daily_context", handler);
 }
 

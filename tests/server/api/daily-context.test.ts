@@ -94,6 +94,17 @@ describe("GET /api/daily_context", () => {
     expect(data).toHaveProperty("tag_cloud");
   });
 
+  test("/api/daily-context (hyphen, canonical) responds identically to the underscore alias", async () => {
+    const hyphen = await fetch(`${env.baseUrl}/api/daily-context`);
+    expect(hyphen.status).toBe(200);
+    const a = await hyphen.json();
+    const b = await (await fetch(`${env.baseUrl}/api/daily_context`)).json();
+    // generated_at differs per call; everything else must match.
+    delete a.generated_at;
+    delete b.generated_at;
+    expect(a).toEqual(b);
+  });
+
   test("today.journal contains today's entry", async () => {
     const res = await fetch(`${env.baseUrl}/api/daily_context`);
     const data = await res.json();
