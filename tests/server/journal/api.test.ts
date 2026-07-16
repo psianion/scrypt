@@ -115,6 +115,36 @@ test("a completed task due that day stays in tasks_due (not filtered out)", asyn
   expect(found.status).toBe("closed");
 });
 
+test("GET /api/journal/:date/tasks returns tasks due that day, any status", async () => {
+  const { router, tasks } = setup();
+  const open = tasks.create({
+    title: "due today",
+    type: "CUSTOM",
+    due_date: "2026-06-09",
+  });
+  const closed = tasks.create({
+    title: "done today",
+    type: "CUSTOM",
+    due_date: "2026-06-09",
+  });
+  tasks.update(closed.id, { status: "closed" });
+  tasks.create({ title: "other day", type: "CUSTOM", due_date: "2026-06-10" });
+
+  const res = await router.handle(
+    new Request("http://x/api/journal/2026-06-09/tasks"),
+  )!;
+  expect(res.status).toBe(200);
+  const list = await res.json();
+  expect(list.map((t: any) => t.id).sort()).toEqual(
+    [open.id, closed.id].sort(),
+  );
+
+  const bad = await router.handle(
+    new Request("http://x/api/journal/nope/tasks"),
+  )!;
+  expect(bad.status).toBe(400);
+});
+
 test("rejects an invalid date key", async () => {
   const { router } = setup();
   const res = await router.handle(

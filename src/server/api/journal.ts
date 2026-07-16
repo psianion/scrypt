@@ -108,6 +108,12 @@ export function journalRoutes(
     return Response.json(await dayBundle(p.date));
   });
 
+  // Journal-scoped task list (spec §5): tasks due that day, any status.
+  router.get("/api/journal/:date/tasks", async (_req, p) => {
+    if (!isValidDayKey(p.date)) return badDate();
+    return Response.json(tasks.list({ due_date: p.date }).tasks);
+  });
+
   router.post("/api/journal/:date/entries", async (req, p) => {
     if (!isValidDayKey(p.date)) return badDate();
     const { body } = (await req.json()) as { body?: string };
