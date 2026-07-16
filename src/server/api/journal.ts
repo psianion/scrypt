@@ -71,10 +71,17 @@ export function journalRoutes(
     // Include tasks of any status due this day: a completed task should stay
     // visible (struck-through) so it can be un-checked, not vanish on toggle.
     const due = tasks.list({ due_date: date }).tasks;
-    const related =
-      engine && embeddings
-        ? await buildRelated(date, doc, indexer, engine, embeddings)
-        : [];
+    // Related notes are best-effort suggestions: never let an embedder hiccup
+    // (model not loaded, worker down) 500 the whole day view. Degrade to [],
+    // matching /api/search/graph and hybridSearch which also catch embed errors.
+    let related: Awaited<ReturnType<typeof buildRelated>> = [];
+    if (engine && embeddings) {
+      try {
+        related = await buildRelated(date, doc, indexer, engine, embeddings);
+      } catch {
+        related = [];
+      }
+    }
     return { date, entries: doc.entries, tasks_due: due, related };
   }
 
