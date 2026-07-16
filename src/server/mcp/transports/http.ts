@@ -13,6 +13,11 @@ export type AuthFn = (
   server?: PeerAddressProvider,
 ) => Promise<string | null>;
 
+// Returns the vault SCHEMA.md content for the MCP `instructions` field,
+// or null when the vault has none. Read per-initialize so edits to the
+// doc apply to the next session without a server restart.
+export type InstructionsFn = () => string | null;
+
 interface JsonRpcReq {
   jsonrpc: "2.0";
   id: number | string | null;
@@ -37,6 +42,7 @@ export async function handleMcpHttp(
   baseCtx: ToolContext,
   auth: AuthFn,
   server?: PeerAddressProvider,
+  instructions?: InstructionsFn,
 ): Promise<Response> {
   if (req.method !== "POST") {
     return new Response("Method Not Allowed", { status: 405 });
@@ -73,11 +79,13 @@ export async function handleMcpHttp(
       const clientProtocol =
         (body.params as { protocolVersion?: string } | undefined)
           ?.protocolVersion ?? "2024-11-05";
+      const schemaDoc = instructions?.() ?? null;
       return jsonRpcResponse(body.id, {
         result: {
           protocolVersion: clientProtocol,
           capabilities: { tools: {} },
           serverInfo: { name: "scrypt", version: "0.8.0" },
+          ...(schemaDoc !== null ? { instructions: schemaDoc } : {}),
         },
       });
     }

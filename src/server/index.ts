@@ -47,6 +47,7 @@ import { IngestRouter } from "./ingest/router";
 import { ActivityLog } from "./activity";
 import { loadConfig, type ScryptConfig } from "./config";
 import { checkAuth, isLoopbackPeer, unauthorizedResponse } from "./auth";
+import { ensureSchemaDoc, readSchemaDoc, schemaRoutes } from "./schema-doc";
 import {
   initRepo,
   startAutocommitLoop,
@@ -81,6 +82,12 @@ export function createApp(config: AppConfig) {
 
   mkdirSync(scryptPath, { recursive: true });
   mkdirSync(join(scryptPath, "trash"), { recursive: true });
+
+  // Seed the vault's agent-facing conventions doc before the watcher and
+  // initial reindex start, so it's indexed like any other note.
+  if (ensureSchemaDoc(config.vaultPath)) {
+    console.log("[scrypt] seeded SCHEMA.md at vault root from bundled template");
+  }
 
   const db = createDatabase(dbPath);
   initSchema(db);
@@ -179,6 +186,7 @@ export function createApp(config: AppConfig) {
   researchRoutes(router, db, ingestRouter);
   memoryRoutes(router, fm);
   dailyContextRoutes(router, fm, indexer, config.vaultPath);
+  schemaRoutes(router, config.vaultPath);
   activityRoutes(router, activity);
   taskListRoutes(router, wave9Tasks);
   embedHealthRoutes(router, wave8EmbedClient);
@@ -222,7 +230,7 @@ export function createApp(config: AppConfig) {
     if (!scryptConfig.authToken) return null;
     const token = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
     return token === scryptConfig.authToken ? "local" : null;
-  });
+  }, () => readSchemaDoc(config.vaultPath));
 
   let autocommit: AutocommitLoop | undefined;
   if (scryptConfig.gitAutocommit) {

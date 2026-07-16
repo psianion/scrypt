@@ -63,6 +63,39 @@ describe("handleMcpHttp", () => {
     expect(inner.echoed).toBe("hi");
   });
 
+  test("initialize includes instructions when a schema doc exists", async () => {
+    const reg = makeRegistry();
+    const req = new Request("http://x/mcp", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize" }),
+    });
+    const res = await handleMcpHttp(
+      req, reg, stubCtx, async () => "user-1", undefined,
+      () => "# Vault Schema\ndo librarian things",
+    );
+    const body = (await res.json()) as {
+      result: { instructions?: string; serverInfo: { name: string } };
+    };
+    expect(body.result.serverInfo.name).toBe("scrypt");
+    expect(body.result.instructions).toContain("# Vault Schema");
+  });
+
+  test("initialize omits instructions when no schema doc", async () => {
+    const reg = makeRegistry();
+    const req = new Request("http://x/mcp", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize" }),
+    });
+    const res = await handleMcpHttp(
+      req, reg, stubCtx, async () => "user-1", undefined,
+      () => null,
+    );
+    const body = (await res.json()) as { result: Record<string, unknown> };
+    expect("instructions" in body.result).toBe(false);
+  });
+
   test("missing auth returns 401", async () => {
     const reg = makeRegistry();
     const req = new Request("http://x/mcp", {

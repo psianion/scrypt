@@ -19,6 +19,7 @@ RUN apt-get update \
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/src ./src
 COPY --from=build /app/scripts ./scripts
+COPY --from=build /app/templates ./templates
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/package.json ./
 

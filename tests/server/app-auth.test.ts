@@ -153,6 +153,13 @@ describe("createApp > auth wiring", () => {
     expect(res.status).toBe(401);
   });
 
+  test("GET /api/schema serves the auto-seeded vault schema to a loopback caller", async () => {
+    makeApp({ isProduction: false, authToken: undefined });
+    const res = await callFetch("http://127.0.0.1/api/schema", undefined, LOOPBACK);
+    expect(res.status).toBe(200);
+    expect(await res.text()).toContain("# Vault Schema");
+  });
+
   test("static file serving cannot escape staticDir via path traversal", async () => {
     makeApp({ isProduction: false, authToken: undefined });
     const res = await callFetch(
@@ -176,6 +183,7 @@ describe("createApp > auth wiring > Wave 3 routes require auth in production", (
     ["GET /api/memories", "http://example.com/api/memories", undefined],
     ["GET /api/daily_context", "http://example.com/api/daily_context", undefined],
     ["GET /api/activity", "http://example.com/api/activity", undefined],
+    ["GET /api/schema", "http://example.com/api/schema", undefined],
     ["GET /api/graph", "http://example.com/api/graph", undefined],
     ["GET /api/graph/*path", "http://example.com/api/graph/notes/x.md", undefined],
   ];

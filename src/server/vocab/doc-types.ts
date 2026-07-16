@@ -5,6 +5,7 @@ export const DOC_TYPES = [
   "architecture",
   "review",
   "guide",
+  "synthesis",
   "journal",
   "sessionlog",
   "mytop10",
