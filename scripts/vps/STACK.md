@@ -176,6 +176,14 @@ scrypt goes first because para-raid and uxie both depend on it being up.
 
 ## Dev on Windows
 
+**Full-loop dev rig (all three apps native inside WSL2 Ubuntu):**
+`scripts/dev/sup-dev.sh up | down | status` starts/stops the whole stack —
+para-raid via its systemd --user unit, scrypt + uxie as named bun processes
+with logs in `~/.local/state/sup-dev/`. Assumes clones at `~/scrypt ~/uxie
+~/para-raid` with deps + `.env` in place (see the 2026-07-16 E2E notes in
+labs-docs/sup/). The split below remains the light option when para-raid
+isn't needed.
+
 - **scrypt**: run its own `docker-compose.yml` (dev, not `.vps.yml`), serves
   `localhost:3777`. This stays canonical for day-to-day MCP use regardless of
   what's on the VPS.
