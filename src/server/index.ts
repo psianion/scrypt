@@ -162,7 +162,7 @@ export function createApp(config: AppConfig) {
   // graphRoutes must come before searchRoutes — searchRoutes registers a
   // catch-all /api/graph/*path that would otherwise swallow /api/graph/snapshot.
   graphRoutes(router, db, config.vaultPath, snapshotScheduler, wave8Engine, wave8Embeddings);
-  searchRoutes(router, indexer, wave8Engine, wave8Embeddings);
+  searchRoutes(router, indexer, db, wave8Metadata, wave8Engine, wave8Embeddings);
   journalRoutes(router, fm, indexer, config.vaultPath);
   templateRoutes(router, fm, config.vaultPath);
   // Wave 9: legacy /api/tasks REST endpoint removed. Tasks are managed via
