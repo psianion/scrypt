@@ -19,6 +19,7 @@ import { getTaskTool } from "./get-task";
 import { listTasksTool } from "./list-tasks";
 import { updateTaskTool } from "./update-task";
 import { deleteTaskTool } from "./delete-task";
+import { lintVaultTool } from "./lint-vault";
 
 export function registerAllTools(registry: ToolRegistry): void {
   registry.register(createNoteTool);
@@ -40,4 +41,5 @@ export function registerAllTools(registry: ToolRegistry): void {
   registry.register(listTasksTool);
   registry.register(updateTaskTool);
   registry.register(deleteTaskTool);
+  registry.register(lintVaultTool);
 }

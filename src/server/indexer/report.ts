@@ -4,6 +4,13 @@
 // shape of graphify's GRAPH_REPORT.md.
 import type { Database } from "bun:sqlite";
 
+// Orphan predicate over a graph_nodes row aliased `n`: no edge touches the
+// node in either direction. Shared with the lint_vault MCP tool so the two
+// features can't drift apart on what "orphan" means.
+export const ORPHAN_NODE_WHERE = `NOT EXISTS (
+         SELECT 1 FROM graph_edges WHERE source = n.id OR target = n.id
+       )`;
+
 export function generateReport(db: Database): string {
   const totalNodes =
     db.query<{ n: number }, []>(`SELECT COUNT(*) AS n FROM graph_nodes`).get()
@@ -26,9 +33,7 @@ export function generateReport(db: Database): string {
   const orphans = db
     .query<{ id: string; label: string }, []>(
       `SELECT id, label FROM graph_nodes n
-       WHERE NOT EXISTS (
-         SELECT 1 FROM graph_edges WHERE source = n.id OR target = n.id
-       )
+       WHERE ${ORPHAN_NODE_WHERE}
        LIMIT 20`,
     )
     .all();

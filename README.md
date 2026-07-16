@@ -15,7 +15,7 @@ Everything lives at `projects/<project>/<doc_type>/<slug>.md`. Ingested notes ca
 | **Editor** | CodeMirror 6 markdown — auto-save, line wrap, live backlinks |
 | **Graph** | WebGL canvas, tiered edges (`connected` / `mentions` / `semantic`) from typed links + embedding similarity |
 | **Search** | FTS5 keyword **and** semantic search over local `bge-small-en-v1.5` embeddings, hybrid-ranked |
-| **MCP** | 19 tools over stdio + streamable-HTTP — JSON-RPC, bearer auth, idempotent writes |
+| **MCP** | 20 tools over stdio + streamable-HTTP — JSON-RPC, bearer auth, idempotent writes |
 | **Sync** | Git-style push/pull across devices through a private Tailscale hub, with a 3-way clash resolver |
 | **Plus** | Kanban of every `- [ ]` in the vault · CSV/XLSX preview · tag browser · live embedding overlay · opt-in git autocommit · token-driven light/dark UI |
 
@@ -66,7 +66,7 @@ bun run scrypt sync status        # push/pull against the hub
 - **Read** — `get_note`, `search_notes`, `semantic_search`, `find_similar`, `walk_graph`, `cluster_graph`, `get_report`
 - **Write** — `create_note`, `update_note_metadata`, `add_section_summary`, `add_edge`, `remove_edge`
 - **Tasks** — `create_task`, `get_task`, `list_tasks`, `update_task`, `delete_task`
-- **Maintenance** — `batch_ingest`, `rescan_similarity`
+- **Maintenance** — `batch_ingest`, `rescan_similarity`, `lint_vault`
 
 Every `create_note` runs the full chunk + embed pipeline server-side and streams progress to the UI. Prefer stdio? `bun run scrypt-mcp`.
 
