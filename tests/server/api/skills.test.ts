@@ -42,6 +42,15 @@ describe("GET /api/skills/:name", () => {
     const res = await fetch(`${env.baseUrl}/api/skills/nope`);
     expect(res.status).toBe(404);
   });
+
+  test("rejects a traversal :name instead of reading outside skills/", async () => {
+    // Vault fixture has notes/inbox — attempt to read a file there via
+    // skills.ts's join(skillsDir, name + ".md").
+    const res = await fetch(
+      `${env.baseUrl}/api/skills/${encodeURIComponent("../notes/inbox/secret")}`,
+    );
+    expect(res.status).toBe(404);
+  });
 });
 
 describe("POST /api/skills", () => {
@@ -58,6 +67,21 @@ describe("POST /api/skills", () => {
       }),
     });
     expect(res.status).toBe(201);
+  });
+
+  test("rejects a traversal name instead of writing outside skills/", async () => {
+    const res = await fetch(`${env.baseUrl}/api/skills`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "../../notes/inbox/evil",
+        description: "evil",
+        input: {},
+        output: "",
+        body: "pwned",
+      }),
+    });
+    expect(res.status).toBe(400);
   });
 });
 
@@ -76,5 +100,13 @@ describe("DELETE /api/skills/:name", () => {
     });
     const res = await fetch(`${env.baseUrl}/api/skills/temp`, { method: "DELETE" });
     expect(res.status).toBe(200);
+  });
+
+  test("rejects a traversal :name instead of deleting outside skills/", async () => {
+    const res = await fetch(
+      `${env.baseUrl}/api/skills/${encodeURIComponent("../notes/inbox/secret")}`,
+      { method: "DELETE" },
+    );
+    expect(res.status).toBe(404);
   });
 });

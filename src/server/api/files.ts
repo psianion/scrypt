@@ -1,5 +1,5 @@
 // src/server/api/files.ts
-import { join, normalize } from "node:path";
+import { basename, join, normalize, sep } from "node:path";
 import { existsSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import type { Router } from "../router";
@@ -9,7 +9,7 @@ export function fileRoutes(router: Router, vaultPath: string): void {
 
   function safePath(filePath: string): string | null {
     const resolved = normalize(join(assetsDir, filePath));
-    if (!resolved.startsWith(assetsDir)) return null;
+    if (resolved !== assetsDir && !resolved.startsWith(assetsDir + sep)) return null;
     return resolved;
   }
 
@@ -18,10 +18,18 @@ export function fileRoutes(router: Router, vaultPath: string): void {
     const file = formData.get("file") as File | null;
     if (!file) return Response.json({ error: "No file provided" }, { status: 400 });
 
+    // Multipart filenames are attacker-controlled — take the basename only
+    // (strips any "../" traversal segments) and run it through the same
+    // containment check as the GET handler below.
+    const safeName = basename(file.name);
+    const destPath = safePath(safeName);
+    if (!safeName || !destPath) {
+      return Response.json({ error: "Invalid filename" }, { status: 400 });
+    }
+
     await mkdir(assetsDir, { recursive: true });
-    const destPath = join(assetsDir, file.name);
     await Bun.write(destPath, file);
-    return Response.json({ path: `assets/${file.name}` }, { status: 201 });
+    return Response.json({ path: `assets/${safeName}` }, { status: 201 });
   });
 
   router.get("/api/files/*path", (_req, params) => {

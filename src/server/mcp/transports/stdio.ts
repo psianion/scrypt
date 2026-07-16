@@ -12,14 +12,17 @@ import { randomUUID } from "crypto";
 import type { ToolRegistry } from "../registry";
 import type { ToolContext } from "../types";
 import { McpError } from "../errors";
+import { readSchemaDoc } from "../../schema-doc";
 
 export async function runStdio(
   registry: ToolRegistry,
   ctx: ToolContext,
 ): Promise<void> {
+  // Same vault conventions doc the HTTP transport serves on initialize.
+  const instructions = readSchemaDoc(ctx.vaultDir) ?? undefined;
   const server = new Server(
     { name: "scrypt", version: "0.8.0" },
-    { capabilities: { tools: {} } },
+    { capabilities: { tools: {} }, instructions },
   );
 
   server.setRequestHandler(ListToolsRequestSchema, async () => ({

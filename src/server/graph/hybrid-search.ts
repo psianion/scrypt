@@ -82,8 +82,12 @@ async function semanticRanks(
   if (rows.length === 0) return out;
   const hits = searchChunks(vectors[0], rows, { limit: 250, minScore: 0 });
   const grouped = groupByNote(hits, 50);
+  // groupByNote keeps journal chunks entry-granular, so the same note_path can
+  // appear multiple times. Keep its BEST (first, highest-score) rank — mirrors
+  // the FTS builder's `if (!out.has(...))` guard. Without this the last (worst)
+  // duplicate would win and journal notes would rank lower in RRF, not higher.
   grouped.forEach((g, i) => {
-    out.set(g.note_path, i + 1);
+    if (!out.has(g.note_path)) out.set(g.note_path, i + 1);
   });
   return out;
 }

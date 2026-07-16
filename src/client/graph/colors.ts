@@ -5,6 +5,7 @@ export const DOC_TYPE_COLOR: Record<string, string> = {
   architecture: "#8b5cf6",
   review:       "#ef4444",
   guide:        "#06b6d4",
+  synthesis:    "#ec4899",
   journal:      "#64748b",
   changelog:    "#94a3b8",
   other:        "#737373",

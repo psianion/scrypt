@@ -1,7 +1,8 @@
 // src/server/router.ts
 type Handler = (
   req: Request,
-  params: Record<string, string>
+  params: Record<string, string>,
+  server?: unknown,
 ) => Response | Promise<Response>;
 
 interface Route {
@@ -40,7 +41,7 @@ export class Router {
   delete(path: string, handler: Handler) { this.add("DELETE", path, handler); }
   patch(path: string, handler: Handler) { this.add("PATCH", path, handler); }
 
-  handle(req: Request): Response | Promise<Response> | null {
+  handle(req: Request, server?: unknown): Response | Promise<Response> | null {
     const url = new URL(req.url);
     for (const route of this.routes) {
       if (req.method !== route.method) continue;
@@ -50,7 +51,7 @@ export class Router {
       route.paramNames.forEach((name, i) => {
         params[name] = decodeURIComponent(match[i + 1]);
       });
-      return route.handler(req, params);
+      return route.handler(req, params, server);
     }
     return null;
   }

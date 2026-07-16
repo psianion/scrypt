@@ -1,5 +1,6 @@
 // src/server/activity.ts
 import type { Database } from "bun:sqlite";
+import { nowIso } from "../shared/date";
 
 export type ActivityAction = "create" | "update" | "delete" | "append" | "snapshot";
 export type ActivityActor = "claude" | "ui" | "watcher" | "system";
@@ -35,7 +36,7 @@ export class ActivityLog {
   constructor(private db: Database) {}
 
   record(rec: ActivityRecord): void {
-    const timestamp = new Date().toISOString();
+    const timestamp = nowIso();
     const meta = rec.meta ? JSON.stringify(rec.meta) : null;
     this.db
       .query(

@@ -9,7 +9,6 @@ export const KINDS = [
   "log",
   "thought",
   "idea",
-  "journal",
 ] as const;
 
 export type Kind = (typeof KINDS)[number];
@@ -50,7 +49,5 @@ export function destinationFor(kind: Kind, slug: string, now: Date): string {
       return `notes/thoughts/${ymdhm(now)}-${slug}.md`;
     case "idea":
       return `notes/ideas/${slug}.md`;
-    case "journal":
-      return `journal/${ymd(now)}.md`;
   }
 }

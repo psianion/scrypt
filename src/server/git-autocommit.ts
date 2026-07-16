@@ -2,6 +2,7 @@
 import { $ } from "bun";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+import { nowIso } from "../shared/date";
 
 const GITIGNORE_CONTENT = `
 .scrypt/scrypt.db
@@ -37,7 +38,7 @@ export async function commitPending(
     const status = await $`git -C ${vaultPath} status --porcelain`.quiet().text();
     if (status.trim() === "") return null;
     const fileCount = status.trim().split("\n").length;
-    const timestamp = new Date().toISOString();
+    const timestamp = nowIso();
     await $`git -C ${vaultPath} add -A`.quiet();
     await $`git -C ${vaultPath} commit -m ${`scrypt snapshot ${timestamp}`}`.quiet();
     const sha = (await $`git -C ${vaultPath} rev-parse --short HEAD`.quiet().text()).trim();

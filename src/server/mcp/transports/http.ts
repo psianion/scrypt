@@ -6,8 +6,17 @@ import { randomUUID } from "crypto";
 import { ToolRegistry } from "../registry";
 import type { ToolContext } from "../types";
 import { McpError, MCP_ERROR } from "../errors";
+import type { PeerAddressProvider } from "../../auth";
 
-export type AuthFn = (req: Request) => Promise<string | null>;
+export type AuthFn = (
+  req: Request,
+  server?: PeerAddressProvider,
+) => Promise<string | null>;
+
+// Returns the vault SCHEMA.md content for the MCP `instructions` field,
+// or null when the vault has none. Read per-initialize so edits to the
+// doc apply to the next session without a server restart.
+export type InstructionsFn = () => string | null;
 
 interface JsonRpcReq {
   jsonrpc: "2.0";
@@ -32,11 +41,13 @@ export async function handleMcpHttp(
   registry: ToolRegistry,
   baseCtx: ToolContext,
   auth: AuthFn,
+  server?: PeerAddressProvider,
+  instructions?: InstructionsFn,
 ): Promise<Response> {
   if (req.method !== "POST") {
     return new Response("Method Not Allowed", { status: 405 });
   }
-  const userId = await auth(req);
+  const userId = await auth(req, server);
   if (!userId) {
     return new Response(JSON.stringify({ error: "unauthorized" }), {
       status: 401,
@@ -68,11 +79,13 @@ export async function handleMcpHttp(
       const clientProtocol =
         (body.params as { protocolVersion?: string } | undefined)
           ?.protocolVersion ?? "2024-11-05";
+      const schemaDoc = instructions?.() ?? null;
       return jsonRpcResponse(body.id, {
         result: {
           protocolVersion: clientProtocol,
           capabilities: { tools: {} },
           serverInfo: { name: "scrypt", version: "0.8.0" },
+          ...(schemaDoc !== null ? { instructions: schemaDoc } : {}),
         },
       });
     }

@@ -6,13 +6,20 @@
 import type { Router } from "../router";
 import type { ToolRegistry } from "./registry";
 import type { ToolContext } from "./types";
-import { handleMcpHttp, type AuthFn } from "./transports/http";
+import {
+  handleMcpHttp,
+  type AuthFn,
+  type InstructionsFn,
+} from "./transports/http";
 
 export function mcpRoutes(
   router: Router,
   registry: ToolRegistry,
   ctx: ToolContext,
   auth: AuthFn,
+  instructions?: InstructionsFn,
 ): void {
-  router.post("/mcp", (req) => handleMcpHttp(req, registry, ctx, auth));
+  router.post("/mcp", (req, _params, server) =>
+    handleMcpHttp(req, registry, ctx, auth, server as any, instructions),
+  );
 }
