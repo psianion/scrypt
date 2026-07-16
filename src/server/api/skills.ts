@@ -1,5 +1,5 @@
 // src/server/api/skills.ts
-import { join } from "node:path";
+import { join, normalize, sep } from "node:path";
 import { readdir, readFile, unlink } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import type { Router } from "../router";
@@ -7,6 +7,16 @@ import { parseFrontmatter, stringifyFrontmatter } from "../parsers";
 
 export function skillRoutes(router: Router, vaultPath: string): void {
   const skillsDir = join(vaultPath, "skills");
+
+  // :name (and POST body's data.name) are attacker-controlled and land
+  // directly in a filesystem path below — contain them to skillsDir the
+  // same way api/files.ts's safePath() contains uploads. Returns null for
+  // any name that escapes (e.g. "../projects/secret" or an absolute path).
+  function safeSkillPath(name: string): string | null {
+    const resolved = normalize(join(skillsDir, `${name}.md`));
+    if (resolved !== skillsDir && !resolved.startsWith(skillsDir + sep)) return null;
+    return resolved;
+  }
 
   router.get("/api/skills", async () => {
     try {
@@ -29,8 +39,8 @@ export function skillRoutes(router: Router, vaultPath: string): void {
   });
 
   router.get("/api/skills/:name", async (_req, params) => {
-    const filePath = join(skillsDir, `${params.name}.md`);
-    if (!existsSync(filePath)) {
+    const filePath = safeSkillPath(params.name);
+    if (!filePath || !existsSync(filePath)) {
       return Response.json({ error: "Not found" }, { status: 404 });
     }
     const content = await readFile(filePath, "utf-8");
@@ -46,7 +56,10 @@ export function skillRoutes(router: Router, vaultPath: string): void {
       output: string;
       body: string;
     };
-    const filePath = join(skillsDir, `${data.name}.md`);
+    const filePath = safeSkillPath(data.name);
+    if (!filePath) {
+      return Response.json({ error: "Invalid name" }, { status: 400 });
+    }
     const fm = {
       name: data.name,
       description: data.description,
@@ -59,8 +72,8 @@ export function skillRoutes(router: Router, vaultPath: string): void {
   });
 
   router.put("/api/skills/:name", async (req, params) => {
-    const filePath = join(skillsDir, `${params.name}.md`);
-    if (!existsSync(filePath)) {
+    const filePath = safeSkillPath(params.name);
+    if (!filePath || !existsSync(filePath)) {
       return Response.json({ error: "Not found" }, { status: 404 });
     }
     const data = (await req.json()) as Record<string, unknown>;
@@ -70,8 +83,8 @@ export function skillRoutes(router: Router, vaultPath: string): void {
   });
 
   router.delete("/api/skills/:name", async (_req, params) => {
-    const filePath = join(skillsDir, `${params.name}.md`);
-    if (!existsSync(filePath)) {
+    const filePath = safeSkillPath(params.name);
+    if (!filePath || !existsSync(filePath)) {
       return Response.json({ error: "Not found" }, { status: 404 });
     }
     await unlink(filePath);

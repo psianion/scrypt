@@ -1,5 +1,5 @@
 // src/server/index.ts
-import { join } from "node:path";
+import { join, normalize, sep } from "node:path";
 import { mkdirSync } from "node:fs";
 import { createDatabase, initSchema } from "./db";
 import { FileManager } from "./file-manager";
@@ -46,7 +46,7 @@ import type { ToolContext } from "./mcp/types";
 import { IngestRouter } from "./ingest/router";
 import { ActivityLog } from "./activity";
 import { loadConfig, type ScryptConfig } from "./config";
-import { checkAuth, isLoopbackHost, unauthorizedResponse } from "./auth";
+import { checkAuth, isLoopbackPeer, unauthorizedResponse } from "./auth";
 import {
   initRepo,
   startAutocommitLoop,
@@ -209,14 +209,16 @@ export function createApp(config: AppConfig) {
   wireWebSocketSink(wave8Bus, (channel, payload) =>
     ws.broadcastChannel(channel, payload),
   );
-  mcpRoutes(router, mcpRegistry, mcpCtx, async (req) => {
-    // Same loopback-or-token rule as the /api/* gate (checkAuth): a loopback
-    // caller (Host 127.0.0.1 / localhost / ::1) is trusted — the local browser
-    // and stdio bridge can't attach a bearer header. Any non-loopback caller
-    // (tailnet / public Host) MUST present the configured token; when no token
+  mcpRoutes(router, mcpRegistry, mcpCtx, async (req, server) => {
+    // Same loopback-or-token rule as the /api/* gate (checkAuth): a caller
+    // whose real socket peer is this machine is trusted — the local browser
+    // and stdio bridge can't attach a bearer header. isLoopbackPeer() checks
+    // the actual TCP peer address (server.requestIP), not the spoofable Host
+    // header, so this holds even when the process is reachable off-box. Any
+    // non-loopback caller MUST present the configured token; when no token
     // is configured we fail CLOSED for them instead of returning "local" for
     // everyone. (F5)
-    if (isLoopbackHost(req)) return "local";
+    if (isLoopbackPeer(server, req)) return "local";
     if (!scryptConfig.authToken) return null;
     const token = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
     return token === scryptConfig.authToken ? "local" : null;
@@ -272,13 +274,7 @@ export function createApp(config: AppConfig) {
   return {
     ready,
     fetch(req: Request, server: any): Response | Promise<Response> {
-      // WebSocket upgrade
       const url = new URL(req.url);
-      if (url.pathname === "/ws") {
-        const upgraded = server.upgrade(req);
-        if (upgraded) return undefined as any;
-        return new Response("WebSocket upgrade failed", { status: 400 });
-      }
 
       // Liveness probe — outside auth gate so Docker/VPS healthchecks work
       // in production without a token. Cheap and stable; do not bolt on
@@ -287,8 +283,10 @@ export function createApp(config: AppConfig) {
         return Response.json({ ok: true });
       }
 
-      // Auth gate for /api/*
-      const authResult = checkAuth(req, {
+      // Auth gate for /api/* and /ws — must run before the WebSocket upgrade
+      // and before static serving so neither sits outside it. checkAuth()
+      // itself decides which paths actually require auth (see auth.ts).
+      const authResult = checkAuth(req, server, {
         isProduction: scryptConfig.isProduction,
         authToken: scryptConfig.authToken,
       });
@@ -296,8 +294,16 @@ export function createApp(config: AppConfig) {
         return unauthorizedResponse();
       }
 
+      // WebSocket upgrade — broadcasts carry vault-relative note paths and
+      // embedding progress, so it's gated exactly like /api/* above.
+      if (url.pathname === "/ws") {
+        const upgraded = server.upgrade(req);
+        if (upgraded) return undefined as any;
+        return new Response("WebSocket upgrade failed", { status: 400 });
+      }
+
       // API routes
-      const apiResponse = router.handle(req);
+      const apiResponse = router.handle(req, server);
       if (apiResponse) return apiResponse;
 
       // Static files + SPA fallback
@@ -307,9 +313,15 @@ export function createApp(config: AppConfig) {
         // SPA shell. Bun.file() on a directory throws on macOS.
         const hasExt = /\.[a-zA-Z0-9]+$/.test(url.pathname);
         if (hasExt) {
-          const filePath = join(staticDir, url.pathname);
-          const file = Bun.file(filePath);
-          if (file.size > 0) return new Response(file);
+          // Contain the resolved path to staticDir — url.pathname can carry
+          // "../" (raw or percent-encoded) segments that would otherwise let
+          // a caller read arbitrary files off the host (e.g. ../../.env or
+          // ../../.scrypt/scrypt.db).
+          const resolved = normalize(join(staticDir, url.pathname));
+          if (resolved === staticDir || resolved.startsWith(staticDir + sep)) {
+            const file = Bun.file(resolved);
+            if (file.size > 0) return new Response(file);
+          }
         }
         const indexFile = Bun.file(join(staticDir, "index.html"));
         if (indexFile.size > 0) return new Response(indexFile);

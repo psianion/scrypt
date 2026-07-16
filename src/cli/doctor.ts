@@ -4,7 +4,8 @@
 // the load-bearing security knowledge verified in the server source:
 //   - config.ts:45  exposure rule (NODE_ENV=production OR non-loopback bind)
 //   - index.ts:338  Bun.serve has no hostname -> native binds all interfaces
-//   - auth.ts:35    loopback trust keyed on the (spoofable) Host header
+//   - auth.ts       loopback trust keyed on the real socket peer address
+//                   (server.requestIP), not the spoofable Host header
 //   - DB path hardcoded <vault>/.scrypt/scrypt.db (ignores SCRYPT_DB_PATH)
 // gatherFacts() is the thin impure layer that probes the running server + tools.
 
@@ -89,23 +90,19 @@ export function evaluateDoctor(f: DoctorFacts): Finding[] {
     out.push({ id: "exposed-no-token", severity: "CRITICAL", title: "Exposed without a token", detail: `NODE_ENV=production or non-loopback SCRYPT_BIND_ADDR (${f.bindAddr}) requires a token; loadConfig() throws without one.`, remedy: "Set SCRYPT_AUTH_TOKEN (run `scrypt token rotate`).", passed: false });
   }
 
-  // 4. native binds all interfaces (index.ts:338) and is reachable off-box
+  // 4. native binds all interfaces (index.ts:338) and is reachable off-box.
+  // The Host-spoof auth bypass this used to compound with is fixed — checkAuth()
+  // now keys loopback trust off the real socket peer address (server.requestIP),
+  // not the client-supplied Host header, so a token is still enforced for
+  // non-loopback callers. The remaining exposure is purely "more surface area
+  // reachable", already priced into severity via whether a token is set.
   if (f.profile === "native" && f.offBoxReachable) {
     out.push({
       id: "native-offbox",
       severity: f.envToken ? "HIGH" : "CRITICAL",
       title: "Native server reachable off-box",
-      detail: `Bun.serve has no hostname, so native mode binds all interfaces regardless of SCRYPT_BIND_ADDR. Reachable at ${f.routableIp}:${f.port}.`,
-      remedy: "Use the docker or vps profile, or firewall the port. (A true fix requires passing hostname to Bun.serve server-side.)",
-      passed: false,
-    });
-    // 5. structural Host-spoof bypass — possible whenever reachable off-box
-    out.push({
-      id: "host-spoof",
-      severity: "CRITICAL",
-      title: "Auth bypassable via Host-header spoof",
-      detail: "checkAuth() trusts requests whose Host is localhost/127.0.0.1/::1 (auth.ts:35), reconstructed from the spoofable Host header. A remote caller sending `Host: localhost` bypasses the token entirely.",
-      remedy: "Do not expose this server off-box until the server stops trusting the Host header. Use docker/vps + Tailscale.",
+      detail: `Bun.serve has no hostname, so native mode binds all interfaces regardless of SCRYPT_BIND_ADDR. Reachable at ${f.routableIp}:${f.port}. A configured token is still required for non-loopback callers (auth keys off the real socket peer, not Host).`,
+      remedy: "Use the docker or vps profile, or firewall the port, to reduce exposed surface.",
       passed: false,
     });
   }

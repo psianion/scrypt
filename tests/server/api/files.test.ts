@@ -23,6 +23,29 @@ describe("POST /api/files/upload", () => {
     const data = await res.json();
     expect(data.path).toContain("test.txt");
   });
+
+  test("rejects a traversal filename instead of writing outside assets/", async () => {
+    const formData = new FormData();
+    formData.append(
+      "file",
+      new Blob(["evil"], { type: "text/plain" }),
+      "../../.env",
+    );
+    const res = await fetch(`${env.baseUrl}/api/files/upload`, {
+      method: "POST",
+      body: formData,
+    });
+    // basename() strips the traversal segments, so this either 400s or lands
+    // safely inside assets/ as a plain ".env" file — it must never resolve
+    // outside assetsDir.
+    if (res.status === 201) {
+      const data = await res.json();
+      expect(data.path.startsWith("assets/")).toBe(true);
+      expect(data.path).not.toContain("..");
+    } else {
+      expect(res.status).toBe(400);
+    }
+  });
 });
 
 describe("GET /api/files/*path", () => {

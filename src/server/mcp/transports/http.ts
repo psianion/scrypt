@@ -6,8 +6,12 @@ import { randomUUID } from "crypto";
 import { ToolRegistry } from "../registry";
 import type { ToolContext } from "../types";
 import { McpError, MCP_ERROR } from "../errors";
+import type { PeerAddressProvider } from "../../auth";
 
-export type AuthFn = (req: Request) => Promise<string | null>;
+export type AuthFn = (
+  req: Request,
+  server?: PeerAddressProvider,
+) => Promise<string | null>;
 
 interface JsonRpcReq {
   jsonrpc: "2.0";
@@ -32,11 +36,12 @@ export async function handleMcpHttp(
   registry: ToolRegistry,
   baseCtx: ToolContext,
   auth: AuthFn,
+  server?: PeerAddressProvider,
 ): Promise<Response> {
   if (req.method !== "POST") {
     return new Response("Method Not Allowed", { status: 405 });
   }
-  const userId = await auth(req);
+  const userId = await auth(req, server);
   if (!userId) {
     return new Response(JSON.stringify({ error: "unauthorized" }), {
       status: 401,

@@ -14,5 +14,7 @@ export function mcpRoutes(
   ctx: ToolContext,
   auth: AuthFn,
 ): void {
-  router.post("/mcp", (req) => handleMcpHttp(req, registry, ctx, auth));
+  router.post("/mcp", (req, _params, server) =>
+    handleMcpHttp(req, registry, ctx, auth, server as any),
+  );
 }

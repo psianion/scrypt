@@ -50,16 +50,16 @@ describe("doctor evaluators", () => {
     expect(find(out, "exposed-no-token")?.severity).toBe("CRITICAL");
   });
 
-  test("native reachable off-box -> native-offbox + host-spoof CRITICAL", () => {
+  test("native reachable off-box -> native-offbox CRITICAL; no more host-spoof finding", () => {
     const out = evaluateDoctor(facts({ offBoxReachable: true, envToken: undefined }));
     expect(find(out, "native-offbox")?.severity).toBe("CRITICAL");
-    expect(find(out, "host-spoof")?.severity).toBe("CRITICAL");
+    expect(find(out, "host-spoof")).toBeUndefined();
   });
 
-  test("native reachable off-box WITH token -> native-offbox HIGH (still spoofable CRITICAL)", () => {
+  test("native reachable off-box WITH token -> native-offbox HIGH", () => {
     const out = evaluateDoctor(facts({ offBoxReachable: true }));
     expect(find(out, "native-offbox")?.severity).toBe("HIGH");
-    expect(find(out, "host-spoof")?.severity).toBe("CRITICAL");
+    expect(find(out, "host-spoof")).toBeUndefined();
   });
 
   test("weak token -> HIGH", () => {

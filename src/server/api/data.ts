@@ -1,5 +1,5 @@
 // src/server/api/data.ts
-import { join, normalize } from "node:path";
+import { join, normalize, sep } from "node:path";
 import { readdir } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
 import type { Router } from "../router";
@@ -59,7 +59,10 @@ export function dataRoutes(router: Router, vaultPath: string): void {
 
   function safePath(file: string): string | null {
     const resolved = normalize(join(dataDir, file));
-    if (!resolved.startsWith(dataDir)) return null;
+    // Sibling-directory containment: `startsWith(dataDir)` alone would also
+    // accept `<vault>/data-evil` (a sibling that shares the prefix). Require an
+    // exact match or a trailing separator, same as api/files.ts's safePath().
+    if (resolved !== dataDir && !resolved.startsWith(dataDir + sep)) return null;
     return resolved;
   }
 
