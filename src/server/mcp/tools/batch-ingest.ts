@@ -188,10 +188,16 @@ export const batchIngestTool: ToolDef<Input, Output> = {
       const vaultPath = buildVaultPath(project, docType, titleSlug);
 
       try {
+        // Replay detection must live OUTSIDE the cached response: anything
+        // exec returns gets serialized into mcp_dedup and comes back verbatim
+        // on a cache hit, so an in-response flag can never distinguish the
+        // first run from a replay.
+        let executed = false;
         const result = await ctx.idempotency.runCached(
           "batch_ingest",
           tag,
           async () => {
+            executed = true;
             const rawBytes = readFileSync(absSource);
             const rawText = rawBytes.toString("utf8");
             const { frontmatter: rawFm, body } = parseFrontmatter(rawText);
@@ -276,12 +282,11 @@ export const batchIngestTool: ToolDef<Input, Output> = {
             return {
               note_path: vaultPath,
               chunks_total: embed.chunks_total,
-              was_cached: false,
             };
           },
         );
 
-        if (result.was_cached === undefined) {
+        if (!executed) {
           // Returned from idempotency cache.
           results.push({
             source: relPath,

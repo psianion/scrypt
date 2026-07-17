@@ -13,6 +13,11 @@ export function createDatabase(dbPath: string): Database {
 }
 
 export function initSchema(db: Database): void {
+  // Two connections write concurrently (main thread + embed worker, which
+  // replays these migrations on its own connection at bootstrap). Without a
+  // busy timeout the loser of any write race throws SQLITE_BUSY immediately —
+  // seen as the embed worker dying at boot while the main thread reindexes.
+  db.run("PRAGMA busy_timeout = 10000");
   db.run(`
     CREATE TABLE IF NOT EXISTS notes (
       id INTEGER PRIMARY KEY,
