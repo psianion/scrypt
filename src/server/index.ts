@@ -367,6 +367,11 @@ if (import.meta.main) {
   });
   const server = Bun.serve({
     port: config.port,
+    // Explicit dual-stack-reachable bind: newer Bun releases resolve an omitted hostname to
+    // IPv6-any WITHOUT v4-mapped addresses, which silently breaks Docker's IPv4 port forward
+    // (host connects hang while in-container ::1 works). Network exposure is controlled by the
+    // compose port mapping (e.g. 127.0.0.1:3777:3777 on the VPS), not this bind.
+    hostname: "0.0.0.0",
     fetch: app.fetch,
     websocket: app.websocket,
   });
