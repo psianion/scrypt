@@ -1,6 +1,7 @@
 // src/server/api/daily-context.ts
 import { join } from "node:path";
 import { existsSync } from "node:fs";
+import type { Database } from "bun:sqlite";
 import type { Router } from "../router";
 import type { FileManager } from "../file-manager";
 import type { Indexer } from "../indexer";
@@ -12,6 +13,7 @@ export function dailyContextRoutes(
   fm: FileManager,
   indexer: Indexer,
   vaultPath: string,
+  db: Database,
 ): void {
   const handler = async () => {
     const date = todayKey();
@@ -26,7 +28,14 @@ export function dailyContextRoutes(
         }
       : { path: journalRel, content: "", exists: false };
 
-    const notes = await fm.listNotes();
+    // Candidate list comes from the index DB, NOT fm.listNotes(): listNotes reads
+    // and parses EVERY vault file, which made this route O(vault) disk I/O per
+    // request (10s+ for ~1000 notes on a Docker Desktop bind mount — probes saw
+    // scrypt as permanently down). The indexer keeps `notes` current via the
+    // file watcher, so the DB view is as fresh as search already trusts.
+    const notes = db
+      .query("SELECT path, title, modified FROM notes")
+      .all() as { path: string; title: string | null; modified: string | null }[];
     const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
     const recent_notes: any[] = [];
@@ -34,6 +43,15 @@ export function dailyContextRoutes(
     const active_memories: any[] = [];
 
     for (const n of notes) {
+      // Only three categories can contribute to the response: thread notes,
+      // memory notes, and notes modified in the last 24h — filter BEFORE the
+      // file read so only survivors cost disk I/O.
+      const canContribute =
+        n.path.startsWith("notes/threads/") ||
+        n.path.startsWith("memory/") ||
+        (!n.path.startsWith("journal/") && (n.modified ?? "") >= cutoff);
+      if (!canContribute) continue;
+
       const raw = await fm.readRaw(n.path);
       if (!raw) continue;
       const { frontmatter, body } = parseFrontmatter(raw);

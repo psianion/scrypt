@@ -9,6 +9,12 @@ export function embedHealthRoutes(
   router: Router,
   client: EmbedClient | null,
 ): void {
+  // GET /api/health — liveness for external probes (uxie's rest.health(), the
+  // SUP watchdog). Constant-time on purpose: health checks previously hit
+  // /api/daily-context, whose O(vault) disk walk made every probe read the
+  // whole vault — 10s+ on a Docker Desktop bind mount, i.e. "down" forever.
+  router.get("/api/health", () => Response.json({ ok: true }));
+
   router.get("/api/health/embed", () => {
     if (!client) {
       return Response.json(

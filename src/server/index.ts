@@ -185,7 +185,7 @@ export function createApp(config: AppConfig) {
   threadRoutes(router, fm, config.vaultPath, activity);
   researchRoutes(router, db, ingestRouter);
   memoryRoutes(router, fm);
-  dailyContextRoutes(router, fm, indexer, config.vaultPath);
+  dailyContextRoutes(router, fm, indexer, config.vaultPath, db);
   schemaRoutes(router, config.vaultPath);
   activityRoutes(router, activity);
   taskListRoutes(router, wave9Tasks);
