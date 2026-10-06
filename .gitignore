@@ -75,7 +75,7 @@ ehthumbs.db
 
 # Misc project dirs kept local only
 docs/
-.github/
+# .github is tracked: the release workflow must travel with the repo.
 
 # git worktrees
 .worktrees/
