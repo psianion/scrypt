@@ -17,7 +17,9 @@
   border-top:     1px solid var(--border-subtle);
   font-family:    'JetBrains Mono', monospace;
   font-size:      11px;
-  color:          var(--text-subtle);
+  /* --text-muted: the bar carries live info (sync state, breadcrumb) at 11px,
+   * which needs the 4.5:1 ramp step, not the disabled tier. */
+  color:          var(--text-muted);
   gap:            var(--space-5);
   flex-shrink:    0;
 }

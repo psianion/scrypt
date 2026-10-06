@@ -1,111 +1,38 @@
----
-description: Use Bun instead of Node.js, npm, pnpm, or vite.
-globs: "*.ts, *.tsx, *.html, *.css, *.js, *.jsx, package.json"
-alwaysApply: false
----
+# Scrypt
 
-Default to using Bun instead of Node.js.
+Local-first markdown notes vault: Bun server + Vite/React client + PixiJS knowledge graph + MCP server.
 
-- Use `bun <file>` instead of `node <file>` or `ts-node <file>`
-- Use `bun test` instead of `jest` or `vitest`
-- Use `bun build <file.html|file.ts|file.css>` instead of `webpack` or `esbuild`
-- Use `bun install` instead of `npm install` or `yarn install` or `pnpm install`
-- Use `bun run <script>` instead of `npm run <script>` or `yarn run <script>` or `pnpm run <script>`
-- Use `bunx <package> <command>` instead of `npx <package> <command>`
-- Bun automatically loads .env, so don't use dotenv.
+## Stack (this repo deviates from Bun defaults — do NOT "fix" these)
 
-## APIs
+- Runtime: Bun (`bun run`, `bun test`). No Node, no npm.
+- Client: **Vite** builds/serves the React app (`vite.config.ts`). Vite is intentional here despite Bun's HTML-imports feature.
+- Server: `src/server/index.ts` on Bun, domain folders per subsystem (api, graph, indexer, sync, embeddings, mcp, …).
+- State: zustand — one main store (`src/client/store.ts`) + focused stores in `src/client/stores/`.
+- Styling: Tailwind v4 + hand-written component CSS sharing one token set.
 
-- `Bun.serve()` supports WebSockets, HTTPS, and routes. Don't use `express`.
-- `bun:sqlite` for SQLite. Don't use `better-sqlite3`.
-- `Bun.redis` for Redis. Don't use `ioredis`.
-- `Bun.sql` for Postgres. Don't use `pg` or `postgres.js`.
-- `WebSocket` is built-in. Don't use `ws`.
-- Prefer `Bun.file` over `node:fs`'s readFile/writeFile
-- Bun.$`ls` instead of execa.
+## Commands
 
-## Testing
+- `bun run dev` — server (hot), `bun run dev:client` — Vite dev server
+- `bun run build` — production client build
+- `bun test tests/client/` (or `test:server`, `test:cli`, `test` for all)
 
-Use `bun test` to run tests.
+## Client layout
 
-```ts#index.test.ts
-import { test, expect } from "bun:test";
+- `src/client/ui/` — design-system primitives (Button, Input, Modal, Chip, …), CSS co-located per component, barrel exports.
+- `src/client/components/` — app chrome (Sidebar, TabBar, StatusBar, CommandPalette).
+- `src/client/views/` — routes. GraphView is the one lazy-loaded chunk.
+- `src/client/theme/` — `tokens.css` (single source of color/space/motion/z tokens, dark default + `[data-theme="light"]` overrides), `fonts.css` (self-hosted woff2 in `theme/fonts/`).
 
-test("hello world", () => {
-  expect(1).toBe(1);
-});
-```
+## Design system rules
 
-## Frontend
+- Never hard-code colors; use `var(--*)` tokens. Tints derive via `color-mix(in srgb, var(--token) N%, transparent)` so light theme re-derives them.
+- Light theme overrides every accent/semantic token — if you add a token, add its light value and keep text ≥4.5:1 contrast.
+- Text painted on accent fills uses `--on-accent`. Links use `--link`. Z-index uses `--z-*` tokens only.
+- Motion: `--dur-*`/`--ease-*` tokens, 150–250ms, transform/opacity only (no width/height/margin animation). A global `prefers-reduced-motion` override lives in `main.css`.
+- Every interactive element needs hover + `:focus-visible` states.
+- Some CSS headers reference `docs/pencils/*.md` spec docs — those files do not exist in this repo; the CSS itself is the source of truth.
 
-Use HTML imports with `Bun.serve()`. Don't use `vite`. HTML imports fully support React, CSS, Tailwind.
+## Conventions
 
-Server:
-
-```ts#index.ts
-import index from "./index.html"
-
-Bun.serve({
-  routes: {
-    "/": index,
-    "/api/users/:id": {
-      GET: (req) => {
-        return new Response(JSON.stringify({ id: req.params.id }));
-      },
-    },
-  },
-  // optional websocket support
-  websocket: {
-    open: (ws) => {
-      ws.send("Hello, world!");
-    },
-    message: (ws, message) => {
-      ws.send(message);
-    },
-    close: (ws) => {
-      // handle close
-    }
-  },
-  development: {
-    hmr: true,
-    console: true,
-  }
-})
-```
-
-HTML files can import .tsx, .jsx or .js files directly and Bun's bundler will transpile & bundle automatically. `<link>` tags can point to stylesheets and Bun's CSS bundler will bundle.
-
-```html#index.html
-<html>
-  <body>
-    <h1>Hello, world!</h1>
-    <script type="module" src="./frontend.tsx"></script>
-  </body>
-</html>
-```
-
-With the following `frontend.tsx`:
-
-```tsx#frontend.tsx
-import React from "react";
-import { createRoot } from "react-dom/client";
-
-// import .css files directly and it works
-import './index.css';
-
-const root = createRoot(document.body);
-
-export default function Frontend() {
-  return <h1>Hello, world!</h1>;
-}
-
-root.render(<Frontend />);
-```
-
-Then, run index.ts
-
-```sh
-bun --hot ./index.ts
-```
-
-For more information, read the Bun API docs in `node_modules/bun-types/docs/**.mdx`.
+- Desktop-first UI; narrow-window fallbacks live at the bottom of `main.css`.
+- View-specific CSS is co-located with its component, never added to `main.css`.

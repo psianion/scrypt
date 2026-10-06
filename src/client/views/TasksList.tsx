@@ -1,21 +1,14 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { api } from "../api";
+import { Chip, type ChipVariant } from "../ui/Chip";
 import type { Task } from "../../shared/types";
+import "./TasksList.css";
 
-const TYPE_COLOR: Record<string, string> = {
-  BRAINSTORM: "#6366f1",
-  PLAN:       "#10b981",
-  BUILD:      "#f59e0b",
-  RESEARCH:   "#8b5cf6",
-  REVIEW:     "#ef4444",
-  CUSTOM:     "#64748b",
-};
-
-const STATUS_COLOR: Record<string, string> = {
-  open:        "#94a3b8",
-  in_progress: "#f59e0b",
-  closed:      "#16a34a",
+const STATUS_VARIANT: Record<string, ChipVariant> = {
+  open:        "default",
+  in_progress: "status-review",
+  closed:      "status-done",
 };
 
 export function TasksList() {
@@ -43,7 +36,7 @@ export function TasksList() {
         <span className="tasks-list__count">{total}</span>
       </header>
       {loading ? (
-        <div>Loading…</div>
+        <div className="tasks-list__empty">Loading…</div>
       ) : tasks.length === 0 ? (
         <div className="tasks-list__empty">No tasks.</div>
       ) : (
@@ -56,9 +49,9 @@ export function TasksList() {
           <tbody>
             {tasks.map((t) => (
               <tr key={t.id}>
-                <td><span className="legacy-pill" style={{ background: TYPE_COLOR[t.type] ?? "#64748b" }}>{t.type}</span></td>
+                <td><Chip>{t.type}</Chip></td>
                 <td>{t.title}</td>
-                <td><span className="legacy-pill" style={{ background: STATUS_COLOR[t.status] ?? "#64748b" }}>{t.status}</span></td>
+                <td><Chip variant={STATUS_VARIANT[t.status] ?? "default"}>{t.status}</Chip></td>
                 <td>{t.note_path ? <Link to={`/note/${t.note_path}`}>{t.note_path}</Link> : "—"}</td>
                 <td>{t.due_date ?? "—"}</td>
                 <td>{t.priority ?? 0}</td>

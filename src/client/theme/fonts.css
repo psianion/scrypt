@@ -1,8 +1,46 @@
 /* src/client/theme/fonts.css
  * Poppins (headings), Inter (body), JetBrains Mono (metadata).
- * Actual font loading happens via <link> in index.html for best FCP.
+ * Self-hosted latin woff2 subsets in ./fonts/ (no CDN: scrypt is local-first
+ * and must render identically offline). Inter and JetBrains Mono are variable
+ * fonts covering the weights we use; Poppins ships as three statics.
  * This file defines the typography utility classes from docs/pencils/01-foundations.md.
  */
+
+@font-face {
+  font-family: 'Inter';
+  src: url('./fonts/inter-var.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('./fonts/jetbrains-mono-var.woff2') format('woff2');
+  font-weight: 100 800;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Poppins';
+  src: url('./fonts/poppins-500.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Poppins';
+  src: url('./fonts/poppins-600.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Poppins';
+  src: url('./fonts/poppins-700.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
 
 .display  { font-family: 'Poppins', sans-serif; font-size: 40px; font-weight: 600; line-height: 48px; }
 .h1       { font-family: 'Poppins', sans-serif; font-size: 32px; font-weight: 600; line-height: 40px; }
@@ -24,5 +62,6 @@
   font-weight: 500;
   letter-spacing: 2px;
   text-transform: uppercase;
-  color: var(--text-subtle);
+  /* --text-muted, not -subtle: 10px caps needs the 4.5:1 ramp step. */
+  color: var(--text-muted);
 }

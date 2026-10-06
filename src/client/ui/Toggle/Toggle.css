@@ -42,5 +42,5 @@
 .toggle[data-checked] .toggle-track { background: var(--accent); }
 .toggle[data-checked] .toggle-thumb {
   transform: translateX(16px);
-  background: #1A1C23;
+  background: var(--on-accent);
 }
