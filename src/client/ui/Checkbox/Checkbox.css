@@ -26,6 +26,17 @@
 .checkbox[data-checked] {
   background: var(--accent);
   border-color: var(--accent);
-  color: #1A1C23;
+  color: var(--on-accent);
+}
+/* Check-mark pop: icon scales in on check instead of flashing on. */
+.checkbox svg {
+  transform: scale(0.4);
+  opacity: 0;
+  transition: transform var(--dur-fast) var(--ease-standard),
+              opacity var(--dur-fast) var(--ease-standard);
+}
+.checkbox[data-checked] svg {
+  transform: scale(1);
+  opacity: 1;
 }
 .checkbox:disabled { cursor: not-allowed; opacity: 0.5; }

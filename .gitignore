@@ -79,3 +79,7 @@ docs/
 
 # git worktrees
 .worktrees/
+
+# Runtime index artifacts
+.scrypt/graph.json
+.scrypt/embed-cache/

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import "./GraphView.css";
 import { useNavigate, useSearchParams } from "react-router";
 import type { SnapshotNode } from "../../server/graph/snapshot";
 import { useGraphSnapshot } from "../graph/useGraphSnapshot";

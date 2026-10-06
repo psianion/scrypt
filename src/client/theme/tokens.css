@@ -21,7 +21,14 @@
 
   /* --- Accent & semantic --- */
   --accent:          #9EE6CF;
+  --accent-hover:    #88DFC4;
+  --accent-active:   #72D4B8;
+  /* Text/icon color painted ON an accent-filled surface (primary button,
+   * checked toggle/checkbox). Dark ink on mint here; white on the deeper
+   * light-theme green. */
+  --on-accent:       #1A1C23;
   --accent-ai:       #A4B0FF;
+  --link:            var(--accent-ai);
   --success:         #7FD4B0;
   --warning:         #F5C678;
   --danger:          #E88FA0;
@@ -56,6 +63,13 @@
   --shadow-lg: 0 12px 28px rgba(19, 21, 27, 0.10);
 
   /* --- Motion --- */
+  /* --- Z-index scale (dropdown → modal → palette → menu → toast) --- */
+  --z-dropdown: 100;
+  --z-modal:    900;
+  --z-palette:  1000;
+  --z-menu:     1200;
+  --z-toast:    2000;
+
   --dur-instant:    75ms;
   --dur-fast:       150ms;
   --dur-base:       200ms;
@@ -76,8 +90,18 @@
   --border-strong:   #D4D0C8;
   --text-strong:     #1C1D22;
   --text:            #37352F;
-  --text-muted:      #787774;
+  --text-muted:      #6F6E6B;
   --text-subtle:     #9B9A97;
-  --accent:          #80CFB8;
-  --accent-ai:       #6670D9;
+  /* Accent + semantics re-derived for light surfaces: the dark-theme pastels
+   * sit at 1.5–2.4:1 on white. Every value below is ≥4.5:1 as text on
+   * --bg/--surface, same hue families as dark. */
+  --accent:          #257D60;
+  --accent-hover:    #1F6B52;
+  --accent-active:   #1A5A45;
+  --on-accent:       #FFFFFF;
+  --accent-ai:       #5560C9;
+  --success:         #1E7B55;
+  --warning:         #A16207;
+  --danger:          #C42B4D;
+  --tier-semantic:   #7C4DBE;
 }

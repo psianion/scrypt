@@ -4,6 +4,7 @@ import { api } from "../api";
 import { useGraphSnapshot } from "./useGraphSnapshot";
 import { createProjector, type ProjectorHandle } from "./projector";
 import type { IngestBlock, Note, NoteIncomingEdge } from "../../shared/types";
+import "./NoteContextPanel.css";
 
 interface Props {
   path: string;

@@ -1,4 +1,4 @@
-@import "tailwindcss";
+﻿@import "tailwindcss";
 @import "./theme/tokens.css";
 @import "./theme/fonts.css";
 
@@ -51,271 +51,27 @@ body {
   color: var(--text-strong);
 }
 
-/* GraphView (Pixi renderer) */
-.graph-view {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  height: 100%;
+/* View-specific styles live with their components:
+ * views/GraphView.css, graph/NoteContextPanel.css, views/TasksList.css. */
+
+
+/* Desktop-first app. Two structural fallbacks keep narrow windows usable:
+ * the supplementary right rail yields first, then the sidebar narrows.
+ * (Sidebar can always be toggled via its collapse control in the store.) */
+@media (max-width: 1100px) {
+  .note-context { display: none; }
 }
-.graph-view__top {
-  /* Hidden for the full-bleed Marble-style global graph (parity fix): the
-   * search input + tier checkboxes stay in the DOM (search/filter logic and
-   * tests still exercise them) but render nothing so the canvas is full-bleed
-   * behind GraphChrome. Flip to `flex` to bring the bar back. */
-  display: none;
-  align-items: center;
-  gap: 12px;
-  height: 60px;
-  padding: 0 16px;
-  border-bottom: 1px solid var(--border);
-  background: var(--surface);
-  flex-shrink: 0;
-}
-.graph-view__search {
-  flex: 1;
-  background: var(--surface-hover);
-  border: 1px solid var(--border);
-  color: var(--text);
-  padding: 6px 10px;
-  font: inherit;
-  border-radius: 3px;
-  outline: none;
-}
-.graph-view__search:focus {
-  border-color: var(--text-muted);
-}
-.graph-view__tiers {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  color: var(--text-muted);
-  font-size: 12px;
-}
-.graph-view__tiers label {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  cursor: pointer;
-}
-.graph-view__canvas {
-  flex: 1;
-  overflow: hidden;
-  position: relative;
+@media (max-width: 900px) {
+  .sidebar { width: 200px; }
 }
 
-/* NoteContextPanel (right rail on /note/* pages) */
-.note-context {
-  width: 280px;
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  padding: 12px;
-  border-left: 1px solid var(--border);
-  background: var(--surface);
-  overflow-y: auto;
-  color: var(--text);
-  font-size: 13px;
-}
-.note-context h4 {
-  margin: 0 0 6px 0;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-muted);
-}
-.note-context__graph {
-  position: relative;
-}
-.note-context__graph-host {
-  width: 260px;
-  height: 260px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: var(--bg);
-  overflow: hidden;
-}
-.note-context__open-global {
-  position: absolute;
-  top: 22px;
-  right: 4px;
-  padding: 2px 6px;
-  color: var(--text-muted);
-  background: var(--surface-hover);
-  border: 1px solid var(--border);
-  border-radius: 3px;
-  text-decoration: none;
-  font-size: 12px;
-  line-height: 1;
-}
-.note-context__open-global:hover {
-  color: var(--text);
-  border-color: var(--text-muted);
-}
-.note-context__tags,
-.note-context__related {
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--border);
-}
-.note-context__related {
-  border-bottom: none;
-  padding-bottom: 0;
-}
-.note-context__tag-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.tag-chip {
-  display: inline-block;
-  padding: 2px 8px;
-  background: var(--surface-hover);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  color: var(--text-muted);
-  font-size: 11px;
-  text-decoration: none;
-}
-.tag-chip:hover {
-  color: var(--text);
-  border-color: var(--text-muted);
-}
-.note-context__empty {
-  font-size: 12px;
-  color: var(--text-muted);
-}
-.tier-group {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-bottom: 10px;
-}
-.tier-group h5 {
-  margin: 0 0 2px 0;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-.tier-group__toggle {
-  cursor: pointer;
-  user-select: none;
-}
-.tier-group__toggle:hover {
-  color: var(--text);
-}
-.tier-row {
-  display: block;
-  padding: 2px 0;
-}
-.tier-row a {
-  color: var(--link);
-  text-decoration: none;
-  font-size: 12px;
-}
-.tier-row a:hover {
-  color: var(--text);
-}
-.tier-row__reason {
-  font-size: 11px;
-  color: var(--text-muted);
-  margin-top: 1px;
-}
-
-/* Wave B: read-only TasksList */
-.tasks-list {
-  padding: 20px 28px;
-  color: var(--text);
-  overflow: auto;
-  height: 100%;
-}
-.tasks-list__header {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  margin-bottom: 16px;
-}
-.tasks-list__header h1 {
-  font-size: 20px;
-  font-weight: 600;
-  margin: 0;
-  flex-shrink: 0;
-}
-.tasks-list__header label {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  color: var(--text-muted);
-  cursor: pointer;
-  user-select: none;
-}
-.tasks-list__count {
-  margin-left: auto;
-  font-size: 12px;
-  color: var(--text-muted);
-  background: var(--surface-hover);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 2px 10px;
-}
-.tasks-list__empty {
-  color: var(--text-muted);
-  font-style: italic;
-  padding: 24px 0;
-}
-.tasks-list__table {
-  width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
-  font-size: 13px;
-}
-.tasks-list__table thead th {
-  text-align: left;
-  font-weight: 600;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--text-muted);
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--border);
-  background: var(--surface);
-  position: sticky;
-  top: 0;
-  z-index: 1;
-}
-.tasks-list__table tbody td {
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--border);
-  vertical-align: top;
-}
-.tasks-list__table tbody tr:hover {
-  background: var(--surface);
-}
-.tasks-list__table a {
-  color: var(--link);
-  text-decoration: none;
-}
-.tasks-list__table a:hover {
-  color: var(--text);
-  text-decoration: underline;
-}
-/* Legacy pill used by TasksList for type/status badges with inline background.
- * Renamed from `.pill` so it no longer shadows the design-system Chip family
- * `.pill` rule in `src/client/ui/Chip/Chip.css`. Slated for migration to
- * <Chip variant="status-*"> in a later wave.
- */
-.legacy-pill {
-  display: inline-block;
-  padding: 2px 8px;
-  border-radius: 10px;
-  font-size: 11px;
-  font-weight: 600;
-  color: #fff;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  white-space: nowrap;
+/* Reduced motion: collapse every animation/transition to a near-instant cut.
+ * Covers the infinite pulses (ActivityStrip, embedding overlay) and all
+ * micro-transitions in one place. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

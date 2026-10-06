@@ -27,7 +27,7 @@
   font-weight:    500;
   letter-spacing: 2px;
   text-transform: uppercase;
-  color:          var(--text-subtle);
+  color:          var(--text-muted);
 }
 
 .new-note-grid {

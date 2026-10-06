@@ -29,13 +29,15 @@
   align-items: center;
 }
 
-.toast-info    { border-left: 3px solid var(--accent-ai); }
+/* Variant identity: colored icon + a faint tint of the semantic color mixed
+ * into the card surface. (Replaces the earlier 3px side-stripe.) */
+.toast-info    { background: color-mix(in srgb, var(--accent-ai) 6%, var(--surface)); }
 .toast-info    .toast-icon { color: var(--accent-ai); }
-.toast-success { border-left: 3px solid var(--success);  }
+.toast-success { background: color-mix(in srgb, var(--success) 6%, var(--surface)); }
 .toast-success .toast-icon { color: var(--success); }
-.toast-warning { border-left: 3px solid var(--warning);  }
+.toast-warning { background: color-mix(in srgb, var(--warning) 6%, var(--surface)); }
 .toast-warning .toast-icon { color: var(--warning); }
-.toast-error   { border-left: 3px solid var(--danger);   }
+.toast-error   { background: color-mix(in srgb, var(--danger) 6%, var(--surface)); }
 .toast-error   .toast-icon { color: var(--danger); }
 
 .toast-content {
@@ -108,7 +110,7 @@
   display:        flex;
   flex-direction: column;
   gap:            var(--space-3);
-  z-index:        2000;
+  z-index:        var(--z-toast);
   pointer-events: none;
 }
 

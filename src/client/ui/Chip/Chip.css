@@ -13,20 +13,24 @@
   background: var(--surface-hover);
   color: var(--text-muted);
   border: 1px solid var(--border-subtle);
-  transition: background var(--dur-fast) var(--ease-standard);
+  transition: background var(--dur-fast) var(--ease-standard),
+              color var(--dur-fast) var(--ease-standard),
+              border-color var(--dur-fast) var(--ease-standard);
 }
 
+/* Tints derive from the semantic tokens via color-mix so they re-derive
+ * automatically in light theme instead of freezing the dark pastels. */
 .chip-tag {
-  background: rgba(158, 230, 207, 0.10);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
   color: var(--accent);
-  border-color: rgba(158, 230, 207, 0.20);
+  border-color: color-mix(in srgb, var(--accent) 20%, transparent);
 }
-.chip-tag:hover { background: rgba(158, 230, 207, 0.18); }
+.chip-tag:hover { background: color-mix(in srgb, var(--accent) 18%, transparent); }
 
-.chip-status-done    { background: rgba(127, 212, 176, 0.12); color: var(--success);    border-color: rgba(127, 212, 176, 0.20); }
-.chip-status-review  { background: rgba(245, 198, 120, 0.12); color: var(--warning);    border-color: rgba(245, 198, 120, 0.20); }
-.chip-status-blocked { background: rgba(232, 143, 160, 0.12); color: var(--danger);     border-color: rgba(232, 143, 160, 0.20); }
-.chip-status-ai      { background: rgba(164, 176, 255, 0.12); color: var(--accent-ai);  border-color: rgba(164, 176, 255, 0.20); }
+.chip-status-done    { background: color-mix(in srgb, var(--success) 12%, transparent);   color: var(--success);    border-color: color-mix(in srgb, var(--success) 20%, transparent); }
+.chip-status-review  { background: color-mix(in srgb, var(--warning) 12%, transparent);   color: var(--warning);    border-color: color-mix(in srgb, var(--warning) 20%, transparent); }
+.chip-status-blocked { background: color-mix(in srgb, var(--danger) 12%, transparent);    color: var(--danger);     border-color: color-mix(in srgb, var(--danger) 20%, transparent); }
+.chip-status-ai      { background: color-mix(in srgb, var(--accent-ai) 12%, transparent); color: var(--accent-ai);  border-color: color-mix(in srgb, var(--accent-ai) 20%, transparent); }
 
 .chip-remove {
   display: inline-flex;
@@ -39,8 +43,15 @@
   color: inherit;
   padding: 0;
   font: inherit;
+  transition: opacity var(--dur-fast) var(--ease-standard);
 }
 .chip-remove:hover { opacity: 1; }
+.chip-remove:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-radius: var(--radius-xs);
+  opacity: 1;
+}
 
 .pill {
   display: inline-flex;
@@ -88,6 +99,6 @@
   text-transform: uppercase;
   letter-spacing: 1px;
 }
-.tier-connected { background: rgba(127, 212, 176, 0.12); color: var(--success); }
-.tier-mentions  { background: rgba(245, 198, 120, 0.12); color: var(--warning); }
-.tier-semantic  { background: rgba(199, 155, 242, 0.12); color: var(--tier-semantic); }
+.tier-connected { background: color-mix(in srgb, var(--success) 12%, transparent);       color: var(--success); }
+.tier-mentions  { background: color-mix(in srgb, var(--warning) 12%, transparent);       color: var(--warning); }
+.tier-semantic  { background: color-mix(in srgb, var(--tier-semantic) 12%, transparent); color: var(--tier-semantic); }
