@@ -14,13 +14,17 @@ export interface InitAnswers {
   profile: Profile;
   vaultPath: string; // absolute
   ingestDir?: string; // docker only
-  hubUrl?: string; // vps only
+  /** Sync hub this machine pushes to / pulls from. Required for vps;
+   *  optional for native (a client with its own server + UI). Absent on
+   *  the hub itself. */
+  hubUrl?: string;
   gitAutocommit?: boolean;
 }
 
 export type InitStep =
   | { kind: "write-env" }
   | { kind: "write-override"; ingestDir: string; arch: string }
+  | { kind: "build-ui" }
   | { kind: "start-runtime"; profile: Profile }
   | { kind: "health-verify"; url: string }
   | { kind: "probe-hub"; url: string };
@@ -39,6 +43,9 @@ export interface PlanInitInput {
   /** Effective port (default 3777). */
   port: number;
   arch: string;
+  /** `dist/index.html` exists — the web UI has been built. When false, the
+   *  native plan builds it before starting, so the first visit isn't a 404. */
+  uiBuilt?: boolean;
 }
 
 export interface InitPlan {
@@ -90,6 +97,9 @@ export function planInit(input: PlanInitInput): InitPlan {
   if (answers.profile === "native") {
     updates.SCRYPT_VAULT_PATH = answers.vaultPath;
     updates.SCRYPT_AUTH_TOKEN = token;
+    // A native client syncs through its own server (in-app Sync bar and the
+    // CLI both read this); the hub machine simply leaves it unset.
+    if (answers.hubUrl) updates.SCRYPT_HUB_URL = answers.hubUrl;
     if (port !== 3777) updates.SCRYPT_PORT = String(port);
     if (answers.gitAutocommit) updates.SCRYPT_GIT_AUTOCOMMIT = "1";
     // A NODE_ENV=production copied from .env.example would make native boot throw
@@ -124,12 +134,16 @@ export function planInit(input: PlanInitInput): InitPlan {
   if (answers.profile === "docker" && answers.ingestDir) {
     steps.push({ kind: "write-override", ingestDir: answers.ingestDir, arch });
   }
+  if (answers.profile === "native" && input.uiBuilt === false) {
+    steps.push({ kind: "build-ui" });
+  }
   if (!input.noStart) {
     if (answers.profile === "vps") {
       if (answers.hubUrl) steps.push({ kind: "probe-hub", url: `${answers.hubUrl.replace(/\/$/, "")}/api/sync/manifest` });
     } else {
       steps.push({ kind: "start-runtime", profile: answers.profile });
       steps.push({ kind: "health-verify", url: `http://localhost:${port}/health` });
+      if (answers.hubUrl) steps.push({ kind: "probe-hub", url: `${answers.hubUrl}/api/sync/manifest` });
     }
   }
 

@@ -20,9 +20,25 @@ export type InstructionsFn = () => string | null;
 
 interface JsonRpcReq {
   jsonrpc: "2.0";
-  id: number | string | null;
+  id?: number | string | null;
   method: string;
   params?: { name?: string; arguments?: Record<string, unknown> };
+}
+
+export const SERVER_VERSION = "0.8.0";
+
+/** Standard JSON-RPC code for an unknown method (the MCP_ERROR table holds
+ *  scrypt's application codes). */
+export const JSON_RPC_METHOD_NOT_FOUND = -32601;
+
+/** Protocol revisions this transport implements, newest first. Per spec the
+ *  server answers with the client's version when it supports it, otherwise
+ *  with the latest it does — never with a version it has never heard of. */
+export const SUPPORTED_PROTOCOL_VERSIONS = ["2025-06-18", "2025-03-26", "2024-11-05"] as const;
+
+export function negotiateProtocolVersion(requested: string | undefined): string {
+  if (requested && (SUPPORTED_PROTOCOL_VERSIONS as readonly string[]).includes(requested)) return requested;
+  return SUPPORTED_PROTOCOL_VERSIONS[0];
 }
 
 function jsonRpcResponse(
@@ -70,38 +86,49 @@ export async function handleMcpHttp(
 
   const ctx: ToolContext = { ...baseCtx, userId };
   const correlationId = randomUUID();
+  // Every response below needs a request id; notifications (no id) are
+  // answered before any of them.
+  const reqId: number | string | null = body.id ?? null;
 
   try {
+    // A JSON-RPC notification carries no id and MUST NOT get a response
+    // body: the Streamable HTTP spec says 202 Accepted, empty. Answering
+    // with `{"id":null,"result":{}}` (the old behaviour) is what MCP SDK
+    // clients log as a protocol error on every session start.
+    if (
+      (body.id === undefined || body.id === null) &&
+      typeof body.method === "string" &&
+      body.method.startsWith("notifications/")
+    ) {
+      return new Response(null, { status: 202 });
+    }
+
     // MCP SDK handshake — Claude Code / any MCP client sends these
     // before tools/list or tools/call. Keep stateless; we don't track
     // sessions since the HTTP transport is request-scoped.
     if (body.method === "initialize") {
-      const clientProtocol =
+      const requested =
         (body.params as { protocolVersion?: string } | undefined)
-          ?.protocolVersion ?? "2024-11-05";
+          ?.protocolVersion;
       const schemaDoc = instructions?.() ?? null;
-      return jsonRpcResponse(body.id, {
+      return jsonRpcResponse(reqId, {
         result: {
-          protocolVersion: clientProtocol,
+          protocolVersion: negotiateProtocolVersion(requested),
           capabilities: { tools: {} },
-          serverInfo: { name: "scrypt", version: "0.8.0" },
+          serverInfo: { name: "scrypt", version: SERVER_VERSION },
           ...(schemaDoc !== null ? { instructions: schemaDoc } : {}),
         },
       });
     }
-    if (
-      body.method === "notifications/initialized" ||
-      body.method === "initialized"
-    ) {
-      // Notification — spec-wise has no id, but some clients still
-      // POST it as a request. Acknowledge with an empty result.
-      return jsonRpcResponse(body.id, { result: {} });
+    if (body.method === "initialized") {
+      // Legacy clients that POST the initialized notification as a request.
+      return jsonRpcResponse(reqId, { result: {} });
     }
     if (body.method === "ping") {
-      return jsonRpcResponse(body.id, { result: {} });
+      return jsonRpcResponse(reqId, { result: {} });
     }
     if (body.method === "tools/list") {
-      return jsonRpcResponse(body.id, {
+      return jsonRpcResponse(reqId, {
         result: { tools: registry.listTools() },
       });
     }
@@ -109,7 +136,7 @@ export async function handleMcpHttp(
       const name = body.params?.name;
       const args = body.params?.arguments ?? {};
       if (!name) {
-        return jsonRpcResponse(body.id, {
+        return jsonRpcResponse(reqId, {
           error: {
             code: MCP_ERROR.INVALID_PARAMS,
             message: "missing params.name",
@@ -126,7 +153,7 @@ export async function handleMcpHttp(
           ctx,
           correlationId,
         );
-        return jsonRpcResponse(body.id, {
+        return jsonRpcResponse(reqId, {
           result: {
             content: [
               { type: "text", text: JSON.stringify(toolResult) },
@@ -135,7 +162,7 @@ export async function handleMcpHttp(
         });
       } catch (toolErr) {
         if (toolErr instanceof McpError) {
-          return jsonRpcResponse(body.id, {
+          return jsonRpcResponse(reqId, {
             result: {
               isError: true,
               content: [
@@ -150,18 +177,18 @@ export async function handleMcpHttp(
         throw toolErr;
       }
     }
-    return jsonRpcResponse(body.id, {
+    return jsonRpcResponse(reqId, {
       error: {
-        code: MCP_ERROR.NOT_FOUND,
+        code: JSON_RPC_METHOD_NOT_FOUND,
         message: `unknown method ${body.method}`,
       },
     });
   } catch (err) {
     if (err instanceof McpError) {
-      return jsonRpcResponse(body.id, { error: err.toJsonRpc(correlationId) });
+      return jsonRpcResponse(reqId, { error: err.toJsonRpc(correlationId) });
     }
     return jsonRpcResponse(
-      body.id,
+      reqId,
       {
         error: {
           code: MCP_ERROR.INTERNAL,

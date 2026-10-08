@@ -128,3 +128,44 @@ describe("handleMcpHttp", () => {
     expect(res.status).toBe(400);
   });
 });
+
+describe("handleMcpHttp protocol compliance", () => {
+  const post = (payload: unknown) =>
+    new Request("http://x/mcp", {
+      method: "POST",
+      headers: { authorization: "Bearer t", "content-type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+  test("a notification (no id) gets 202 with an empty body, not a JSON-RPC envelope", async () => {
+    const res = await handleMcpHttp(post({ jsonrpc: "2.0", method: "notifications/initialized" }), makeRegistry(), stubCtx, async () => "u");
+    expect(res.status).toBe(202);
+    expect(await res.text()).toBe("");
+  });
+
+  test("initialize negotiates a protocol version the server actually supports", async () => {
+    const known = await handleMcpHttp(post({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-03-26" } }), makeRegistry(), stubCtx, async () => "u");
+    expect(((await known.json()) as any).result.protocolVersion).toBe("2025-03-26");
+    const future = await handleMcpHttp(post({ jsonrpc: "2.0", id: 2, method: "initialize", params: { protocolVersion: "2099-01-01" } }), makeRegistry(), stubCtx, async () => "u");
+    expect(((await future.json()) as any).result.protocolVersion).toBe("2025-06-18");
+  });
+
+  test("an unknown method is the standard JSON-RPC -32601", async () => {
+    const res = await handleMcpHttp(post({ jsonrpc: "2.0", id: 3, method: "resources/list" }), makeRegistry(), stubCtx, async () => "u");
+    expect(((await res.json()) as any).error.code).toBe(-32601);
+  });
+
+  test("tools/list carries title + annotations for known scrypt tools", async () => {
+    const reg = new ToolRegistry();
+    reg.register({ name: "get_note", description: "", inputSchema: { type: "object" }, handler: async () => ({}) });
+    reg.register({ name: "delete_task", description: "", inputSchema: { type: "object" }, handler: async () => ({}) });
+    const res = await handleMcpHttp(post({ jsonrpc: "2.0", id: 4, method: "tools/list" }), reg, stubCtx, async () => "u");
+    const tools = ((await res.json()) as any).result.tools as any[];
+    const get = tools.find((t) => t.name === "get_note");
+    const del = tools.find((t) => t.name === "delete_task");
+    expect(get.title).toBe("Read note");
+    expect(get.annotations.readOnlyHint).toBe(true);
+    expect(del.annotations.destructiveHint).toBe(true);
+    expect(del.annotations.readOnlyHint).toBe(false);
+  });
+});

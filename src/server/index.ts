@@ -1,6 +1,7 @@
 // src/server/index.ts
 import { join, normalize, sep } from "node:path";
-import { mkdirSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
+import { resolveStaticDir } from "./static-dir";
 import { createDatabase, initSchema } from "./db";
 import { FileManager } from "./file-manager";
 import { Indexer } from "./indexer";
@@ -355,7 +356,14 @@ export function createApp(config: AppConfig) {
 // CLI entry point
 if (import.meta.main) {
   const vaultPath = process.env.SCRYPT_VAULT_PATH || process.cwd();
-  const staticDir = process.env.SCRYPT_STATIC_DIR;
+  const staticDir = resolveStaticDir(
+    {
+      env: process.env.SCRYPT_STATIC_DIR,
+      repoDist: join(import.meta.dir, "..", "..", "dist"),
+      vaultDist: join(vaultPath, "dist"),
+    },
+    existsSync,
+  ).dir;
   const config = loadConfig({ vaultPath, staticDir });
   const app = createApp({
     vaultPath: config.vaultPath,

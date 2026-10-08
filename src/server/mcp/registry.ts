@@ -4,6 +4,7 @@
 // (enough to catch wrong types and missing required fields before a
 // handler runs). Registered tools are dispatched by name.
 import { McpError, MCP_ERROR } from "./errors";
+import { TOOL_ANNOTATIONS, type ToolAnnotations } from "./annotations";
 import type {
   JsonSchema,
   ToolContext,
@@ -63,8 +64,10 @@ function validateInput(
 
 interface ToolManifestEntry {
   name: string;
+  title?: string;
   description: string;
   inputSchema: JsonSchema;
+  annotations?: ToolAnnotations;
 }
 
 export class ToolRegistry {
@@ -75,11 +78,15 @@ export class ToolRegistry {
   }
 
   listTools(): ToolManifestEntry[] {
-    return Array.from(this.tools.values()).map((t) => ({
-      name: t.name,
-      description: t.description,
-      inputSchema: t.inputSchema,
-    }));
+    return Array.from(this.tools.values()).map((t) => {
+      const annotations = TOOL_ANNOTATIONS[t.name];
+      return {
+        name: t.name,
+        ...(annotations ? { title: annotations.title, annotations } : {}),
+        description: t.description,
+        inputSchema: t.inputSchema,
+      };
+    });
   }
 
   async call(

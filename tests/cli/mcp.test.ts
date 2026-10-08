@@ -1,6 +1,7 @@
 import { describe, test, expect } from "bun:test";
-import { buildMcpAddArgs, mcpUrlFromPort, MCP_PROBE_BODY, runMcpInstall } from "../../src/cli/mcp-install";
+import { buildMcpAddArgs, buildMcpStdioAddArgs, mcpUrlFromPort, renderMcpConfig, MCP_PROBE_BODY, runMcpInstall } from "../../src/cli/mcp-install";
 import { makeFakeCtx } from "../../src/cli/ctx";
+import { join } from "node:path";
 
 const TOKEN = "0123456789abcdef".repeat(4);
 
@@ -62,5 +63,33 @@ describe("runMcpInstall", () => {
     expect(r.ok).toBe(false);
     expect(r.message).toContain("claude CLI not on PATH");
     expect(ctx.recorded.shell.length).toBe(0);
+  });
+});
+
+describe("stdio transport + config snippets", () => {
+  test("buildMcpStdioAddArgs registers the bridge with the vault path in its env", () => {
+    expect(buildMcpStdioAddArgs({ name: "scrypt", scope: "user", repoDir: "/home/me/scrypt", vaultPath: "/home/me/vault" })).toEqual([
+      "mcp", "add", "--transport", "stdio", "scrypt", "--scope", "user",
+      "-e", "SCRYPT_VAULT_PATH=/home/me/vault",
+      "--", "bun", "run", join("/home/me/scrypt", "scripts", "scrypt-mcp.ts"),
+    ]);
+  });
+
+  test("renderMcpConfig produces the http snippet with the bearer header, and the stdio snippet with env", () => {
+    const http = renderMcpConfig({ transport: "http", name: "scrypt", url: "http://localhost:3777/mcp", token: TOKEN, repoDir: "/r", vaultPath: "/v" }) as any;
+    expect(http.mcpServers.scrypt).toEqual({ type: "http", url: "http://localhost:3777/mcp", headers: { Authorization: `Bearer ${TOKEN}` } });
+    const noToken = renderMcpConfig({ transport: "http", name: "scrypt", url: "u", repoDir: "/r", vaultPath: "/v" }) as any;
+    expect("headers" in noToken.mcpServers.scrypt).toBe(false);
+    const stdio = renderMcpConfig({ transport: "stdio", name: "scrypt", url: "u", repoDir: "/r", vaultPath: "/v" }) as any;
+    expect(stdio.mcpServers.scrypt).toEqual({ type: "stdio", command: "bun", args: ["run", join("/r", "scripts", "scrypt-mcp.ts")], env: { SCRYPT_VAULT_PATH: "/v" } });
+  });
+
+  test("runMcpInstall --transport stdio skips the server probe and adds the bridge", async () => {
+    const ctx = makeFakeCtx({ files: { "/work/.env": `SCRYPT_AUTH_TOKEN=${TOKEN}\nSCRYPT_VAULT_PATH=/data/vault\n` } });
+    const r = await runMcpInstall(ctx, { envPath: "/work/.env", transport: "stdio" });
+    expect(r.ok).toBe(true);
+    expect(ctx.recorded.http).toHaveLength(0);
+    const calls = ctx.recorded.shell.map((s) => s.args.join(" "));
+    expect(calls.some((c) => c.startsWith("mcp add --transport stdio scrypt") && c.includes("SCRYPT_VAULT_PATH=/data/vault"))).toBe(true);
   });
 });

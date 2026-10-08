@@ -120,3 +120,31 @@ describe("planInit steps + idempotency", () => {
     expect(tokenLine).not.toContain(CAND);
   });
 });
+
+describe("planInit native client + UI build", () => {
+  test("a native profile with a hub URL writes SCRYPT_HUB_URL and probes the hub after start", () => {
+    const p = planInit(base({ answers: { profile: "native", vaultPath: "/abs/vault", hubUrl: "http://100.1.2.3:3777" }, uiBuilt: true }));
+    expect(p.envUpdates.SCRYPT_HUB_URL).toBe("http://100.1.2.3:3777");
+    expect(p.steps.map((s) => s.kind)).toEqual(["write-env", "start-runtime", "health-verify", "probe-hub"]);
+  });
+
+  test("the hub machine (no hub URL) writes no SCRYPT_HUB_URL", () => {
+    const p = planInit(base({ uiBuilt: true }));
+    expect("SCRYPT_HUB_URL" in p.envUpdates).toBe(false);
+    expect(p.steps.map((s) => s.kind)).toEqual(["write-env", "start-runtime", "health-verify"]);
+  });
+
+  test("builds the UI before starting when dist is missing, and skips the build when it exists", () => {
+    const missing = planInit(base({ uiBuilt: false }));
+    expect(missing.steps.map((s) => s.kind)).toEqual(["write-env", "build-ui", "start-runtime", "health-verify"]);
+    const built = planInit(base({ uiBuilt: true }));
+    expect(built.steps.some((s) => s.kind === "build-ui")).toBe(false);
+    // Unknown (old callers) means: don't guess, don't build.
+    expect(planInit(base({})).steps.some((s) => s.kind === "build-ui")).toBe(false);
+  });
+
+  test("--no-start still builds the UI but neither starts nor probes", () => {
+    const p = planInit(base({ uiBuilt: false, noStart: true, answers: { profile: "native", vaultPath: "/v", hubUrl: "http://h:3777" } }));
+    expect(p.steps.map((s) => s.kind)).toEqual(["write-env", "build-ui"]);
+  });
+});

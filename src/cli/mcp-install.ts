@@ -6,6 +6,7 @@
 // PowerShell or bash).
 
 import type { Ctx } from "./ctx";
+import { join } from "node:path";
 import { parseEnv, getEnv } from "./env-file";
 import { redactToken } from "./token";
 
@@ -31,11 +32,70 @@ export function mcpUrlFromPort(port: number): string {
   return `http://localhost:${port}/mcp`;
 }
 
+export interface McpStdioAddOpts {
+  name: string;
+  scope: string;
+  /** Repo checkout; the bridge script lives at <repoDir>/scripts/scrypt-mcp.ts. */
+  repoDir: string;
+  vaultPath: string;
+}
+
+/** argv for `claude mcp add` of the stdio bridge. No server needed: the
+ *  bridge opens the vault's database directly, so the vault path travels in
+ *  its environment. */
+export function buildMcpStdioAddArgs(opts: McpStdioAddOpts): string[] {
+  return [
+    "mcp", "add", "--transport", "stdio", opts.name, "--scope", opts.scope,
+    "-e", `SCRYPT_VAULT_PATH=${opts.vaultPath}`,
+    "--", "bun", "run", join(opts.repoDir, "scripts", "scrypt-mcp.ts"),
+  ];
+}
+
+export type McpTransport = "http" | "stdio";
+
+/** The `mcpServers` snippet other MCP clients (Cursor, Codex, Claude Desktop,
+ *  an `.mcp.json`) take verbatim. */
+export function renderMcpConfig(opts: {
+  transport: McpTransport;
+  name: string;
+  url: string;
+  token?: string;
+  repoDir: string;
+  vaultPath: string;
+}): Record<string, unknown> {
+  if (opts.transport === "stdio") {
+    return {
+      mcpServers: {
+        [opts.name]: {
+          type: "stdio",
+          command: "bun",
+          args: ["run", join(opts.repoDir, "scripts", "scrypt-mcp.ts")],
+          env: { SCRYPT_VAULT_PATH: opts.vaultPath },
+        },
+      },
+    };
+  }
+  return {
+    mcpServers: {
+      [opts.name]: {
+        type: "http",
+        url: opts.url,
+        ...(opts.token ? { headers: { Authorization: `Bearer ${opts.token}` } } : {}),
+      },
+    },
+  };
+}
+
 export interface McpInstallOpts {
   name?: string;
   url?: string;
   scope?: string;
   envPath: string;
+  /** `http` (default) talks to the running server; `stdio` spawns the bridge
+   *  per session and works without the server. */
+  transport?: McpTransport;
+  repoDir?: string;
+  vaultPath?: string;
 }
 
 export interface McpInstallResult {
@@ -58,6 +118,19 @@ export async function runMcpInstall(ctx: Ctx, opts: McpInstallOpts): Promise<Mcp
   // 1. claude present?
   if (!ctx.shell.which("claude")) {
     return { ok: false, code: 1, message: "claude CLI not on PATH — install Claude Code, then re-run `scrypt mcp install`." };
+  }
+
+  if (opts.transport === "stdio") {
+    const repoDir = opts.repoDir ?? ctx.cwd;
+    const vaultPath = opts.vaultPath ?? getEnv(lines, "SCRYPT_VAULT_PATH") ?? ctx.cwd;
+    ctx.log.info(`>> removing any existing '${name}' entry (--scope ${scope})`);
+    await ctx.shell.run("claude", ["mcp", "remove", name, "--scope", scope]); // ignore failure
+    ctx.log.info(`>> adding '${name}' as a stdio bridge for vault ${vaultPath} (--scope ${scope})`);
+    const add = await ctx.shell.run("claude", buildMcpStdioAddArgs({ name, scope, repoDir, vaultPath }));
+    if (add.code !== 0) {
+      return { ok: false, code: 1, message: `\`claude mcp add\` failed (exit ${add.code}): ${add.stderr.trim() || add.stdout.trim()}` };
+    }
+    return { ok: true, code: 0, message: `installed '${name}' (stdio). Claude Code starts the bridge per session; no running server needed.` };
   }
 
   // 2. reachability probe (must be 200 before registering)
