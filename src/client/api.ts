@@ -13,7 +13,10 @@ export interface HubStatusOk {
   ok: true; checkedAt: number; counts: { push: number; pull: number; clash: number };
   notPushed: string[]; clashes: string[]; toPull: { path: string; reason: string }[]; removedOnHub: string[];
 }
-export type HubStatus = HubStatusOk | { ok: false; error: "hub_unreachable" };
+// `hub_not_configured`: this instance has no SCRYPT_HUB_URL — it is the hub
+// (or sync is simply not set up here). Distinct from a configured hub that
+// cannot be reached right now.
+export type HubStatus = HubStatusOk | { ok: false; error: "hub_unreachable" | "hub_not_configured" };
 export interface SyncResult { ok: boolean; pushed?: number; pulled?: number; clashes?: number; failed?: string[]; checkedAt?: number; error?: string; }
 
 // Journal day bundle — mirrors the server `journalRoutes` day-bundle shape.

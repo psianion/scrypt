@@ -14,6 +14,10 @@ interface SyncStatusStore {
   notPushed: Set<string>;
   clashes: Set<string>;
   toPull: { path: string; reason: string }[];
+  /** False when the server reports `hub_not_configured`: there is no hub to
+   *  sync with, so counts and the Sync action are meaningless here. This is
+   *  the normal state on the hub machine itself. */
+  hubConfigured: boolean;
   hubReachable: boolean;
   checkedAt: number | null;
   syncing: boolean;
@@ -26,6 +30,7 @@ export const useSyncStatus = create<SyncStatusStore>((set, get) => ({
   notPushed: new Set(),
   clashes: new Set(),
   toPull: [],
+  hubConfigured: true,
   hubReachable: true,
   checkedAt: null,
   syncing: false,
@@ -45,7 +50,12 @@ export const useSyncStatus = create<SyncStatusStore>((set, get) => ({
     try {
       const res = await api.sync.status();
       if (!res.ok) {
-        set({ hubReachable: false });
+        if (res.error === "hub_not_configured") {
+          set({ hubConfigured: false, hubReachable: false });
+          if (opts?.interactive) useToastStore.getState().enqueue({ variant: "info", title: "No sync hub configured", message: "This instance has no SCRYPT_HUB_URL. If it is the hub, other machines sync to it; nothing to do here." });
+          return;
+        }
+        set({ hubConfigured: true, hubReachable: false });
         if (opts?.interactive) useToastStore.getState().enqueue({ variant: "warn", title: "Hub offline", message: "Couldn't reach the sync hub." });
         return;
       }
@@ -54,6 +64,7 @@ export const useSyncStatus = create<SyncStatusStore>((set, get) => ({
       // `undefined` into `toPull` — the SyncBar reads `toPull.length` on every
       // render and would otherwise crash the whole sidebar. (F10)
       set({
+        hubConfigured: true,
         hubReachable: true,
         clashes: new Set(res.clashes ?? []),
         toPull: Array.isArray(res.toPull) ? res.toPull : [],

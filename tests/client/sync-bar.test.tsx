@@ -6,8 +6,17 @@ import { useSyncStatus } from "../../src/client/stores/syncStatus";
 // useSyncStatus is a module-singleton shared across all client test files, so
 // reset to a known baseline BEFORE each test — otherwise a prior file leaving
 // hubReachable:false would suppress the pull/clash pills this file asserts on.
-beforeEach(() => { useSyncStatus.setState({ notPushed: new Set(), clashes: new Set(), toPull: [], hubReachable: true, syncing: false }); });
+beforeEach(() => { useSyncStatus.setState({ notPushed: new Set(), clashes: new Set(), toPull: [], hubConfigured: true, hubReachable: true, syncing: false }); });
 afterEach(() => { cleanup(); });
+
+test("no hub configured: says so, hides counts, and disables Sync instead of claiming the hub is offline", () => {
+  useSyncStatus.setState({ hubConfigured: false, hubReachable: false, notPushed: new Set(["a.md"]) });
+  render(<SyncBar />);
+  expect(screen.getByText(/no sync hub configured/i)).toBeDefined();
+  expect(screen.queryByText(/hub offline/i)).toBeNull();
+  expect(screen.queryByText(/to push/)).toBeNull();
+  expect((screen.getByRole("button", { name: /^sync$/i }) as HTMLButtonElement).disabled).toBe(true);
+});
 
 test("shows the push / pull / clash breakdown", () => {
   useSyncStatus.setState({ notPushed: new Set(["a.md", "b.md", "c.md"]), clashes: new Set(["d.md"]), toPull: [{ path: "e.md", reason: "pull_new" }, { path: "f.md", reason: "pull_update" }] });

@@ -12,11 +12,31 @@ export function SyncBar() {
   const push = useSyncStatus((s) => s.notPushed.size);
   const pull = useSyncStatus((s) => s.toPull.length);
   const clash = useSyncStatus((s) => s.clashes.size);
+  const hubConfigured = useSyncStatus((s) => s.hubConfigured);
   const hubReachable = useSyncStatus((s) => s.hubReachable);
   const checkedAt = useSyncStatus((s) => s.checkedAt);
   const syncing = useSyncStatus((s) => s.syncing);
   const runSync = useSyncStatus((s) => s.runSync);
   const refreshHub = useSyncStatus((s) => s.refreshHub);
+
+  // No hub at all (the normal state on the hub machine): there is nothing to
+  // push to or pull from, so counts and the Sync action would only mislead.
+  if (!hubConfigured) {
+    return (
+      <div className="sync-bar" data-testid="sync-bar">
+        <div className="sync-bar__counts">
+          <span className="sync-bar__synced">Local vault</span>
+        </div>
+        <div className="sync-bar__actions">
+          <button type="button" className="sync-bar__sync" disabled title="No sync hub configured on this instance" aria-label="Sync">
+            <RotateCw size={13} strokeWidth={1.75} aria-hidden="true" /> Sync
+          </button>
+          <button type="button" className="sync-bar__refresh" onClick={() => refreshHub({ interactive: true })} title="Check hub" aria-label="Check hub">⟳</button>
+        </div>
+        <div className="sync-bar__last">no sync hub configured</div>
+      </div>
+    );
+  }
 
   // Count the pills actually shown. "In sync" must only appear when the hub is
   // reachable AND nothing is outstanding — otherwise it contradicts the
