@@ -47,6 +47,20 @@ test("refreshHub on hub_unreachable sets hubReachable false and keeps last clash
   expect([...useSyncStatus.getState().clashes]).toEqual(["x.md"]); // preserved
 });
 
+test("refreshHub on hub_not_configured marks the hub as not configured rather than offline", async () => {
+  useSyncStatus.setState({ hubConfigured: true, hubReachable: true });
+  globalThis.fetch = (async () => new Response(JSON.stringify({ ok: false, error: "hub_not_configured" }), { status: 200 })) as unknown as typeof fetch;
+  await useSyncStatus.getState().refreshHub();
+  expect(useSyncStatus.getState().hubConfigured).toBe(false);
+  expect(useSyncStatus.getState().hubReachable).toBe(false);
+
+  // A later successful check (hub URL added, server restarted) flips it back.
+  globalThis.fetch = (async () => new Response(JSON.stringify({ ok: true, counts: { push: 0, pull: 0, clash: 0 }, notPushed: [], clashes: [], toPull: [], removedOnHub: [], checkedAt: 1 }), { status: 200 })) as unknown as typeof fetch;
+  await useSyncStatus.getState().refreshHub();
+  expect(useSyncStatus.getState().hubConfigured).toBe(true);
+  expect(useSyncStatus.getState().hubReachable).toBe(true);
+});
+
 import { useSyncStatus as store2 } from "../../src/client/stores/syncStatus";
 
 test("refreshLocal is callable and updates the store (used by Editor post-save + App load)", async () => {
