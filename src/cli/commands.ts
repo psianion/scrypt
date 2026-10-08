@@ -5,7 +5,10 @@
 
 import { parseArgs } from "node:util";
 import { resolve, join } from "node:path";
+import { homedir } from "node:os";
+import { spawn as spawnDetached } from "node:child_process";
 import type { Ctx } from "./ctx";
+import { runService, usageService } from "./service";
 import { parseEnv, getEnv, mergeEnv } from "./env-file";
 import { generateToken, redactToken } from "./token";
 import { detectRuntimes, type Profile, type RuntimeFacts } from "./runtime-detect";
@@ -13,7 +16,7 @@ import { planInit, type InitAnswers } from "./init-plan";
 import { buildOverrideYaml } from "./compose";
 import { waitForHealth, classifyHealth } from "./health";
 import { gatherFacts, evaluateDoctor, formatReport, doctorExitCode } from "./doctor";
-import { runMcpInstall, MCP_PROBE_BODY } from "./mcp-install";
+import { runMcpInstall, renderMcpConfig, mcpUrlFromPort, MCP_PROBE_BODY, type McpTransport } from "./mcp-install";
 import {
   buildStartCommand,
   buildDockerDown,
@@ -123,14 +126,21 @@ export async function runInit(ctx: Ctx, argv: string[]): Promise<number> {
     answers.ingestDir = resolve(ingest || join(vault, "ingest"));
     ctx.fs.mkdirp(answers.ingestDir);
   }
-  if (profile === "vps") {
+  if (profile === "vps" || profile === "native") {
     let hub = values.hub as string | undefined;
-    if (!hub && interactive) hub = await ctx.prompt.ask("Hub URL (e.g. http://100.x.y.z:3777)");
-    if (!hub) {
+    if (!hub && interactive) {
+      hub = await ctx.prompt.ask(
+        profile === "vps"
+          ? "Hub URL (e.g. http://100.x.y.z:3777)"
+          : "Sync hub URL — leave blank if this machine is the hub, or you don't sync",
+        "",
+      );
+    }
+    if (profile === "vps" && !hub) {
       ctx.log.error("vps profile requires --hub <url> (the remote hub's tailnet URL).");
       return 2;
     }
-    answers.hubUrl = hub.replace(/\/$/, "");
+    if (hub) answers.hubUrl = hub.replace(/\/$/, "");
   }
 
   // 5. plan
@@ -149,6 +159,7 @@ export async function runInit(ctx: Ctx, argv: string[]): Promise<number> {
     noStart: Boolean(values["no-start"]),
     port,
     arch: ctx.arch,
+    uiBuilt: ctx.fs.exists(join(ctx.cwd, "dist", "index.html")),
   });
 
   // dry-run
@@ -183,6 +194,10 @@ export async function runInit(ctx: Ctx, argv: string[]): Promise<number> {
       const overridePath = join(ctx.cwd, COMPOSE_OVERRIDE);
       ctx.fs.write(overridePath, buildOverrideYaml({ ingestDir: step.ingestDir, arch: step.arch }));
       ctx.log.info(`wrote ${overridePath}`);
+    } else if (step.kind === "build-ui") {
+      ctx.log.info("building the web UI (bun run build) — first time only");
+      const r = await ctx.shell.run("bun", ["run", "build"], { cwd: ctx.cwd });
+      if (r.code !== 0) { ctx.log.error(`UI build failed: ${r.stderr.trim() || r.stdout.trim()}`); return 1; }
     } else if (step.kind === "start-runtime") {
       const code = await startRuntime(ctx, step.profile, vault);
       if (code !== 0) return code;
@@ -220,7 +235,7 @@ export async function runInit(ctx: Ctx, argv: string[]): Promise<number> {
   ctx.log.info(`  profile: ${profile}`);
   ctx.log.info(`  vault:   ${vault}`);
   if (profile !== "vps") ctx.log.info(`  url:     http://localhost:${port}`);
-  if (profile === "vps") ctx.log.info(`  hub:     ${answers.hubUrl}`);
+  if (answers.hubUrl) ctx.log.info(`  hub:     ${answers.hubUrl}`);
   ctx.log.info(`  token:   ${redactToken(plan.token)}`);
   ctx.log.info(profile === "vps" ? "  next:    scrypt sync status" : "  next:    open the URL above, or run `scrypt doctor`");
   return 0;
@@ -235,18 +250,25 @@ async function startRuntime(ctx: Ctx, profile: Profile, vault: string): Promise<
     return 0;
   }
   // native: spawn detached so the CLI returns; record pid for `scrypt down`.
+  // node:child_process with `detached` puts the server in its own process
+  // group (and, on Windows, its own console), so it outlives the shell that
+  // ran the CLI — Bun.spawn + unref did not on Windows.
   ctx.log.info("starting: bun src/server/index.ts (detached)");
-  const proc = Bun.spawn(["bun", "src/server/index.ts"], {
+  const child = spawnDetached(process.execPath, ["run", "src/server/index.ts"], {
     cwd: ctx.cwd,
-    stdout: "ignore",
-    stderr: "ignore",
-    stdin: "ignore",
+    detached: true,
+    stdio: "ignore",
+    windowsHide: true,
   });
-  proc.unref();
+  child.unref();
   const pidPath = pidFilePath(vault);
   ctx.fs.mkdirp(join(vault, ".scrypt", "cli"));
-  ctx.fs.write(pidPath, String(proc.pid));
+  ctx.fs.write(pidPath, String(child.pid ?? ""));
   return 0;
+}
+
+function serviceSpec(ctx: Ctx) {
+  return { repoDir: ctx.cwd, bunPath: process.execPath, home: ctx.env.HOME ?? ctx.env.USERPROFILE ?? homedir() };
 }
 
 async function probeHub(ctx: Ctx, url: string, token: string): Promise<void> {
@@ -351,16 +373,36 @@ export async function runDoctor(ctx: Ctx, argv: string[]): Promise<number> {
 export async function runMcp(ctx: Ctx, argv: string[]): Promise<number> {
   const sub = argv[0];
   const rest = argv.slice(1);
-  const { values } = parseArgs({ args: rest, strict: false, options: { name: { type: "string" }, url: { type: "string" }, scope: { type: "string" } } });
+  const { values } = parseArgs({ args: rest, strict: false, options: { name: { type: "string" }, url: { type: "string" }, scope: { type: "string" }, transport: { type: "string" } } });
+  const transport = ((values.transport as string | undefined) ?? "http") as McpTransport;
+  if (transport !== "http" && transport !== "stdio") { ctx.log.error("--transport must be http or stdio"); return 2; }
   if (sub === "install") {
     const r = await runMcpInstall(ctx, {
       envPath: envPathOf(ctx),
       name: values.name as string | undefined,
       url: values.url as string | undefined,
       scope: values.scope as string | undefined,
+      transport,
+      repoDir: ctx.cwd,
+      vaultPath: configuredVault(ctx),
     });
     ctx.log.info((r.ok ? "✓ " : "✗ ") + r.message);
     return r.code;
+  }
+  if (sub === "config") {
+    // For clients other than Claude Code: print the snippet, don't register.
+    const env = parseEnv(ctx.fs.read(envPathOf(ctx)) ?? "");
+    const token = getEnv(env, "SCRYPT_AUTH_TOKEN")?.trim() || undefined;
+    const cfg = renderMcpConfig({
+      transport,
+      name: (values.name as string) ?? "scrypt",
+      url: (values.url as string) ?? mcpUrlFromPort(configuredPort(ctx)),
+      token,
+      repoDir: ctx.cwd,
+      vaultPath: configuredVault(ctx),
+    });
+    ctx.log.info(JSON.stringify(cfg, null, 2));
+    return 0;
   }
   if (sub === "uninstall") {
     if (!ctx.shell.which("claude")) { ctx.log.error("claude CLI not on PATH."); return 1; }
@@ -370,7 +412,7 @@ export async function runMcp(ctx: Ctx, argv: string[]): Promise<number> {
     ctx.log.info(`removed MCP entry '${name}' (if it existed).`);
     return 0;
   }
-  ctx.log.error("usage: scrypt mcp <install|uninstall> [--name n] [--url u] [--scope user|project|local]");
+  ctx.log.error("usage: scrypt mcp <install|uninstall|config> [--transport http|stdio] [--name n] [--url u] [--scope user|project|local]");
   return 2;
 }
 
@@ -435,7 +477,8 @@ export const commands: Record<string, Command> = {
   up: { summary: "Start the configured runtime and wait for health", run: runUp },
   down: { summary: "Stop the runtime ([--volumes] also drops embed cache)", run: runDown },
   doctor: { summary: "Health + security audit ([--hub url] [--json])", run: runDoctor },
-  mcp: { summary: "Register/unregister the Scrypt MCP server in Claude", run: runMcp },
+  mcp: { summary: "Register the MCP server in Claude Code, or print config for other clients", run: runMcp },
+  service: { summary: "Keep the server running across reboots (install | uninstall | status)", run: (ctx, argv) => argv.length ? runService(ctx, argv, serviceSpec(ctx)) : (ctx.log.error(usageService()), Promise.resolve(2)) },
   token: { summary: "token rotate — generate a new auth token", run: runToken },
   sync: { summary: "Push/pull against the hub (forwards to scrypt-sync)", run: runSync },
   reindex: { summary: "Rebuild embeddings (forwards to scrypt-reindex)", run: runReindex },

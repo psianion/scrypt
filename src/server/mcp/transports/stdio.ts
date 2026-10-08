@@ -13,6 +13,7 @@ import type { ToolRegistry } from "../registry";
 import type { ToolContext } from "../types";
 import { McpError } from "../errors";
 import { readSchemaDoc } from "../../schema-doc";
+import { SERVER_VERSION } from "./http";
 
 export async function runStdio(
   registry: ToolRegistry,
@@ -21,7 +22,7 @@ export async function runStdio(
   // Same vault conventions doc the HTTP transport serves on initialize.
   const instructions = readSchemaDoc(ctx.vaultDir) ?? undefined;
   const server = new Server(
-    { name: "scrypt", version: "0.8.0" },
+    { name: "scrypt", version: SERVER_VERSION },
     { capabilities: { tools: {} }, instructions },
   );
 
