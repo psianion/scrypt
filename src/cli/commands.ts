@@ -77,6 +77,7 @@ export async function runInit(ctx: Ctx, argv: string[]): Promise<number> {
       token: { type: "string" },
       yes: { type: "boolean" },
       "no-start": { type: "boolean" },
+      "no-mcp": { type: "boolean" },
       "print-env": { type: "boolean" },
       "rotate-token": { type: "boolean" },
       ingest: { type: "string" },
@@ -222,7 +223,7 @@ export async function runInit(ctx: Ctx, argv: string[]): Promise<number> {
   ctx.log.info(formatReport(findings));
 
   // 8. offer MCP install
-  if (facts.claude && profile !== "vps") {
+  if (facts.claude && profile !== "vps" && !values["no-mcp"]) {
     const doInstall = values.yes ? true : interactive ? await ctx.prompt.confirm("Register the Scrypt MCP server in Claude Code now?", true) : false;
     if (doInstall) {
       const r = await runMcpInstall(ctx, { envPath });

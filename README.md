@@ -50,7 +50,15 @@ bun run scrypt service install   # optional: systemd --user / launchd / Schedule
 
 ### Install options
 
-Set any of these before running the installer. Each is one decision:
+The installer asks one question per setting, with the default in brackets, then shows the plan and asks before touching anything:
+
+1. Install directory
+2. Notes folder (the vault)
+3. Sync: standalone or hub, or join an existing hub (then its URL and token)
+4. Keep the server running after reboot
+5. Register the MCP server in Claude Code (asked only when the `claude` CLI is present)
+
+Every answer can be pre-seeded with an env var, which is also the default shown; `SCRYPT_YES=1` skips the questions, and `SCRYPT_DRY_RUN=1` prints the plan and stops:
 
 | Var | Default | What it decides |
 |---|---|---|
@@ -59,6 +67,7 @@ Set any of these before running the installer. Each is one decision:
 | `SCRYPT_HUB_URL` | — | Join a sync hub at this URL; leave unset if this machine is the hub or standalone |
 | `SCRYPT_AUTH_TOKEN` | generated | When joining a hub, the hub's token; otherwise a strong one is made for you |
 | `SCRYPT_NO_SERVICE` | `0` | `1` skips the always-on service (then start with `scrypt up`) |
+| `SCRYPT_NO_MCP` | `0` | `1` skips the MCP registration (`scrypt mcp install` later) |
 
 Profiles the wizard offers: **native** (Bun on this machine, the default and what the installer uses), **docker** (Compose, port published on loopback only), **vps** (sync client only, no server — a native client with a hub URL is usually what you want instead).
 
